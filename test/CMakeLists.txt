@@ -18,17 +18,20 @@ if(NOT CMAKE_CROSSCOMPILING)
     )
 
   # aggregate mruby's *.rb test files as a single C file
-  add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/mrbtest.c"
-    DEPENDS xpcat init_mrbtest.c "${CMAKE_CURRENT_BINARY_DIR}/mrbtest.ctmp"
-    COMMAND xpcat -o "${CMAKE_CURRENT_BINARY_DIR}/mrbtest.c"
-                     "${CMAKE_CURRENT_SOURCE_DIR}/init_mrbtest.c"
-                     "${CMAKE_CURRENT_BINARY_DIR}/mrbtest.ctmp"
-    )
+  #add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/mrbtest.c"
+  #     DEPENDS xpcat init_mrbtest.c "${CMAKE_CURRENT_BINARY_DIR}/mrbtest.ctmp"
+  #    COMMAND xpcat -o "${CMAKE_CURRENT_BINARY_DIR}/mrbtest.c"
+  #                 "${CMAKE_CURRENT_SOURCE_DIR}/init_mrbtest.c"
+  #                 "${CMAKE_CURRENT_BINARY_DIR}/mrbtest.ctmp"
+  #)
+  SET(compiled_libs ${CMAKE_CURRENT_BINARY_DIR}/mrblib_all.c)
+  SET(compiled_gems ${CMAKE_CURRENT_BINARY_DIR}/mrb_gems_all.c)
+  configure_file(init_mrbtest.c.cmake ${CMAKE_CURRENT_BINARY_DIR}/init_mrbtest.cpp)
 
   add_executable(mrbtest
     EXCLUDE_FROM_ALL
     "${CMAKE_CURRENT_SOURCE_DIR}/driver.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/mrbtest.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/init_mrbtest.cpp"
     )
   target_link_libraries(mrbtest libmruby_static ${MRUBY_LIBS})
 
