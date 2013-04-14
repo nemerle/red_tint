@@ -37,7 +37,7 @@ if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "Build type not set, defaulting to 'RelWithDebInfo'")
 endif()
 
-project(mruby)
+project(red_tint)
 
 # TODO stop polluting source tree with CMakeFiles/ and CMakeCache.txt
 #      on build location check failure

@@ -214,7 +214,7 @@ static void
 cipop(mrb_state *mrb)
 {
     if (mrb->ci->env) {
-        struct REnv *e = mrb->ci->env;
+        REnv *e = mrb->ci->env;
         size_t len = (size_t)e->flags;
         mrb_value *p = (mrb_value *)mrb->gc()._malloc(sizeof(mrb_value)*len);
 
@@ -226,13 +226,12 @@ cipop(mrb_state *mrb)
     mrb->ci--;
 }
 
-static void
-ecall(mrb_state *mrb, int i)
+static void ecall(mrb_state *mrb, int i)
 {
-    struct RProc *p;
+    RProc *p;
     mrb_callinfo *ci;
     mrb_value *self = mrb->stack;
-    struct RObject *exc;
+    RObject *exc;
 
     p = mrb->ensure[i];
     ci = cipush(mrb);
@@ -256,7 +255,7 @@ ecall(mrb_state *mrb, int i)
 mrb_value
 mrb_funcall(mrb_state *mrb, mrb_value self, const char *name, int argc, ...)
 {
-    mrb_sym mid = mrb_intern(mrb, name);
+    mrb_sym mid = mrb_intern_cstr(mrb, name);
 
     if (argc == 0) {
         return mrb_funcall_argv(mrb, self, mid, 0, 0);

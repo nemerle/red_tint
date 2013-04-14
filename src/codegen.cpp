@@ -1051,10 +1051,10 @@ void codegen_scope::gen_assignment(mrb_ast_node *node, int sp, int val)
 {
     struct AssignGenerator : public NodeVisitor_Null {
         AssignGenerator(int v,int sp,codegen_scope *sc) : inner_val(v),inner_sp(sp),s(sc) {}
-        void visit(IVarNode * n) {  common_assign(OP_SETIV,n->sym()); }
-        void visit(CVarNode * n) {  common_assign(OP_SETCV,n->sym()); }
-        void visit(GVarNode * n) {  common_assign(OP_SETGLOBAL,n->sym()); }
-        void visit(ConstNode * n) { common_assign(OP_SETCONST,n->sym()); }
+        void visit(IVarNode * n)    { common_assign(OP_SETIV,n->sym()); }
+        void visit(CVarNode * n)    { common_assign(OP_SETCV,n->sym()); }
+        void visit(GVarNode * n)    { common_assign(OP_SETGLOBAL,n->sym()); }
+        void visit(ConstNode * n)   { common_assign(OP_SETCONST,n->sym()); }
         void visit(LVarNode * n) {
             s->gen_lvar_assignment(inner_sp, n, inner_val);
         }
@@ -2973,8 +2973,7 @@ codedump(mrb_state *mrb, int n)
 #endif
 }
 
-void
-codedump_all(mrb_state *mrb, int start)
+void codedump_all(mrb_state *mrb, int start)
 {
     size_t i;
 
@@ -2983,8 +2982,7 @@ codedump_all(mrb_state *mrb, int start)
     }
 }
 
-static int
-codegen_start(mrb_state *mrb, parser_state *p)
+static int codegen_start(mrb_state *mrb, parser_state *p)
 {
     codegen_scope *scope = codegen_scope::create(mrb, 0, 0);
 
@@ -3004,8 +3002,7 @@ codegen_start(mrb_state *mrb, parser_state *p)
     return 0;
 }
 
-int
-mrb_generate_code(mrb_state *mrb, parser_state *p)
+int mrb_generate_code(mrb_state *mrb, parser_state *p)
 {
     int start = mrb->irep_len;
     int n;

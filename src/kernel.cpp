@@ -674,8 +674,7 @@ mrb_obj_ivar_set(mrb_state *mrb, mrb_value self)
  *     b.kind_of? C       #=> false
  *     b.kind_of? M       #=> true
  */
-mrb_value
-mrb_obj_is_kind_of_m(mrb_state *mrb, mrb_value self)
+mrb_value mrb_obj_is_kind_of_m(mrb_state *mrb, mrb_value self)
 {
     mrb_value arg;
     mrb_bool kind_of_p;
@@ -686,8 +685,7 @@ mrb_obj_is_kind_of_m(mrb_state *mrb, mrb_value self)
     return mrb_bool_value(kind_of_p);
 }
 
-static void
-method_entry_loop(mrb_state *mrb, struct RClass* klass, mrb_value ary)
+static void method_entry_loop(mrb_state *mrb, struct RClass* klass, mrb_value ary)
 {
     khash_t(mt) *h = klass->mt;
     if (!h) return;
@@ -728,8 +726,7 @@ class_instance_method_list(mrb_state *mrb, int argc, mrb_value *argv, RClass* kl
     return ary;
 }
 
-mrb_value
-mrb_obj_singleton_methods(mrb_state *mrb, int argc, mrb_value *argv, mrb_value obj)
+mrb_value mrb_obj_singleton_methods(mrb_state *mrb, int argc, mrb_value *argv, mrb_value obj)
 {
     mrb_value recur, ary;
     RClass* klass;
@@ -756,22 +753,17 @@ mrb_obj_singleton_methods(mrb_state *mrb, int argc, mrb_value *argv, mrb_value o
     return ary;
 }
 
-mrb_value
-mrb_obj_methods(mrb_state *mrb, int argc, mrb_value *argv, mrb_value obj, mrb_method_flag_t flag)
+mrb_value mrb_obj_methods(mrb_state *mrb, int argc, mrb_value *argv, mrb_value obj, mrb_method_flag_t flag)
 {
-retry:
-    if (argc == 0) {
-        return class_instance_method_list(mrb, argc, argv, RClass::mrb_class(mrb, obj), 0);
-    }
-    else {
+    while(true) {
+        if (argc == 0)
+            return class_instance_method_list(mrb, argc, argv, RClass::mrb_class(mrb, obj), 0);
         mrb_value recur;
 
         recur = argv[0];
-        if (mrb_test(recur)) {
-            argc = 0;
-            goto retry;
-        }
-        return mrb_obj_singleton_methods(mrb, argc, argv, obj);
+        if (!mrb_test(recur))
+            return mrb_obj_singleton_methods(mrb, argc, argv, obj);
+        argc = 0;
     }
 }
 /* 15.3.1.3.31 */
