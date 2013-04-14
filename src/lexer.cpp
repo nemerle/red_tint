@@ -261,7 +261,7 @@ int mrb_parser_state::nextc()
                 c = (unsigned char)*this->s++;
             }
     }
-    this->m_column++;
+    m_column++;
     return c;
 }
 void mrb_parser_state::skip(char term)
@@ -414,8 +414,8 @@ int mrb_parser_state::parse_string()
             m_lexer.tokadd('\n');
             if(false==m_lexer.tokfix())
                 yyerror("string too long (truncated)");
-            this->m_lineno++;
-            this->m_column = 0;
+            m_lineno++;
+            m_column = 0;
             line_head = hinf->line_head;
             hinf->line_head = TRUE;
             if (line_head) {
@@ -460,8 +460,8 @@ int mrb_parser_state::parse_string()
                     m_lexer.tokadd(c);
                 }
                 else if ((c == '\n') && (type & STR_FUNC_ARRAY)) {
-                    this->m_lineno++;
-                    this->m_column = 0;
+                    m_lineno++;
+                    m_column = 0;
                     m_lexer.tokadd('\n');
                 }
                 else {
@@ -478,8 +478,8 @@ int mrb_parser_state::parse_string()
                 if (c != beg && c != end) {
                     switch (c) {
                         case '\n':
-                            this->m_lineno++;
-                            this->m_column = 0;
+                            m_lineno++;
+                            m_column = 0;
                             break;
 
                         case '\\':
@@ -500,7 +500,7 @@ int mrb_parser_state::parse_string()
                 if(false==m_lexer.tokfix())
                     yyerror("string too long (truncated)");
                 m_lstate = EXPR_BEG;
-                this->m_cmd_start = true;
+                m_cmd_start = true;
                 yylval.sn = new_str(m_lexer.tok(), m_lexer.toklen());
                 if (hinf)
                     hinf->line_head = FALSE;
@@ -514,8 +514,8 @@ int mrb_parser_state::parse_string()
             if (m_lexer.toklen() == 0) {
                 do {
                     if (c == '\n') {
-                        this->m_lineno++;
-                        this->m_column = 0;
+                        m_lineno++;
+                        m_column = 0;
                     }
                 } while (ISSPACE(c = nextc()));
                 pushback(c);
@@ -626,8 +626,8 @@ retry:
                 case EXPR_DOT:
                 case EXPR_CLASS:
                 case EXPR_VALUE:
-                    this->m_lineno++;
-                    this->m_column = 0;
+                    m_lineno++;
+                    m_column = 0;
                     goto retry;
                 default:
                     break;
@@ -1415,8 +1415,8 @@ trailing_uc:
         case '\\':
             c = this->nextc();
             if (c == '\n') {
-                this->m_lineno++;
-                this->m_column = 0;
+                m_lineno++;
+                m_column = 0;
                 space_seen = 1;
                 goto retry; /* skip \\n */
             }
@@ -1739,7 +1739,7 @@ gvar:
                             return kw->id[0];
                         }
                         if (m_lstate == EXPR_BEG) {
-                            this->m_cmd_start = true;
+                            m_cmd_start = true;
                         }
                         if (kw->id[0] == keyword_do) {
                             if (this->lpar_beg && this->lpar_beg == m_lexer.paren_nest) {

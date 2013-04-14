@@ -2,7 +2,7 @@
 
 if(NOT CMAKE_CROSSCOMPILING)
 
-  file(GLOB MRBTEST_SRC_RB "assert.rb" "t/*.rb")
+  file(GLOB MRBTEST_SRC_RB "assert.rb" "t/*.rb" "report.rb")
 
   # generate a single rb file from all existing test *.rb
   add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/mrbtest.rbtmp"
@@ -27,8 +27,8 @@ if(NOT CMAKE_CROSSCOMPILING)
 
   add_executable(mrbtest
     EXCLUDE_FROM_ALL
-    "${CMAKE_CURRENT_SOURCE_DIR}/driver.c"
-    "${CMAKE_CURRENT_BINARY_DIR}/mrbtest.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/driver.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/mrbtest.cpp"
     )
   target_link_libraries(mrbtest libmruby_static ${MRUBY_LIBS})
 

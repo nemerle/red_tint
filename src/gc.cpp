@@ -152,7 +152,7 @@ void* MemManager::_realloc(void *p, size_t len)
 
     p2 = m_allocf(m_mrb, p, len, this->ud);
 
-    if (!p2 && len > 0 && this->m_heaps) {
+    if (!p2 && len > 0 && m_heaps) {
         mrb_garbage_collect();
         p2 = m_allocf(m_mrb, p, len, this->ud);
     }
@@ -342,7 +342,7 @@ RBasic* MemManager::mrb_obj_alloc(enum mrb_vtype ttype, RClass *cls)
         unlink_free_heap_page(m_free_heaps);
     }
 
-    this->m_live++;
+    m_live++;
     gc_protect(p);
     *(RVALUE *)p = RVALUE_zero;
     p->tt = ttype;
@@ -534,7 +534,7 @@ void MemManager::root_scan_phase()
     mrb_gc_mark_gv(m_mrb);
     /* mark arena */
     for (i=0,e=this->arena_idx; i<e; i++) {
-        mark(this->m_arena[i]);
+        mark(m_arena[i]);
     }
 
     mark(m_mrb->object_class); /* mark class hierarchy */
@@ -668,7 +668,7 @@ void MemManager::final_marking_phase()
 void MemManager::prepare_incremental_sweep()
 {
     m_gc_state = GC_STATE_SWEEP;
-    this->sweeps = this->m_heaps;
+    this->sweeps = m_heaps;
     m_gc_live_after_mark = m_live;
 }
 
@@ -783,7 +783,7 @@ void MemManager::clear_all_old()
     this->is_generational_gc_mode = FALSE;
     prepare_incremental_sweep();
     advance_phase(GC_STATE_NONE);
-    this->variable_gray_list = this->m_gray_list = NULL;
+    this->variable_gray_list = m_gray_list = NULL;
     this->is_generational_gc_mode = origin_mode;
 }
 
@@ -818,7 +818,7 @@ void MemManager::mrb_incremental_gc()
         }
         if (is_major_gc(this)) {
             m_majorgc_old_threshold = m_gc_live_after_mark/100 * DEFAULT_MAJOR_GC_INC_RATIO;
-            this->m_gc_full = FALSE;
+            m_gc_full = FALSE;
         }
         else if (is_minor_gc(this)) {
             if (m_live > m_majorgc_old_threshold) {
@@ -890,9 +890,9 @@ void MemManager::mrb_field_write_barrier(RBasic *obj, RBasic *value)
     if (!value->is_white()) return;
 
     gc_assert(!is_dead(this, value) && !is_dead(this, obj));
-    gc_assert(is_generational(this) || this->m_gc_state != GC_STATE_NONE);
+    gc_assert(is_generational(this) || m_gc_state != GC_STATE_NONE);
 
-    if (is_generational(this) || this->m_gc_state == GC_STATE_MARK) {
+    if (is_generational(this) || m_gc_state == GC_STATE_MARK) {
         add_gray_list(value);
     }
     else {
@@ -915,7 +915,7 @@ void MemManager::mrb_write_barrier(RBasic *obj)
     if (!obj->is_black()) return;
 
     gc_assert(!is_dead(this, obj));
-    gc_assert(is_generational(this) || this->m_gc_state != GC_STATE_NONE);
+    gc_assert(is_generational(this) || m_gc_state != GC_STATE_NONE);
     obj->paint_gray();
     obj->gcnext = this->variable_gray_list;
     this->variable_gray_list = obj;

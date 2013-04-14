@@ -348,7 +348,7 @@ void mrb_parser_state::parser_init_cxt(mrbc_context *cxt)
     if (!cxt)
         return;
     if (cxt->lineno)
-        this->m_lineno = cxt->lineno;
+        m_lineno = cxt->lineno;
     if (cxt->filename)
         m_filename = cxt->filename;
     if (cxt->syms) { // add cxt symbols to locals

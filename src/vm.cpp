@@ -760,8 +760,8 @@ mrb_value mrb_state::mrb_run(RProc *proc, mrb_value self)
 
         CASE(OP_RESCUE) {
             /* A      R(A) := exc; clear(exc) */
-            SET_OBJ_VALUE(regs[GETARG_A(i)], this->m_exc);
-            this->m_exc = 0;
+            SET_OBJ_VALUE(regs[GETARG_A(i)], m_exc);
+            m_exc = 0;
             NEXT;
         }
 
@@ -776,7 +776,7 @@ mrb_value mrb_state::mrb_run(RProc *proc, mrb_value self)
 
         CASE(OP_RAISE) {
             /* A      raise(R(A)) */
-            this->m_exc = mrb_obj_ptr(regs[GETARG_A(i)]);
+            m_exc = mrb_obj_ptr(regs[GETARG_A(i)]);
             goto L_RAISE;
         }
 
@@ -889,7 +889,7 @@ L_SEND:
                 result = m->body.func(this, recv);
                 this->stack[0] = result;
                 gc().arena_restore(ai);
-                if (this->m_exc) goto L_RAISE;
+                if (m_exc) goto L_RAISE;
                 /* pop stackpos */
                 regs = this->stack = this->stbase + this->ci->stackidx;
                 cipop(this);
@@ -942,7 +942,7 @@ L_SEND:
             if (MRB_PROC_CFUNC_P(m)) {
                 recv = m->body.func(this, recv);
                 gc().arena_restore(ai);
-                if (this->m_exc) goto L_RAISE;
+                if (m_exc) goto L_RAISE;
                 /* pop stackpos */
                 ci = this->ci;
                 regs = this->stack = this->stbase + ci->stackidx;
@@ -1024,7 +1024,7 @@ L_SEND:
             if (MRB_PROC_CFUNC_P(m)) {
                 this->stack[0] = m->body.func(this, recv);
                 gc().arena_restore(ai);
-                if (this->m_exc) goto L_RAISE;
+                if (m_exc) goto L_RAISE;
                 /* pop stackpos */
                 regs = this->stack = this->stbase + this->ci->stackidx;
                 cipop(this);
@@ -1069,7 +1069,7 @@ L_SEND:
                     mrb_value exc;
                     static const char m[] = "super called outside of method";
                     exc = mrb_exc_new(this, I_NOMETHOD_ERROR, m, sizeof(m) - 1);
-                    this->m_exc = mrb_obj_ptr(exc);
+                    m_exc = mrb_obj_ptr(exc);
                     goto L_RAISE;
                 }
                 stack = e->stack + 1;
@@ -1192,14 +1192,14 @@ L_SEND:
             /* fall through */
         CASE(OP_RETURN) {
             /* A      return R(A) */
-            if (this->m_exc) {
+            if (m_exc) {
                 mrb_callinfo *ci;
                 int eidx;
 
 L_RAISE:
                 ci = this->ci;
-                mrb_obj_iv_ifnone(this, this->m_exc, mrb_intern2(this, "lastpc", 6), mrb_voidp_value(pc));
-                mrb_obj_iv_ifnone(this, this->m_exc, mrb_intern2(this, "ciidx", 5), mrb_fixnum_value(ci - this->cibase));
+                mrb_obj_iv_ifnone(this, m_exc, mrb_intern2(this, "lastpc", 6), mrb_voidp_value(pc));
+                mrb_obj_iv_ifnone(this, m_exc, mrb_intern2(this, "ciidx", 5), mrb_fixnum_value(ci - this->cibase));
                 eidx = ci->eidx;
                 if (ci == this->cibase) {
                     if (ci->ridx == 0) goto L_STOP;
@@ -1886,7 +1886,7 @@ L_RESCUE:
             if (MRB_PROC_CFUNC_P(p)) {
                 this->stack[0] = p->body.func(this, recv);
                 gc().arena_restore(ai);
-                if (this->m_exc) goto L_RAISE;
+                if (m_exc) goto L_RAISE;
                 /* pop stackpos */
                 regs = this->stack = this->stbase + this->ci->stackidx;
                 cipop(this);
@@ -1925,7 +1925,7 @@ L_RESCUE:
             if (!this->ci->target_class) {
                 static const char msg[] = "no target class or module";
                 mrb_value exc = mrb_exc_new(this, I_TYPE_ERROR, msg, sizeof(msg) - 1);
-                this->m_exc = mrb_obj_ptr(exc);
+                m_exc = mrb_obj_ptr(exc);
                 goto L_RAISE;
             }
             regs[GETARG_A(i)] = mrb_obj_value(this->ci->target_class);
@@ -1961,8 +1961,8 @@ L_STOP:
                 }
             }
             this->jmp = prev_jmp;
-            if (this->m_exc) {
-                return mrb_obj_value(this->m_exc);
+            if (m_exc) {
+                return mrb_obj_value(m_exc);
             }
             return regs[irep->nlocals];
         }
@@ -1978,7 +1978,7 @@ L_STOP:
             else {
                 exc = mrb_exc_new3(this, I_LOCALJUMP_ERROR, msg);
             }
-            this->m_exc = mrb_obj_ptr(exc);
+            m_exc = mrb_obj_ptr(exc);
             goto L_RAISE;
         }
     }
