@@ -1,13 +1,19 @@
-# Compiled Object files
-*.slo
-*.lo
+# /
+*.bak
+*.d
 *.o
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
+*.orig
+*.rej
+*.sav
+*.swp
+*.tmp
+*~
+.DS_Store
+.ccmalloc
+.svn
+/.git
+cscope.out
+/src/y.tab.c
+/bin
+/build
+/lib
