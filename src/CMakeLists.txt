@@ -36,6 +36,7 @@ SET(MRUBY_SRC_C
     ../include/mruby/array.h
     ../include/mruby/class.h
     ../include/mruby/compile.h
+    ../include/mruby/mem_manager.h
     ../include/mruby/data.h
     ../include/mruby/dump.h
     ../include/mruby/irep.h

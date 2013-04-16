@@ -164,7 +164,7 @@ get_syms_block_size(mrb_state *mrb, mrb_irep *irep)
     for (sym_no = 0; sym_no < irep->slen; sym_no++) {
         size += sizeof(uint16_t); /* snl(n) */
         if (irep->syms[sym_no] != 0) {
-            mrb_sym2name_len(mrb, irep->syms[sym_no], &len);
+            mrb_sym2name_len(mrb, irep->syms[sym_no], len);
             size += len + 1; /* sn(n) + null char */
         }
     }
@@ -185,7 +185,7 @@ write_syms_block(mrb_state *mrb, mrb_irep *irep, uint8_t *buf)
         if (irep->syms[sym_no] != 0) {
             size_t len;
 
-            name = mrb_sym2name_len(mrb, irep->syms[sym_no], &len);
+            name = mrb_sym2name_len(mrb, irep->syms[sym_no], len);
             if (len > UINT16_MAX) {
                 return MRB_DUMP_GENERAL_FAILURE;
             }

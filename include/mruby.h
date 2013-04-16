@@ -28,10 +28,10 @@
 #ifndef MRUBY_H
 #define MRUBY_H
 #include <memory>
-#include <scoped_allocator>
 #include <cstring>
 #include "mrbconf.h"
 #include "mruby/value.h"
+#include "mruby/mem_manager.h"
 
 typedef int32_t mrb_code;
 typedef int32_t mrb_aspec;
@@ -42,11 +42,6 @@ struct mrb_state;
 struct mrb_pool;
 RClass *mrb_define_class(mrb_state *, const char*, RClass*);
 RClass *mrb_define_module(mrb_state *, const char*);
-
-typedef void* (*mrb_allocf) (mrb_state *mrb, void*, size_t, void *ud);
-#ifndef MRB_ARENA_SIZE
-#define MRB_ARENA_SIZE 100
-#endif
 
 struct mrb_callinfo {
     mrb_sym mid;
@@ -62,102 +57,6 @@ struct mrb_callinfo {
     REnv *env;
 };
 
-struct heap_page;
-struct MemManager {
-    enum gc_state {
-        GC_STATE_NONE = 0,
-        GC_STATE_MARK,
-        GC_STATE_SWEEP
-    };
-    friend struct mrb_state;
-public:
-    void mrb_garbage_collect();
-    void mrb_incremental_gc();
-    void change_gen_gc_mode(mrb_int enable);
-
-            template<typename T>
-    T *     obj_alloc(RClass *cls) {
-                return (T *)mrb_obj_alloc(T::ttype,cls);
-            }
-            template<typename T>
-    T *     obj_alloc(mrb_vtype type,RClass *cls) {
-                return (T *)mrb_obj_alloc(type,cls);
-            }
-    RBasic *mrb_obj_alloc(mrb_vtype ttype, RClass *cls);
-    void *  _calloc(size_t nelem, size_t len);
-    void *  _realloc(void *p, size_t len);
-    void *  _free(void *p);
-    void *  _malloc(size_t len);
-    void    unlink_heap_page(heap_page *page);
-    void    link_free_heap_page(heap_page *page);
-    void    mrb_heap_init();
-    void    mrb_heap_free();
-    void    gc_protect(RBasic *p);
-    void    mark_children(RBasic *obj);
-    void    mark(RBasic *obj);
-    int     arena_save();
-    void    arena_restore(int idx);
-    void    mrb_field_write_barrier(RBasic *obj, RBasic *value);
-    void    mrb_write_barrier(RBasic *obj);
-    mrb_pool *mrb_pool_open();
-    void *  mrb_alloca(size_t size);
-    void    mrb_alloca_free();
-    bool    gc_disabled(bool v) { bool res=m_gc_disabled; m_gc_disabled=v; return res;}
-    int     interval_ratio() const {return gc_interval_ratio; }
-    void    interval_ratio(int v) {gc_interval_ratio=v; }
-    int     step_ratio() const { return gc_step_ratio; }
-    void    step_ratio(int value) { gc_step_ratio = value; }
-    bool    generational_gc_mode() const { return is_generational_gc_mode;}
-protected:
-    void    root_scan_phase();
-    size_t  incremental_sweep_phase(size_t limit);
-    void    prepare_incremental_sweep();
-    size_t  incremental_marking_phase(size_t limit);
-    void    final_marking_phase();
-    size_t  gc_gray_mark(RBasic *obj);
-    void    add_gray_list(RBasic *obj) {
-    #ifdef MRB_GC_STRESS
-        if (obj->tt > MRB_TT_MAXDEFINE) {
-            abort();
-        }
-    #endif
-        obj->paint_gray();
-        obj->gcnext = m_gray_list;
-        m_gray_list = obj;
-    }
-    void obj_free(RBasic *obj);
-    void add_heap();
-    void unlink_free_heap_page(heap_page *page);
-    void link_heap_page(heap_page *page);
-    void clear_all_old();
-    size_t incremental_gc(size_t limit);
-    void advance_phase(gc_state to_state);
-
-    mrb_allocf m_allocf;
-    void *ud; /* auxiliary data */
-    mrb_state * m_mrb;
-    heap_page * m_heaps;
-    heap_page * sweeps;
-    heap_page * m_free_heaps;
-    size_t      m_live; /* count of live objects */
-    RBasic *    m_arena[MRB_ARENA_SIZE];
-    int         arena_idx;
-
-    gc_state    m_gc_state; /* state of gc */
-    int         current_white_part; /* make white object by white_part */
-    RBasic *    m_gray_list; /* list of gray objects */
-    RBasic *    variable_gray_list; /* list of objects to be traversed atomically */
-    size_t      m_gc_live_after_mark;
-    size_t      gc_threshold;
-    int         gc_interval_ratio;
-    int         gc_step_ratio;
-    mrb_bool    m_gc_disabled:1;
-    mrb_bool    m_gc_full:1;
-    mrb_bool    is_generational_gc_mode:1;
-    mrb_bool    out_of_memory:1;
-    size_t      m_majorgc_old_threshold;
-    struct alloca_header *mems;
-};
 struct mrb_state {
     void *jmp;
     MemManager m_gc;
@@ -198,7 +97,7 @@ struct mrb_state {
     RClass *kernel_module;
     MemManager &gc() {return m_gc;}
     mrb_sym symidx;
-    struct kh_n2s *name2sym;      /* symbol table */
+    struct SymTable *name2sym;      /* symbol table */
 
 #ifdef ENABLE_DEBUG
     void (*code_fetch_hook)(struct mrb_state* mrb, struct mrb_irep *irep, mrb_code *pc, mrb_value *regs);
@@ -250,7 +149,7 @@ RClass * mrb_class_obj_get(mrb_state *mrb, const char *name);
 
 mrb_value mrb_obj_dup(mrb_state *mrb, mrb_value obj);
 mrb_value mrb_check_to_integer(mrb_state *mrb, mrb_value val, const char *method);
-int mrb_obj_respond_to(struct RClass* c, mrb_sym mid);
+mrb_bool mrb_obj_respond_to(struct RClass* c, mrb_sym mid);
 RClass * mrb_define_class_under(mrb_state *mrb, RClass *outer, const char *name, struct RClass *super);
 RClass * mrb_define_module_under(mrb_state *mrb, RClass *outer, const char *name);
 
@@ -281,7 +180,7 @@ mrb_sym mrb_intern_cstr(mrb_state*,const char*);
 mrb_sym mrb_intern2(mrb_state*,const char*,size_t);
 mrb_sym mrb_intern_str(mrb_state*,mrb_value);
 const char *mrb_sym2name(mrb_state*,mrb_sym);
-const char *mrb_sym2name_len(mrb_state*,mrb_sym,size_t*);
+const char *mrb_sym2name_len(mrb_state*,mrb_sym,size_t&);
 mrb_value mrb_sym2str(mrb_state*,mrb_sym);
 mrb_value mrb_str_format(mrb_state *, int, const mrb_value *, mrb_value);
 

@@ -282,10 +282,10 @@ RClass* mrb_singleton_class_clone(mrb_state *mrb, mrb_value obj)
             mrb_obj_iv_set(mrb, clone, mrb_intern2(mrb, "__attached__", 12), obj);
         }
         if (klass->mt) {
-            clone->mt = kh_copy(mt, mrb, klass->mt);
+            clone->mt = klass->mt->copy(mrb);
         }
         else {
-            clone->mt = kh_init(mt, mrb);
+            clone->mt = RClass::kh_mt::init(mrb);
         }
         clone->tt = MRB_TT_SCLASS;
         return clone;
@@ -548,7 +548,7 @@ check_iv_name(mrb_state *mrb, mrb_sym id)
     const char *s;
     size_t len;
 
-    s = mrb_sym2name_len(mrb, id, &len);
+    s = mrb_sym2name_len(mrb, id, len);
     if (len < 2 || !(s[0] == '@' && s[1] != '@')) {
         mrb_name_error(mrb, id, "`%S' is not allowed as an instance variable name", mrb_sym2str(mrb, id));
     }
@@ -677,21 +677,21 @@ mrb_obj_ivar_set(mrb_state *mrb, mrb_value self)
 mrb_value mrb_obj_is_kind_of_m(mrb_state *mrb, mrb_value self)
 {
     mrb_value arg;
-    mrb_bool kind_of_p;
 
     mrb_get_args(mrb, "o", &arg);
-    kind_of_p = mrb_obj_is_kind_of(mrb, self, mrb_class_ptr(arg));
+    mrb_bool kind_of_p = mrb_obj_is_kind_of(mrb, self, mrb_class_ptr(arg));
 
     return mrb_bool_value(kind_of_p);
 }
 
-static void method_entry_loop(mrb_state *mrb, struct RClass* klass, mrb_value ary)
+static void method_entry_loop(mrb_state *mrb, RClass* klass, mrb_value ary)
 {
-    khash_t(mt) *h = klass->mt;
-    if (!h) return;
-    for (khint_t i=0; i<kh_end(h); i++) {
-        if (kh_exist(h, i)) {
-            RArray::push(mrb, ary, mrb_symbol_value(kh_key(h,i)));
+    RClass::kh_mt *h = klass->mt;
+    if (!h)
+        return;
+    for (khint_t i=0; i<h->end(); i++) {
+        if (h->exist(i)) {
+            RArray::push(mrb, ary, mrb_symbol_value(h->key(i)));
         }
     }
 }

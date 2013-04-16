@@ -11,6 +11,7 @@
 #include "mruby/proc.h"
 #include "mruby/string.h"
 
+#include "mruby/khash.h"
 #define mrb_class_ptr(v)    ((struct RClass*)((v).value.p))
 #define RCLASS_SUPER(v)     (((struct RClass*)((v).value.p))->super)
 #define RCLASS_IV_TBL(v)    (((struct RClass*)((v).value.p))->iv)
@@ -20,9 +21,10 @@
 
 struct RProc;
 struct RClass : public RObject {
+    typedef kh_T<mrb_sym,RProc*,IntHashFunc,IntHashEq> kh_mt;
     static const mrb_vtype ttype=MRB_TT_CLASS;
 
-    struct kh_mt *mt;
+    kh_mt *mt;
     RClass *super;
 #define FORWARD_TO_INSTANCE(name)\
     static mrb_value name(mrb_state *mrb, mrb_value self) {\
@@ -60,14 +62,15 @@ public:
     }
     void define_method_vm(mrb_state *mrb, mrb_sym name, mrb_value body)
     {
-        khash_t(mt) *h = this->mt;
+        kh_mt *h = this->mt;
         khiter_t k;
         RProc *p;
 
-        if (!h) h = this->mt = kh_init(mt, mrb);
-        k = kh_put(mt, h, name);
+        if (!h)
+            this->mt = kh_mt::init(mrb);
+        k = this->mt->put(name);
         p = mrb_proc_ptr(body);
-        kh_value(h, k) = p;
+        this->mt->value(k) = p;
         if (p) {
             mrb->gc().mrb_field_write_barrier(this, p);
         }
@@ -75,12 +78,13 @@ public:
     void define_method_id(mrb_state *mrb, mrb_sym mid, mrb_func_t func, mrb_aspec aspec);
     RClass &define_method_raw(mrb_state *mrb, mrb_sym mid, RProc *p)
     {
-        khash_t(mt) *h = this->mt;
+        kh_mt *h = this->mt;
         khiter_t k;
 
-        if (!h) h = this->mt = kh_init(mt, mrb);
-        k = kh_put(mt, h, mid);
-        kh_value(h, k) = p;
+        if (!h)
+            this->mt = kh_mt::init(mrb);
+        k = this->mt->put(mid);
+        this->mt->value(k) = p;
         if (p) {
             mrb->gc().mrb_field_write_barrier(this, p);
         }
@@ -123,6 +127,8 @@ public:
     RClass& undef_method(mrb_state *mrb, mrb_sym a);
     RClass& undef_class_method(mrb_state *mrb, const char *name);
     mrb_value const_get(mrb_state * mrb, mrb_sym sym);
+    void mark_mt(MemManager &mm);
+    size_t mark_mt_size(mrb_state *mrb) const;
 };
 
 
@@ -142,8 +148,6 @@ RClass* mrb_class_real(RClass* cl);
 
 void mrb_obj_call_init(mrb_state *mrb, mrb_value obj, int argc, mrb_value *argv);
 
-void mrb_gc_mark_mt(mrb_state*, struct RClass*);
-size_t mrb_gc_mark_mt_size(mrb_state*, struct RClass*);
 void mrb_gc_free_mt(mrb_state*, struct RClass*);
 
 #if defined(__cplusplus)

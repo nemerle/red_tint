@@ -26,7 +26,7 @@ struct RArray : public RBasic {
     union {
         mrb_int capa;
         mrb_shared_array *shared;
-    } aux;
+    } m_aux;
     mrb_value *m_ptr;
 #define FORWARD_TO_INSTANCE(name)\
     static mrb_value name(mrb_state *mrb, mrb_value self) {\
@@ -36,14 +36,14 @@ public:
     static mrb_value new_capa(mrb_state *mrb, mrb_int capa);
     static mrb_value s_create(mrb_state *mrb, mrb_value self);
     static mrb_value new_from_values(mrb_state *mrb, mrb_int size, const mrb_value *vals);
-    static void concat(mrb_state *mrb, mrb_value self, const mrb_value &other);
+static  void        concat(mrb_state *mrb, const mrb_value &self, const mrb_value &other);
     static mrb_value concat_m(mrb_state *mrb, mrb_value self);
     static mrb_value plus(mrb_state *mrb, mrb_value self);
-    static void replace(mrb_state *mrb, mrb_value self, mrb_value other);
+static  void        replace(mrb_state *mrb, const mrb_value &self, const mrb_value &other);
     static mrb_value reverse_bang(mrb_state *mrb, mrb_value self);
-    static mrb_value unshift(mrb_state *mrb, mrb_value self, mrb_value item);
+static  mrb_value   unshift(mrb_state *mrb, const mrb_value &self, const mrb_value &item);
     static mrb_value unshift_m(mrb_state *mrb, mrb_value self);
-    static mrb_value splice(mrb_state *mrb, mrb_value ary, mrb_int head, mrb_int m_len, mrb_value rpl);
+static  mrb_value   splice(mrb_state *mrb, const mrb_value &ary, mrb_int head, mrb_int m_len, mrb_value rpl);
     static mrb_value aset(mrb_state *mrb, mrb_value self);
     static mrb_value delete_at(mrb_state *mrb, mrb_value self);
     static mrb_value clear(mrb_state *mrb, mrb_value self);
@@ -86,7 +86,7 @@ public:
     mrb_value   last(mrb_state *mrb);
     mrb_value   get(mrb_state *mrb);
     mrb_value   ref(mrb_state *mrb, mrb_int n) const;
-    void        set(mrb_state *mrb, mrb_int n, mrb_value val);
+        void        set(mrb_state *mrb, mrb_int n, const mrb_value &val);
     mrb_value   times(mrb_state *mrb);
     mrb_value   reverse(mrb_state *mrb);
     mrb_value   join_m(mrb_state *mrb);
@@ -94,7 +94,7 @@ public:
     mrb_value   size(mrb_state *mrb);
     mrb_value   index_m(mrb_state *mrb);
     mrb_value   rindex_m(mrb_state *mrb);
-    mrb_value   cmp(mrb_state *mrb);
+        mrb_value   cmp(mrb_state *mrb) const;
     mrb_value   entry(mrb_int offset);
     static mrb_value mrb_ary_equal(mrb_state *mrb, mrb_value ary1);
     static mrb_value mrb_ary_eql(mrb_state *mrb, mrb_value ary1);
@@ -105,13 +105,13 @@ protected:
 //    RArray(mrb_int _capa) : len(0) {
 //        aux.capa=_capa;
 //    }
-    static RArray *ary_new_capa(mrb_state *mrb, mrb_int capa);
+static  RArray *    ary_new_capa(mrb_state *mrb, size_t capa);
     mrb_value   inspect_ary(mrb_state *mrb, RArray *list_arr);
     mrb_value   join_ary(mrb_state *mrb, mrb_value sep, RArray *list_arr);
     mrb_value   ary_subseq(mrb_state *mrb, mrb_int beg, mrb_int m_len);
     void ary_make_shared(mrb_state *mrb);
-    void ary_replace(mrb_state *mrb, mrb_value *argv, mrb_int m_len);
-    void ary_expand_capa(mrb_state *mrb, mrb_int m_len);
+        void        ary_replace(mrb_state *mrb, const mrb_value *argv, mrb_int m_len);
+        void        ary_expand_capa(mrb_state *mrb, size_t m_len);
     void ary_concat(mrb_state *mrb, const mrb_value *m_ptr, mrb_int blen);
     void ary_shrink_capa(mrb_state *mrb);
     void ary_modify(mrb_state *mrb);
@@ -127,14 +127,8 @@ protected:
 #undef FORWARD_TO_INSTANCE
 };
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
 void mrb_ary_decref(mrb_state*, mrb_shared_array*);
 mrb_value mrb_ary_new(mrb_state *mrb);
 mrb_value mrb_check_array_type(mrb_state *mrb, mrb_value self);
 mrb_value mrb_assoc_new(mrb_state *mrb, const mrb_value &car, const mrb_value &cdr);
 
-#if defined(__cplusplus)
-}  /* extern "C" { */
-#endif

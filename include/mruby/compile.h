@@ -269,18 +269,13 @@ mrb_parser_state* mrb_parse_file(mrb_state*,FILE*,mrbc_context*);
 mrb_parser_state* mrb_parse_string(mrb_state*,const char*,mrbc_context*);
 mrb_parser_state* mrb_parse_nstring(mrb_state*,const char*,int,mrbc_context*);
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
 mrbc_context* mrbc_context_new(mrb_state *mrb);
 void mrbc_context_free(mrb_state *mrb, mrbc_context *cxt);
 const char *mrbc_filename(mrb_state *mrb, mrbc_context *c, const char *s);
-struct mrb_parser_state* mrb_parser_new(mrb_state*);
-void mrb_parser_free(struct mrb_parser_state*);
-void mrb_parser_parse(struct mrb_parser_state*,mrbc_context*);
-
-int mrb_generate_code(mrb_state*, struct mrb_parser_state*);
-
+mrb_parser_state* mrb_parser_new(mrb_state*);
+void mrb_parser_free(mrb_parser_state*);
+void mrb_parser_parse(mrb_parser_state*,mrbc_context*);
+int mrb_generate_code(mrb_state*, mrb_parser_state*);
 /* program load functions */
 #ifdef ENABLE_STDIO
 mrb_value mrb_load_file(mrb_state*,FILE*);
@@ -290,7 +285,3 @@ mrb_value mrb_load_string(mrb_state *mrb, const char *s);
 mrb_value mrb_load_nstring(mrb_state *mrb, const char *s, int len);
 mrb_value mrb_load_string_cxt(mrb_state *mrb, const char *s, mrbc_context *cxt);
 mrb_value mrb_load_nstring_cxt(mrb_state *mrb, const char *s, int len, mrbc_context *cxt);
-
-#if defined(__cplusplus)
-}  /* extern "C" { */
-#endif

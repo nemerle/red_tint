@@ -190,9 +190,9 @@ void* MemManager::_calloc(size_t nelem, size_t len)
     return p;
 }
 
-void* MemManager::_free(void *p)
+void MemManager::_free(void *p)
 {
-    return (m_allocf)(m_mrb, p, 0, this->ud);
+    m_allocf(m_mrb, p, 0, this->ud);
 }
 
 #ifndef MRB_HEAP_PAGE_SIZE
@@ -368,7 +368,7 @@ void MemManager::mark_children(RBasic *obj)
         {
             RClass *c = (RClass*)obj;
 
-            mrb_gc_mark_mt(m_mrb, c);
+            c->mark_mt(m_mrb->gc());
             mark(c->super);
         }
             /* fall through */
@@ -483,7 +483,7 @@ void MemManager::obj_free(RBasic *obj)
 
         case MRB_TT_ARRAY:
             if (obj->flags & MRB_ARY_SHARED)
-                mrb_ary_decref(m_mrb, ((RArray*)obj)->aux.shared);
+                mrb_ary_decref(m_mrb, ((RArray*)obj)->m_aux.shared);
             else
                 _free(((RArray*)obj)->m_ptr);
             break;
@@ -597,7 +597,7 @@ size_t MemManager::gc_gray_mark(RBasic *obj)
             RClass *c = (RClass*)obj;
 
             children += mrb_gc_mark_iv_size(m_mrb, c);
-            children += mrb_gc_mark_mt_size(m_mrb, c);
+            children += c->mark_mt_size(m_mrb);
             children++;
         }
             break;

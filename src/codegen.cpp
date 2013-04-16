@@ -854,7 +854,7 @@ mrb_sym codegen_scope::attrsym(mrb_sym a)
     size_t len;
     char *name2;
 
-    name = mrb_sym2name_len(m_mrb, a, &len);
+    name = mrb_sym2name_len(m_mrb, a, len);
     name2 = (char *)palloc(len+1);
     memcpy(name2, name, len);
     name2[len] = '=';
@@ -950,7 +950,7 @@ void codegen_scope::gen_call(CallNode *node, mrb_sym name, int sp, int val)
     {
         size_t len;
         eOpEnum op = OP_LAST;
-        const char *name = mrb_sym2name_len(m_mrb, _sym, &len);
+        const char *name = mrb_sym2name_len(m_mrb, _sym, len);
         bool was_peep = false;
         if(!noop) {
             if (len == 1 && name[0] == '+')  {
@@ -1755,7 +1755,7 @@ void codegen_scope::visit(CallCommonNode *node) {
     {
         size_t len;
         eOpEnum op = OP_LAST;
-        const char *name = mrb_sym2name_len(m_mrb, _sym, &len);
+        const char *name = mrb_sym2name_len(m_mrb, _sym, len);
         bool was_peep = false;
         if(!noop) {
             if (len == 1 && name[0] == '+')  {
@@ -1850,7 +1850,7 @@ void codegen_scope::visit(OpAsgnNode *node) {
     bool val = m_val_stack.back();
     mrb_sym sym = node->op_sym;
     size_t len;
-    const char *name = mrb_sym2name_len(m_mrb, sym, &len);
+    const char *name = mrb_sym2name_len(m_mrb, sym, len);
     int idx;
 
     codegen( node->lhs(), true);

@@ -21,9 +21,9 @@
 #define ARY_C_MAX_SIZE (SIZE_MAX / sizeof(mrb_value))
 #define ARY_MAX_SIZE ((ARY_C_MAX_SIZE < (size_t)MRB_INT_MAX) ? (mrb_int)ARY_C_MAX_SIZE : MRB_INT_MAX)
 
-RArray* RArray::ary_new_capa(mrb_state *mrb, mrb_int capa)
+RArray* RArray::ary_new_capa(mrb_state *mrb, size_t capa)
 {
-    mrb_int blen;
+    size_t blen;
 
     if (capa > ARY_MAX_SIZE) {
         mrb_raise(mrb, E_ARGUMENT_ERROR, "array size too big");
@@ -33,23 +33,21 @@ RArray* RArray::ary_new_capa(mrb_state *mrb, mrb_int capa)
         mrb_raise(mrb, E_ARGUMENT_ERROR, "array size too big");
     }
 
-    RArray *a = (RArray*)mrb->gc().mrb_obj_alloc(MRB_TT_ARRAY, mrb->array_class);
+    RArray *a = mrb->gc().obj_alloc<RArray>(mrb->array_class);
     a->m_ptr = (mrb_value *)mrb->gc()._malloc(blen);
-    a->aux.capa = capa;
+    a->m_aux.capa = capa;
     a->m_len = 0;
 
     return a;
 }
 
-mrb_value
-RArray::new_capa(mrb_state *mrb, mrb_int capa)
+mrb_value RArray::new_capa(mrb_state *mrb, mrb_int capa)
 {
     RArray *a = RArray::ary_new_capa(mrb, capa);
     return mrb_obj_value(a);
 }
 
-mrb_value
-mrb_ary_new(mrb_state *mrb)
+mrb_value mrb_ary_new(mrb_state *mrb)
 {
     return RArray::new_capa(mrb, 0);
 }
@@ -96,11 +94,11 @@ static void ary_fill_with_nil(mrb_value *ptr, mrb_int size)
 void RArray::ary_modify(mrb_state *mrb)
 {
     if (this->flags & MRB_ARY_SHARED) {
-        mrb_shared_array *shared = this->aux.shared;
+        mrb_shared_array *shared = m_aux.shared;
 
         if (shared->refcnt == 1 && m_ptr == shared->ptr) {
             m_ptr = shared->ptr;
-            this->aux.capa = m_len;
+            m_aux.capa = m_len;
             mrb->gc()._free(shared);
         }
         else {
@@ -114,7 +112,7 @@ void RArray::ary_modify(mrb_state *mrb)
                 array_copy(_ptr, p, m_len);
             }
             m_ptr = _ptr;
-            this->aux.capa = m_len;
+            m_aux.capa = m_len;
             mrb_ary_decref(mrb, shared);
         }
         this->flags &= ~MRB_ARY_SHARED;
@@ -128,21 +126,21 @@ RArray::ary_make_shared(mrb_state *mrb)
         mrb_shared_array *shared = (mrb_shared_array *)mrb->gc()._malloc(sizeof(mrb_shared_array));
 
         shared->refcnt = 1;
-        if (this->aux.capa > m_len) {
+        if (m_aux.capa > m_len) {
             m_ptr = shared->ptr = (mrb_value *)mrb->gc()._realloc(m_ptr, sizeof(mrb_value)*m_len+1);
         }
         else {
             shared->ptr = m_ptr;
         }
         shared->len = m_len;
-        this->aux.shared = shared;
+        m_aux.shared = shared;
         this->flags |= MRB_ARY_SHARED;
     }
 }
 
-void RArray::ary_expand_capa(mrb_state *mrb, mrb_int _len)
+void RArray::ary_expand_capa(mrb_state *mrb, size_t _len)
 {
-    mrb_int capa = this->aux.capa;
+    mrb_int capa = m_aux.capa;
 
     if (_len > ARY_MAX_SIZE) {
         mrb_raise(mrb, E_ARGUMENT_ERROR, "array size too big");
@@ -157,23 +155,24 @@ void RArray::ary_expand_capa(mrb_state *mrb, mrb_int _len)
         }
     }
 
-    if (capa > ARY_MAX_SIZE) capa = ARY_MAX_SIZE; /* len <= capa <= ARY_MAX_SIZE */
+    if (capa > ARY_MAX_SIZE)
+        capa = ARY_MAX_SIZE; /* len <= capa <= ARY_MAX_SIZE */
 
-    if (capa > this->aux.capa) {
+    if (capa > m_aux.capa) {
         mrb_value *expanded_ptr = (mrb_value *)mrb->gc()._realloc(m_ptr, sizeof(mrb_value)*capa);
 
         if(!expanded_ptr) {
             mrb_raise(mrb, E_RUNTIME_ERROR, "out of memory");
         }
 
-        this->aux.capa = capa;
+        m_aux.capa = capa;
         m_ptr = expanded_ptr;
     }
 }
 
 void RArray::ary_shrink_capa(mrb_state *mrb)
 {
-    mrb_int capa = aux.capa;
+    mrb_int capa = m_aux.capa;
 
     if (capa < ARY_DEFAULT_LEN * 2)
         return;
@@ -187,8 +186,8 @@ void RArray::ary_shrink_capa(mrb_state *mrb)
         }
     } while(capa > m_len * ARY_SHRINK_RATIO);
 
-    if (capa > m_len && capa < aux.capa) {
-        aux.capa = capa;
+    if (capa > m_len && capa < m_aux.capa) {
+        m_aux.capa = capa;
         m_ptr = (mrb_value *)mrb->gc()._realloc(m_ptr, sizeof(mrb_value)*capa);
     }
 }
@@ -207,14 +206,14 @@ void RArray::ary_concat(mrb_state *mrb, const mrb_value *_ptr, mrb_int blen)
     mrb_int _len = m_len + blen;
 
     ary_modify(mrb);
-    if (aux.capa < _len)
+    if (m_aux.capa < _len)
         ary_expand_capa(mrb, _len);
     array_copy(m_ptr+m_len, _ptr, blen);
     mrb->gc().mrb_write_barrier(this);
     m_len = _len;
 }
 
-void RArray::concat(mrb_state *mrb, mrb_value self, const mrb_value &other)
+void RArray::concat(mrb_state *mrb, const mrb_value &self, const mrb_value &other)
 {
     RArray *a2 = mrb_ary_ptr(other);
 
@@ -266,7 +265,7 @@ mrb_value RArray::plus(mrb_state *mrb, mrb_value self)
  *     [ 1, 2, 3, 4, 5, 6 ] <=> [ 1, 2 ]            #=> +1
  *
  */
-mrb_value RArray::cmp(mrb_state *mrb)
+mrb_value RArray::cmp(mrb_state *mrb) const
 {
     mrb_value ary2;
     RArray *a2;
@@ -299,17 +298,17 @@ mrb_value RArray::cmp(mrb_state *mrb)
     return mrb_fixnum_value((_len == 0)? 0: (_len > 0)? 1: -1);
 }
 
-void RArray::ary_replace(mrb_state *mrb, mrb_value *argv, mrb_int len)
+void RArray::ary_replace(mrb_state *mrb, const mrb_value *argv, mrb_int len)
 {
     ary_modify(mrb);
-    if (this->aux.capa < len)
+    if (m_aux.capa < len)
         ary_expand_capa(mrb, len);
     array_copy(m_ptr, argv, len);
     mrb->gc().mrb_write_barrier(this);
     m_len = len;
 }
 
-void RArray::replace(mrb_state *mrb, mrb_value self, mrb_value other)
+void RArray::replace(mrb_state *mrb, const mrb_value &self, const mrb_value &other)
 {
     RArray *a2 = mrb_ary_ptr(other);
 
@@ -375,8 +374,9 @@ mrb_value RArray::reverse_bang(mrb_state *mrb, mrb_value self)
 mrb_value RArray::reverse(mrb_state *mrb)
 {
     mrb_value ary = RArray::new_capa(mrb, m_len);
+    if (m_len <= 0)
+        return ary;
     RArray *b = mrb_ary_ptr(ary);
-    if (m_len > 0) {
         mrb_value *p1, *p2, *e;
 
         p1 = m_ptr;
@@ -386,19 +386,18 @@ mrb_value RArray::reverse(mrb_state *mrb)
             *p2-- = *p1++;
         }
         b->m_len = m_len;
-    }
     return ary;
 }
 
-mrb_value RArray::new_from_values(mrb_state *mrb, mrb_int size, const mrb_value *vals)
+mrb_value RArray::new_from_values(mrb_state *mrb, mrb_int _size, const mrb_value *vals)
 {
     mrb_value ary;
     RArray *a;
 
-    ary = RArray::new_capa(mrb, size);
+    ary = RArray::new_capa(mrb, _size);
     a = mrb_ary_ptr(ary);
-    array_copy(a->m_ptr, vals, size);
-    a->m_len = size;
+    array_copy(a->m_ptr, vals, _size);
+    a->m_len = _size;
 
     return ary;
 }
@@ -406,7 +405,7 @@ mrb_value RArray::new_from_values(mrb_state *mrb, mrb_int size, const mrb_value 
 void RArray::push(mrb_state *mrb, mrb_value elem) /* mrb_ary_push */
 {
     ary_modify(mrb);
-    if (m_len == aux.capa)
+    if (m_len == m_aux.capa)
         ary_expand_capa(mrb, m_len + 1);
     m_ptr[m_len++] = elem;
     mrb->gc().mrb_write_barrier(this);
@@ -425,7 +424,7 @@ mrb_value RArray::push_m(mrb_state *mrb, mrb_value self)
     return self;
 }
 
-mrb_value RArray::pop(mrb_state *mrb)
+mrb_value RArray::pop(mrb_state *)
 {
     if (m_len == 0)
         return mrb_nil_value();
@@ -436,12 +435,13 @@ mrb_value RArray::pop(mrb_state *mrb)
 
 mrb_value RArray::shift(mrb_state *mrb, mrb_value self)
 {
-    struct RArray *a = mrb_ary_ptr(self);
+    RArray *a = mrb_ary_ptr(self);
     mrb_value val;
 
-    if (a->m_len == 0) return mrb_nil_value();
+    if (a->m_len == 0)
+        return mrb_nil_value();
     if (a->flags & MRB_ARY_SHARED) {
-L_SHIFT:
+//L_SHIFT:
         val = a->m_ptr[0];
         a->m_ptr++;
         a->m_len--;
@@ -449,7 +449,11 @@ L_SHIFT:
     }
     if (a->m_len > ARY_SHIFT_SHARED_MIN) {
         a->ary_make_shared(mrb);
-        goto L_SHIFT;
+        //goto L_SHIFT;
+        val = a->m_ptr[0];
+        a->m_ptr++;
+        a->m_len--;
+        return val;
     }
     else {
         mrb_value *ptr = a->m_ptr;
@@ -469,19 +473,19 @@ L_SHIFT:
    item = 0
    self.unshift item
    p self #=> [0, 1, 2, 3] */
-mrb_value RArray::unshift(mrb_state *mrb, mrb_value self, mrb_value item)
+mrb_value RArray::unshift(mrb_state *mrb, const mrb_value &self, const mrb_value &item)
 {
     RArray *a = mrb_ary_ptr(self);
 
     if ((a->flags & MRB_ARY_SHARED)
-            && a->aux.shared->refcnt == 1 /* shared only referenced from this array */
-            && a->m_ptr - a->aux.shared->ptr >= 1) /* there's room for unshifted item */ {
+            && a->m_aux.shared->refcnt == 1 /* shared only referenced from this array */
+            && a->m_ptr - a->m_aux.shared->ptr >= 1) /* there's room for unshifted item */ {
         a->m_ptr--;
         a->m_ptr[0] = item;
     }
     else {
         a->ary_modify(mrb);
-        if (a->aux.capa < a->m_len + 1)
+        if (a->m_aux.capa < a->m_len + 1)
             a->ary_expand_capa(mrb, a->m_len + 1);
         value_move(a->m_ptr + 1, a->m_ptr, a->m_len);
         a->m_ptr[0] = item;
@@ -500,14 +504,14 @@ mrb_value RArray::unshift_m(mrb_state *mrb, mrb_value self)
 
     mrb_get_args(mrb, "*", &vals, &len);
     if ((a->flags & MRB_ARY_SHARED)
-            && a->aux.shared->refcnt == 1 /* shared only referenced from this array */
-            && a->m_ptr - a->aux.shared->ptr >= len) /* there's room for unshifted item */ {
+            && a->m_aux.shared->refcnt == 1 /* shared only referenced from this array */
+            && a->m_ptr - a->m_aux.shared->ptr >= len) /* there's room for unshifted item */ {
         a->m_ptr -= len;
     }
     else {
         a->ary_modify(mrb);
         if (len == 0) return self;
-        if (a->aux.capa < a->m_len + len)
+        if (a->m_aux.capa < a->m_len + len)
             a->ary_expand_capa(mrb, a->m_len + len);
         value_move(a->m_ptr + len, a->m_ptr, a->m_len);
     }
@@ -518,7 +522,7 @@ mrb_value RArray::unshift_m(mrb_state *mrb, mrb_value self)
     return self;
 }
 
-mrb_value RArray::ref(mrb_state *mrb, mrb_int n) const
+mrb_value RArray::ref(mrb_state *, mrb_int n) const
 {
     /* range check */
     if (n < 0)
@@ -528,7 +532,7 @@ mrb_value RArray::ref(mrb_state *mrb, mrb_int n) const
     return m_ptr[n];
 }
 
-void RArray::set(mrb_state *mrb, mrb_int n, mrb_value val) /* rb_ary_store */
+void RArray::set(mrb_state *mrb, mrb_int n, const mrb_value &val) /* rb_ary_store */
 {
     ary_modify(mrb);
     /* range check */
@@ -539,7 +543,7 @@ void RArray::set(mrb_state *mrb, mrb_int n, mrb_value val) /* rb_ary_store */
         }
     }
     if (m_len <= (int)n) {
-        if (this->aux.capa <= (int)n)
+        if (m_aux.capa <= (int)n)
             this->ary_expand_capa(mrb, n + 1);
         ary_fill_with_nil(m_ptr + m_len, n + 1 - m_len);
         m_len = n + 1;
@@ -549,10 +553,10 @@ void RArray::set(mrb_state *mrb, mrb_int n, mrb_value val) /* rb_ary_store */
     mrb->gc().mrb_write_barrier(this);
 }
 
-mrb_value RArray::splice(mrb_state *mrb, mrb_value ary, mrb_int head, mrb_int len, mrb_value rpl)
+mrb_value RArray::splice(mrb_state *mrb, const mrb_value &ary, mrb_int head, mrb_int len, mrb_value rpl)
 {
     RArray *a = mrb_ary_ptr(ary);
-    mrb_int tail, size;
+    mrb_int tail, _size;
     mrb_value *argv;
     mrb_int i, argc;
 
@@ -578,11 +582,11 @@ mrb_value RArray::splice(mrb_state *mrb, mrb_value ary, mrb_int head, mrb_int le
         argc = 1;
         argv = &rpl;
     }
-    size = head + argc;
+    _size = head + argc;
 
-    if (tail < a->m_len) size += a->m_len - tail;
-    if (size > a->aux.capa)
-        a->ary_expand_capa(mrb, size);
+    if (tail < a->m_len) _size += a->m_len - tail;
+    if (_size > a->m_aux.capa)
+        a->ary_expand_capa(mrb, _size);
 
     if (head > a->m_len) {
         ary_fill_with_nil(a->m_ptr + a->m_len, (int)(head - a->m_len));
@@ -595,16 +599,11 @@ mrb_value RArray::splice(mrb_state *mrb, mrb_value ary, mrb_int head, mrb_int le
         *(a->m_ptr + head + i) = *(argv + i);
     }
 
-    a->m_len = size;
+    a->m_len = _size;
 
     return ary;
 }
 
-mrb_int
-mrb_ary_len(mrb_state *mrb, mrb_value ary)
-{
-    return RARRAY_LEN(ary);
-}
 
 void mrb_ary_decref(mrb_state *mrb, mrb_shared_array *shared)
 {
@@ -615,16 +614,15 @@ void mrb_ary_decref(mrb_state *mrb, mrb_shared_array *shared)
     }
 }
 
-mrb_value
-RArray::ary_subseq(mrb_state *mrb, mrb_int beg, mrb_int len)
+mrb_value RArray::ary_subseq(mrb_state *mrb, mrb_int beg, mrb_int len)
 {
 
     ary_make_shared(mrb);
     RArray *b = mrb->gc().obj_alloc<RArray>(mrb->array_class);
     b->m_ptr = m_ptr + beg;
     b->m_len = len;
-    b->aux.shared = this->aux.shared;
-    b->aux.shared->refcnt++;
+    b->m_aux.shared = m_aux.shared;
+    b->m_aux.shared->refcnt++;
     b->flags |= MRB_ARY_SHARED;
 
     return mrb_obj_value(b);
@@ -667,8 +665,7 @@ RArray::get(mrb_state *mrb)
     return mrb_nil_value(); /* dummy to avoid warning : not reach here */
 }
 
-mrb_value
-RArray::aset(mrb_state *mrb, mrb_value self)
+mrb_value RArray::aset(mrb_state *mrb, mrb_value self)
 {
     mrb_value *argv;
     int argc;
@@ -693,8 +690,7 @@ RArray::aset(mrb_state *mrb, mrb_value self)
     }
 }
 
-mrb_value
-RArray::delete_at(mrb_state *mrb, mrb_value self)
+mrb_value RArray::delete_at(mrb_state *mrb, mrb_value self)
 {
     RArray *a = mrb_ary_ptr(self);
     mrb_int   index;
@@ -722,8 +718,7 @@ RArray::delete_at(mrb_state *mrb, mrb_value self)
     return val;
 }
 
-mrb_value
-RArray::first(mrb_state *mrb)
+mrb_value RArray::first(mrb_state *mrb)
 {
     mrb_int size;
 
@@ -741,8 +736,7 @@ RArray::first(mrb_state *mrb)
     }
     return RArray::new_from_values(mrb, size, m_ptr);
 }
-mrb_value
-RArray::last(mrb_state *mrb)
+mrb_value RArray::last(mrb_state *mrb)
 {
     mrb_int _size;
     mrb_value *vals;
@@ -767,8 +761,7 @@ RArray::last(mrb_state *mrb)
     return RArray::new_from_values(mrb, _size, m_ptr + m_len - _size);
 }
 
-mrb_value
-RArray::index_m(mrb_state *mrb)
+mrb_value RArray::index_m(mrb_state *mrb)
 {
     mrb_value obj;
     mrb_get_args(mrb, "o", &obj);
@@ -780,8 +773,7 @@ RArray::index_m(mrb_state *mrb)
     return mrb_nil_value();
 }
 
-mrb_value
-RArray::rindex_m(mrb_state *mrb)
+mrb_value RArray::rindex_m(mrb_state *mrb)
 {
     mrb_value obj;
     mrb_int i;
@@ -795,50 +787,43 @@ RArray::rindex_m(mrb_state *mrb)
     return mrb_nil_value();
 }
 
-mrb_value
-RArray::splat(mrb_state *mrb, mrb_value v)
+mrb_value RArray::splat(mrb_state *mrb, mrb_value v)
 {
     if (mrb_array_p(v)) {
         return v;
     }
-    else {
         return RArray::new_from_values(mrb, 1, &v);
     }
-}
 
 mrb_value RArray::size(mrb_state *mrb)
 {
     return mrb_fixnum_value(m_len);
 }
 
-mrb_value
-RArray::clear(mrb_state *mrb, mrb_value self)
+mrb_value RArray::clear(mrb_state *mrb, mrb_value self)
 {
     RArray *a = mrb_ary_ptr(self);
 
     a->ary_modify(mrb);
     a->m_len = 0;
-    a->aux.capa = 0;
+    a->m_aux.capa = 0;
     mrb->gc()._free(a->m_ptr);
     a->m_ptr = 0;
 
     return self;
 }
 
-mrb_value
-RArray::empty_p(mrb_state *mrb)
+mrb_value RArray::empty_p(mrb_state *mrb)
 {
     return mrb_bool_value(m_len == 0);
 }
 
-mrb_value
-mrb_check_array_type(mrb_state *mrb, mrb_value ary)
+mrb_value mrb_check_array_type(mrb_state *mrb, mrb_value ary)
 {
     return mrb_check_convert_type(mrb, ary, MRB_TT_ARRAY, "Array", "to_ary");
 }
 
-mrb_value
-RArray::entry(mrb_int offset)
+mrb_value RArray::entry(mrb_int offset)
 {
     if (offset < 0) {
         offset += m_len;
@@ -846,11 +831,10 @@ RArray::entry(mrb_int offset)
     return ary_elt(offset);
 }
 
-static constexpr bool simpleArrComp(RArray *a, mrb_value b) {
+static constexpr bool simpleArrComp(RArray *a, const mrb_value &b) {
     return (a == b.value.p);
 }
-mrb_value
-RArray::inspect_ary(mrb_state *mrb, RArray *list_arr)
+mrb_value RArray::inspect_ary(mrb_state *mrb, RArray *list_arr)
 {
     mrb_int i;
     mrb_value s, arystr;
@@ -900,8 +884,7 @@ RArray::inspect_ary(mrb_state *mrb, RArray *list_arr)
  *  Creates a string representation of +self+.
  */
 
-mrb_value
-RArray::inspect(mrb_state *mrb)
+mrb_value RArray::inspect(mrb_state *mrb)
 {
     if (m_len == 0)
         return mrb_str_new(mrb, "[]", 2);
@@ -909,8 +892,7 @@ RArray::inspect(mrb_state *mrb)
     mrb_value tmp=mrb_ary_new(mrb);
     return RArray::inspect_ary(mrb, RARRAY(tmp));
 }
-mrb_value
-RArray::join_ary(mrb_state *mrb, mrb_value sep, RArray *list_arr)
+mrb_value RArray::join_ary(mrb_state *mrb, mrb_value sep, RArray *list_arr)
 {
     mrb_int i;
     mrb_value result, val, tmp;
@@ -1053,28 +1035,27 @@ RArray::mrb_ary_equal(mrb_state *mrb, mrb_value ary1)
  *  or are both arrays with the same content.
  */
 
-mrb_value
-RArray::mrb_ary_eql(mrb_state *mrb, mrb_value ary1)
+mrb_value RArray::mrb_ary_eql(mrb_state *mrb, mrb_value ary1)
 {
     mrb_value ary2;
     mrb_bool eql_p;
 
     mrb_get_args(mrb, "o", &ary2);
     if (mrb_obj_equal(mrb, ary1, ary2)) {
-        eql_p = 1;
+        eql_p = true;
     }
     else if (!mrb_array_p(ary2)) {
-        eql_p = 0;
+        eql_p = false;
     }
     else if (RARRAY_LEN(ary1) != RARRAY_LEN(ary2)) {
-        eql_p = 0;
+        eql_p = false;
     }
     else {
         mrb_int i;
         eql_p = 1;
         for (i=0; i<RARRAY_LEN(ary1); i++) {
             if (!mrb_eql(mrb, RARRAY(ary1)->ary_elt(i), RARRAY(ary2)->ary_elt(i))) {
-                eql_p = 0;
+                eql_p = false;
                 break;
             }
         }

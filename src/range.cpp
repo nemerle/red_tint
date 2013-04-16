@@ -15,8 +15,8 @@ static void
 range_check(mrb_state *mrb, mrb_value a, mrb_value b)
 {
     mrb_value ans;
-    enum mrb_vtype ta;
-    enum mrb_vtype tb;
+    mrb_vtype ta;
+    mrb_vtype tb;
 
     ta = mrb_type(a);
     tb = mrb_type(b);
