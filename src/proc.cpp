@@ -114,6 +114,22 @@ mrb_proc_iseq(mrb_state *mrb, RProc *p)
     return p->body.irep->iseq;
 }
 
+/* 15.2.17.4.2 */
+static mrb_value mrb_proc_arity(mrb_state *mrb, mrb_value self)
+{
+  RProc *p = mrb_proc_ptr(self);
+  mrb_code *iseq = mrb_proc_iseq(mrb, p);
+  mrb_aspec aspec = *iseq >> 6;
+  int ma, ra, pa, arity;
+
+  ma = ARGS_GETREQ(aspec);
+  ra = ARGS_GETREST(aspec);
+  pa = ARGS_GETPOST(aspec);
+  arity = ra ? -(ma + pa + 1) : ma + pa;
+
+  return mrb_fixnum_value(arity);
+}
+
 /* 15.3.1.2.6  */
 /* 15.3.1.3.27 */
 /*
@@ -164,6 +180,7 @@ mrb_init_proc(mrb_state *mrb)
     m = mrb_proc_new(mrb, call_irep);
     mrb->proc_class->define_method(mrb, "initialize", mrb_proc_initialize, ARGS_NONE())
             .define_method(mrb, "initialize_copy", mrb_proc_init_copy, ARGS_REQ(1))
+            .define_method(mrb, "arity", mrb_proc_arity, ARGS_NONE())
             .define_method_raw(mrb, mrb_intern(mrb, "call"), m)
             .define_method_raw(mrb, mrb_intern(mrb, "[]"), m);
 
