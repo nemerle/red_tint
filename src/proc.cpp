@@ -119,12 +119,12 @@ static mrb_value mrb_proc_arity(mrb_state *mrb, mrb_value self)
 {
   RProc *p = mrb_proc_ptr(self);
   mrb_code *iseq = mrb_proc_iseq(mrb, p);
-  mrb_aspec aspec = *iseq >> 6;
+  mrb_aspec aspec = GETARG_Ax(*iseq);
   int ma, ra, pa, arity;
 
-  ma = ARGS_GETREQ(aspec);
-  ra = ARGS_GETREST(aspec);
-  pa = ARGS_GETPOST(aspec);
+  ma = MRB_ASPEC_REQ(aspec);
+  ra = MRB_ASPEC_REST(aspec);
+  pa = MRB_ASPEC_POST(aspec);
   arity = ra ? -(ma + pa + 1) : ma + pa;
 
   return mrb_fixnum_value(arity);
@@ -178,12 +178,12 @@ mrb_init_proc(mrb_state *mrb)
     mrb->proc_class = mrb_define_class(mrb, "Proc", mrb->object_class);
     MRB_SET_INSTANCE_TT(mrb->proc_class, MRB_TT_PROC);
     m = mrb_proc_new(mrb, call_irep);
-    mrb->proc_class->define_method(mrb, "initialize", mrb_proc_initialize, ARGS_NONE())
-            .define_method(mrb, "initialize_copy", mrb_proc_init_copy, ARGS_REQ(1))
-            .define_method(mrb, "arity", mrb_proc_arity, ARGS_NONE())
+    mrb->proc_class->define_method(mrb, "initialize", mrb_proc_initialize, MRB_ARGS_NONE())
+            .define_method(mrb, "initialize_copy", mrb_proc_init_copy, MRB_ARGS_REQ(1))
+            .define_method(mrb, "arity", mrb_proc_arity, MRB_ARGS_NONE())
             .define_method_raw(mrb, mrb_intern(mrb, "call"), m)
             .define_method_raw(mrb, mrb_intern(mrb, "[]"), m);
 
-    mrb->kernel_module->define_class_method(mrb, "lambda", proc_lambda, ARGS_NONE())        /* 15.3.1.2.6  */
-            .define_method(mrb, "lambda", proc_lambda, ARGS_NONE());   /* 15.3.1.3.27 */
+    mrb->kernel_module->define_class_method(mrb, "lambda", proc_lambda, MRB_ARGS_NONE())        /* 15.3.1.2.6  */
+            .define_method(mrb, "lambda", proc_lambda, MRB_ARGS_NONE());   /* 15.3.1.3.27 */
 }

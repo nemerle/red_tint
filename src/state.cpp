@@ -167,8 +167,8 @@ mrb_top_self(mrb_state *mrb)
 {
     if (!mrb->top_self) {
         mrb->top_self = mrb->gc().obj_alloc<RObject>(MRB_TT_OBJECT, mrb->object_class);
-        mrb_define_singleton_method(mrb, mrb->top_self, "inspect", inspect_main, ARGS_NONE());
-        mrb_define_singleton_method(mrb, mrb->top_self, "to_s", inspect_main, ARGS_NONE());
+        mrb_define_singleton_method(mrb, mrb->top_self, "inspect", inspect_main, MRB_ARGS_NONE());
+        mrb_define_singleton_method(mrb, mrb->top_self, "to_s", inspect_main, MRB_ARGS_NONE());
     }
     return mrb_obj_value(mrb->top_self);
 }

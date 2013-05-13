@@ -126,10 +126,10 @@ mrb_ary_at(mrb_state *mrb, mrb_value ary)
 void
 mrb_mruby_array_ext_gem_init(mrb_state* mrb)
 {
-    mrb->array_class->define_class_method(mrb, "try_convert", mrb_ary_s_try_convert, ARGS_REQ(1))
-            .define_method(mrb, "assoc",  mrb_ary_assoc,  ARGS_REQ(1))
-            .define_method(mrb, "at",     mrb_ary_at,     ARGS_REQ(1))
-            .define_method(mrb, "rassoc", mrb_ary_rassoc, ARGS_REQ(1));
+    mrb->array_class->define_class_method(mrb, "try_convert", mrb_ary_s_try_convert, MRB_ARGS_REQ(1))
+            .define_method(mrb, "assoc",  mrb_ary_assoc,  MRB_ARGS_REQ(1))
+            .define_method(mrb, "at",     mrb_ary_at,     MRB_ARGS_REQ(1))
+            .define_method(mrb, "rassoc", mrb_ary_rassoc, MRB_ARGS_REQ(1));
 }
 
 void

@@ -695,7 +695,7 @@ void codegen_scope::for_body(node *tree)
 }
 void codegen_scope::do_lambda_args(ArgsStore *args)
 {
-    int32_t a;
+    mrb_aspec a;
     int ma, oa, ra, pa, ka, kd, ba;
     int pos, i;
     node *n, *opt;
@@ -711,8 +711,8 @@ void codegen_scope::do_lambda_args(ArgsStore *args)
     ka = kd = 0;
     ba = args->m_blk ? 1 : 0;
 
-    a = ((int32_t)(ma & 0x1f) << 18)
-            | ((int32_t)(oa & 0x1f) << 13)
+    a = ((mrb_aspec)(ma & 0x1f) << 18)
+            | ((mrb_aspec)(oa & 0x1f) << 13)
             | ((ra & 1) << 12)
             | ((pa & 0x1f) << 7)
             | ((ka & 0x1f) << 2)

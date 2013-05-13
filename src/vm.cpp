@@ -234,6 +234,8 @@ static void ecall(mrb_state *mrb, int i)
     RObject *exc;
 
     p = mrb->ensure[i];
+    if (!p)
+        return;
     ci = cipush(mrb);
     ci->stackidx = mrb->stack - mrb->stbase;
     ci->mid = ci[-1].mid;
@@ -245,6 +247,7 @@ static void ecall(mrb_state *mrb, int i)
     mrb->stack = mrb->stack + ci[-1].nregs;
     exc = mrb->m_exc; mrb->m_exc = 0;
     mrb->mrb_run(p, *self);
+    mrb->ensure[i] = nullptr;
     if (!mrb->m_exc) mrb->m_exc = exc;
 }
 
@@ -1106,7 +1109,7 @@ L_SEND:
         CASE(OP_ENTER) {
             /* Ax             arg setup according to flags (24=5:5:1:5:5:1:1) */
             /* number of optional arguments times OP_JMP should follow */
-            int32_t ax = GETARG_Ax(i);
+            mrb_aspec ax = GETARG_Ax(i);
             int m1 = (ax>>18)&0x1f;
             int o  = (ax>>13)&0x1f;
             int r  = (ax>>12)&0x1;
@@ -1192,31 +1195,34 @@ L_SEND:
         CASE(OP_RETURN) {
             /* A      return R(A) */
             if (m_exc) {
-                mrb_callinfo *ci;
+                mrb_callinfo *_ci;
                 int eidx;
 
 L_RAISE:
-                ci = this->ci;
+                _ci = this->ci;
                 mrb_obj_iv_ifnone(this, m_exc, mrb_intern2(this, "lastpc", 6), mrb_voidp_value(pc));
-                mrb_obj_iv_ifnone(this, m_exc, mrb_intern2(this, "ciidx", 5), mrb_fixnum_value(ci - this->cibase));
-                eidx = ci->eidx;
-                if (ci == this->cibase) {
-                    if (ci->ridx == 0) goto L_STOP;
+                mrb_obj_iv_ifnone(this, m_exc, mrb_intern2(this, "ciidx", 5), mrb_fixnum_value(_ci - this->cibase));
+                eidx = _ci->eidx;
+                if (_ci == this->cibase) {
+                    if (_ci->ridx == 0) goto L_STOP;
                     goto L_RESCUE;
                 }
-                while (ci[0].ridx == ci[-1].ridx) {
+                while (eidx > _ci[-1].eidx) {
+                    ecall(this, --eidx);
+                }
+                while (_ci[0].ridx == _ci[-1].ridx) {
                     cipop(this);
-                    ci = this->ci;
-                    if (ci[1].acc < 0 && prev_jmp) {
+                    _ci = this->ci;
+                    this->stack = this->stbase + _ci[1].stackidx;
+                    if (_ci[1].acc < 0 && prev_jmp) {
                         this->jmp = prev_jmp;
-                        this->stack = this->stbase + ci[1].stackidx;
                         longjmp(*(jmp_buf*)this->jmp, 1);
                     }
-                    while (eidx > this->ci->eidx) {
+                    while (eidx > _ci->eidx) {
                         ecall(this, --eidx);
                     }
-                    if (ci == this->cibase) {
-                        if (ci->ridx == 0) {
+                    if (_ci == this->cibase) {
+                        if (_ci->ridx == 0) {
                             regs = this->stack = this->stbase;
                             goto L_STOP;
                         }
@@ -1224,11 +1230,11 @@ L_RAISE:
                     }
                 }
 L_RESCUE:
-                irep = ci->proc->body.irep;
+                irep = _ci->proc->body.irep;
                 pool = irep->pool;
                 syms = irep->syms;
-                regs = this->stack = this->stbase + ci[1].stackidx;
-                pc = this->rescue[--ci->ridx];
+                regs = this->stack = this->stbase + _ci[1].stackidx;
+                pc = this->rescue[--_ci->ridx];
             }
             else {
                 mrb_callinfo *ci = this->ci;
@@ -1271,19 +1277,13 @@ L_RESCUE:
                         /* cannot happen */
                         break;
                 }
+                while (eidx > this->ci[-1].eidx) {
+                    ecall(this, --eidx);
+                }
                 cipop(this);
                 acc = ci->acc;
                 pc = ci->pc;
                 regs = this->stack = this->stbase + ci->stackidx;
-                {
-                    int idx = eidx;
-                    while (idx > this->ci->eidx) {
-                        mrb_gc_protect(this, mrb_obj_value(this->ensure[--idx]));
-                    }
-                }
-                while (eidx > this->ci->eidx) {
-                    ecall(this, --eidx);
-                }
                 if (acc < 0) {
                     this->jmp = prev_jmp;
                     return v;
@@ -1588,7 +1588,7 @@ L_RESCUE:
         }
 
         CASE(OP_SUBI) {
-            /* A B C  R(A) := R(A)-C (Syms[B]=:+)*/
+            /* A B C  R(A) := R(A)-C (Syms[B]=:-)*/
             int a = GETARG_A(i);
             mrb_value *regs_a = regs + a;
 

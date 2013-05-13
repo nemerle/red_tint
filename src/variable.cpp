@@ -639,11 +639,13 @@ cv_i(mrb_state *mrb, mrb_sym sym, mrb_value v, void *p)
  */
 mrb_value mrb_mod_class_variables(mrb_state *mrb, mrb_value mod)
 {
-    mrb_value ary;
-
-    ary = mrb_ary_new(mrb);
-    if (obj_iv_p(mod) && mrb_obj_ptr(mod)->iv) {
-        mrb_obj_ptr(mod)->iv->iv_foreach(mrb, cv_i, &ary);
+    mrb_value ary = mrb_ary_new(mrb);
+    RClass *c = mrb_class_ptr(mod);
+    while (c) {
+        if (c->iv) {
+            c->iv->iv_foreach(mrb, cv_i, &ary);
+        }
+        c = c->super;
     }
     return ary;
 }

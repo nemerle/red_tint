@@ -188,8 +188,7 @@ struct kh_T {
         return h2;
     }
     bool exist(iterator x) {return (!__ac_iseither((this)->e_flags, (this)->d_flags, (x)));}
-    khkey_t key(int x) { return keys[x];}
-    khval_t val(int x) { return vals[x];}
+    const khkey_t &key(int x) const { return keys[x];}
     khval_t &value( khiter_t x ) { return  vals[x]; }
     khint_t begin() const { return khint_t(0);}
     khint_t end() const { return n_buckets;}
@@ -393,24 +392,14 @@ extern "C" {
 
 #define kh_int_hash_func(mrb,key) (khint_t)((key)^((key)<<2)^((key)>>2))
 #define kh_int_hash_equal(mrb,a, b) (a == b)
+
+#if defined(__cplusplus)
+}  /* extern "C" { */
+#endif  /* KHASH_H */
+
 struct IntHashFunc {
     khint_t operator()(mrb_state *,khint_t key) { return (khint_t)((key)^((key)<<2)^((key)>>2)); }
 };
 struct IntHashEq {
     khint_t operator()(mrb_state *,khint_t a,khint_t b) { return a==b; }
 };
-static inline khint_t __ac_X31_hash_string(const char *s)
-{
-    khint_t h = *s;
-    if (h) for (++s ; *s; ++s) h = (h << 5) - h + *s;
-    return h;
-}
-#define kh_str_hash_func(mrb,key) __ac_X31_hash_string(key)
-#define kh_str_hash_equal(mrb,a, b) (strcmp(a, b) == 0)
-
-typedef const char *kh_cstr_t;
-
-#if defined(__cplusplus)
-}  /* extern "C" { */
-
-#endif  /* KHASH_H */

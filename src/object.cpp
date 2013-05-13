@@ -111,7 +111,7 @@ nil_inspect(mrb_state *mrb, mrb_value obj)
 static mrb_value
 true_and(mrb_state *mrb, mrb_value obj)
 {
-    int obj2;
+    mrb_bool obj2;
 
     mrb_get_args(mrb, "b", &obj2);
 
@@ -131,7 +131,7 @@ true_and(mrb_state *mrb, mrb_value obj)
 static mrb_value
 true_xor(mrb_state *mrb, mrb_value obj)
 {
-    int obj2;
+    mrb_bool obj2;
 
     mrb_get_args(mrb, "b", &obj2);
     return mrb_bool_value(!obj2);
@@ -171,7 +171,7 @@ true_to_s(mrb_state *mrb, mrb_value obj)
 static mrb_value
 true_or(mrb_state *mrb, mrb_value obj)
 {
-    int obj2;
+    mrb_bool obj2;
 
     mrb_get_args(mrb, "b", &obj2);
     return mrb_true_value();
@@ -202,7 +202,7 @@ true_or(mrb_state *mrb, mrb_value obj)
 static mrb_value
 false_and(mrb_state *mrb, mrb_value obj)
 {
-    int obj2;
+    mrb_bool obj2;
 
     mrb_get_args(mrb, "b", &obj2);
     return mrb_false_value();
@@ -224,7 +224,7 @@ false_and(mrb_state *mrb, mrb_value obj)
 static mrb_value
 false_xor(mrb_state *mrb, mrb_value obj)
 {
-    int obj2;
+    mrb_bool obj2;
 
     mrb_get_args(mrb, "b", &obj2);
     return mrb_bool_value(obj2);
@@ -244,7 +244,7 @@ false_xor(mrb_state *mrb, mrb_value obj)
 static mrb_value
 false_or(mrb_state *mrb, mrb_value obj)
 {
-    int obj2;
+    mrb_bool obj2;
 
     mrb_get_args(mrb, "b", &obj2);
     return mrb_bool_value(obj2);
@@ -269,30 +269,30 @@ mrb_init_object(mrb_state *mrb)
 {
     mrb->nil_class = &mrb->define_class("NilClass",   mrb->object_class)
             .undef_class_method(mrb, "new")
-            .define_method(mrb, "&",    false_and,      ARGS_REQ(1))  /* 15.2.4.3.1  */
-            .define_method(mrb, "^",    false_xor,      ARGS_REQ(1))  /* 15.2.4.3.2  */
-            .define_method(mrb, "|",    false_or,       ARGS_REQ(1))  /* 15.2.4.3.3  */
-            .define_method(mrb, "nil?", mrb_true,       ARGS_NONE())  /* 15.2.4.3.4  */
-            .define_method(mrb, "to_s", nil_to_s,       ARGS_NONE())  /* 15.2.4.3.5  */
-            .define_method(mrb, "inspect", nil_inspect, ARGS_NONE())
+            .define_method(mrb, "&",    false_and,      MRB_ARGS_REQ(1))  /* 15.2.4.3.1  */
+            .define_method(mrb, "^",    false_xor,      MRB_ARGS_REQ(1))  /* 15.2.4.3.2  */
+            .define_method(mrb, "|",    false_or,       MRB_ARGS_REQ(1))  /* 15.2.4.3.3  */
+            .define_method(mrb, "nil?", mrb_true,       MRB_ARGS_NONE())  /* 15.2.4.3.4  */
+            .define_method(mrb, "to_s", nil_to_s,       MRB_ARGS_NONE())  /* 15.2.4.3.5  */
+            .define_method(mrb, "inspect", nil_inspect, MRB_ARGS_NONE())
             ;
 
     mrb->true_class = &mrb->define_class("TrueClass",  mrb->object_class)
             .undef_class_method(mrb,"new")
-            .define_method(mrb, "&",    true_and,       ARGS_REQ(1))  /* 15.2.5.3.1  */
-            .define_method(mrb, "^",    true_xor,       ARGS_REQ(1))  /* 15.2.5.3.2  */
-            .define_method(mrb, "to_s", true_to_s,      ARGS_NONE())  /* 15.2.5.3.3  */
-            .define_method(mrb, "|",    true_or,        ARGS_REQ(1))  /* 15.2.5.3.4  */
-            .define_method(mrb, "inspect", true_to_s,   ARGS_NONE())
+            .define_method(mrb, "&",    true_and,       MRB_ARGS_REQ(1))  /* 15.2.5.3.1  */
+            .define_method(mrb, "^",    true_xor,       MRB_ARGS_REQ(1))  /* 15.2.5.3.2  */
+            .define_method(mrb, "to_s", true_to_s,      MRB_ARGS_NONE())  /* 15.2.5.3.3  */
+            .define_method(mrb, "|",    true_or,        MRB_ARGS_REQ(1))  /* 15.2.5.3.4  */
+            .define_method(mrb, "inspect", true_to_s,   MRB_ARGS_NONE())
             ;
 
     mrb->false_class = &mrb->define_class("FalseClass", mrb->object_class)
             .undef_class_method(mrb, "new")
-            .define_method(mrb, "&",    false_and,      ARGS_REQ(1))  /* 15.2.6.3.1  */
-            .define_method(mrb, "^",    false_xor,      ARGS_REQ(1))  /* 15.2.6.3.2  */
-            .define_method(mrb, "to_s", false_to_s,     ARGS_NONE())  /* 15.2.6.3.3  */
-            .define_method(mrb, "|",    false_or,       ARGS_REQ(1))  /* 15.2.6.3.4  */
-            .define_method(mrb, "inspect", false_to_s,  ARGS_NONE())
+            .define_method(mrb, "&",    false_and,      MRB_ARGS_REQ(1))  /* 15.2.6.3.1  */
+            .define_method(mrb, "^",    false_xor,      MRB_ARGS_REQ(1))  /* 15.2.6.3.2  */
+            .define_method(mrb, "to_s", false_to_s,     MRB_ARGS_NONE())  /* 15.2.6.3.3  */
+            .define_method(mrb, "|",    false_or,       MRB_ARGS_REQ(1))  /* 15.2.6.3.4  */
+            .define_method(mrb, "inspect", false_to_s,  MRB_ARGS_NONE())
             ;
 }
 

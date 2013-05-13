@@ -33,8 +33,8 @@
 #include "mruby/value.h"
 #include "mruby/mem_manager.h"
 
-typedef int32_t mrb_code;
-typedef int32_t mrb_aspec;
+typedef uint32_t mrb_code;
+typedef uint32_t mrb_aspec;
 struct RClass;
 struct RProc;
 struct REnv;
@@ -154,22 +154,25 @@ RClass * mrb_define_class_under(mrb_state *mrb, RClass *outer, const char *name,
 RClass * mrb_define_module_under(mrb_state *mrb, RClass *outer, const char *name);
 
 /* required arguments */
-#define ARGS_REQ(n)     ((mrb_aspec)((n)&0x1f) << 19)
+#define MRB_ARGS_REQ(n) ((mrb_aspec)((n)&0x1f) << 18)
 /* optional arguments */
-#define ARGS_OPT(n)     ((mrb_aspec)((n)&0x1f) << 14)
+#define MRB_ARGS_OPT(n) ((mrb_aspec)((n)&0x1f) << 13)
+/* mandatory and optinal arguments */
+#define MRB_ARGS_ARG(n1,n2) (MRB_ARGS_REQ(n1)|MRB_ARGS_OPT(n2))
+
 /* rest argument */
-#define ARGS_REST()     ((mrb_aspec)(1 << 13))
+#define MRB_ARGS_REST() ((mrb_aspec)(1 << 12))
 /* required arguments after rest */
-#define ARGS_POST(n)    ((mrb_aspec)((n)&0x1f) << 8)
+#define MRB_ARGS_POST(n) ((mrb_aspec)((n)&0x1f) << 7)
 /* keyword arguments (n of keys, kdict) */
-#define ARGS_KEY(n1,n2) ((mrb_aspec)((((n1)&0x1f) << 3) | ((n2)?(1<<2):0)))
+#define MRB_ARGS_KEY(n1,n2) ((mrb_aspec)((((n1)&0x1f) << 2) | ((n2)?(1<<1):0)))
 /* block argument */
-#define ARGS_BLOCK()    ((mrb_aspec)(1 << 1))
+#define MRB_ARGS_BLOCK() ((mrb_aspec)1)
 
 /* accept any number of arguments */
-#define ARGS_ANY()      ARGS_REST()
+#define MRB_ARGS_ANY() MRB_ARGS_REST()
 /* accept no arguments */
-#define ARGS_NONE()     ((mrb_aspec)0)
+#define MRB_ARGS_NONE() ((mrb_aspec)0)
 
 int mrb_get_args(mrb_state *mrb, const char *format, ...);
 
@@ -179,6 +182,9 @@ mrb_value mrb_funcall_with_block(mrb_state*, mrb_value, mrb_sym, int, mrb_value*
 mrb_sym mrb_intern_cstr(mrb_state*,const char*);
 mrb_sym mrb_intern2(mrb_state*,const char*,size_t);
 mrb_sym mrb_intern_str(mrb_state*,mrb_value);
+mrb_value mrb_check_intern_cstr(mrb_state*,const char*);
+mrb_value mrb_check_intern_str(mrb_state*,mrb_value);
+mrb_value mrb_check_intern(mrb_state*,const char*,size_t);
 const char *mrb_sym2name(mrb_state*,mrb_sym);
 const char *mrb_sym2name_len(mrb_state*,mrb_sym,size_t&);
 mrb_value mrb_sym2str(mrb_state*,mrb_sym);
@@ -255,12 +261,16 @@ mrb_value mrb_obj_clone(mrb_state *mrb, mrb_value self);
 #define TOLOWER(c) (ISASCII(c) ? tolower((int)(unsigned char)(c)) : (c))
 #endif
 
+#ifndef __clang__
+#define NORET(x)  x __attribute__ ((noreturn))
+#else
+#define NORET(x)  [[noreturn]] x
+#endif
 mrb_value mrb_exc_new(mrb_state *mrb, struct RClass *c, const char *ptr, long len);
-void mrb_exc_raise(mrb_state *mrb, mrb_value exc);
-
-void mrb_raise(mrb_state *mrb, struct RClass *c, const char *msg);
-void mrb_raisef(mrb_state *mrb, struct RClass *c, const char *fmt, ...);
-void mrb_name_error(mrb_state *mrb, mrb_sym id, const char *fmt, ...);
+NORET(void mrb_exc_raise(mrb_state *mrb, mrb_value exc));
+NORET(void mrb_raise(mrb_state *mrb, RClass *c, const char *msg));
+NORET(void mrb_raisef(mrb_state *mrb, RClass *c, const char *fmt, ...));
+NORET(void mrb_name_error(mrb_state *mrb, mrb_sym id, const char *fmt, ...));
 void mrb_warn(const char *fmt, ...);
 void mrb_bug(const char *fmt, ...);
 /* macros to get typical exception objects
@@ -305,13 +315,6 @@ typedef enum call_type {
     CALL_TYPE_MAX
 } call_type;
 
-#ifndef ANYARGS
-# ifdef __cplusplus
-#   define ANYARGS ...
-# else
-#   define ANYARGS
-# endif
-#endif
 void mrb_define_alias(mrb_state *mrb, RClass *klass, const char *name1, const char *name2);
 const char *mrb_class_name(mrb_state *mrb, RClass* klass);
 void mrb_define_global_const(mrb_state *mrb, const char *name, mrb_value val);

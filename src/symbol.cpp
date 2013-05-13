@@ -38,8 +38,6 @@ struct SymHashEqual {
     }
 };
 
-//KHASH_DECLARE(n2s, symbol_name, mrb_sym, 1)
-//KHASH_DEFINE (n2s, symbol_name, mrb_sym, 1, sym_hash_func, sym_hash_equal)
 struct SymTable {
     typedef kh_T<symbol_name, mrb_sym,SymHashFunc,SymHashEqual> kh_n2s;
     typedef kh_n2s::iterator iterator;
@@ -47,12 +45,13 @@ struct SymTable {
     SymTable(mrb_state *mrb) {
         m_tab = kh_n2s::init(mrb);
     }
-    khiter_t find(const symbol_name &k) {
+    iterator find(const symbol_name &k) {
         return m_tab->get(k);
     }
     iterator begin() const { return m_tab->begin(); }
     iterator end() const { return m_tab->end(); }
     const mrb_sym &operator[](iterator x) const { return m_tab->value(x);}
+    mrb_sym operator[](iterator x) { return m_tab->value(x);}
     const symbol_name &key(iterator x) const { return m_tab->key(x);}
     void insert(const symbol_name &key,mrb_sym v)
     {
@@ -105,6 +104,27 @@ mrb_sym mrb_intern_cstr(mrb_state *mrb, const char *name)
 mrb_sym mrb_intern_str(mrb_state *mrb, mrb_value str)
 {
     return mrb_intern2(mrb, RSTRING_PTR(str), RSTRING_LEN(str));
+}
+
+mrb_value mrb_cstr_interned(mrb_state *mrb, const char *name)
+{
+    return mrb_interned(mrb, name, strlen(name));
+}
+
+mrb_value mrb_interned(mrb_state *mrb, const char *name, size_t len)
+{
+    SymTable &name2sym_tab(*mrb->name2sym);
+    symbol_name sname {len,name};
+    auto iter = name2sym_tab.find(sname);
+
+    if(iter != name2sym_tab.end())
+        return mrb_symbol_value(name2sym_tab[iter]);
+    return mrb_nil_value();
+}
+
+mrb_value mrb_str_interned(mrb_state *mrb, mrb_value str)
+{
+    return mrb_interned(mrb, RSTRING_PTR(str), RSTRING_LEN(str));
 }
 
 /* lenp must be a pointer to a size_t variable */
@@ -256,21 +276,21 @@ static int
 is_special_global_name(const char* m)
 {
     switch (*m) {
-        case '~': case '*': case '$': case '?': case '!': case '@':
-        case '/': case '\\': case ';': case ',': case '.': case '=':
-        case ':': case '<': case '>': case '\"':
-        case '&': case '`': case '\'': case '+':
-        case '0':
-            ++m;
-            break;
-        case '-':
-            ++m;
-            if (is_identchar(*m)) m += 1;
-            break;
-        default:
-            if (!ISDIGIT(*m)) return FALSE;
-            do ++m; while (ISDIGIT(*m));
-            break;
+    case '~': case '*': case '$': case '?': case '!': case '@':
+    case '/': case '\\': case ';': case ',': case '.': case '=':
+    case ':': case '<': case '>': case '\"':
+    case '&': case '`': case '\'': case '+':
+    case '0':
+        ++m;
+        break;
+    case '-':
+        ++m;
+        if (is_identchar(*m)) m += 1;
+        break;
+    default:
+        if (!ISDIGIT(*m)) return FALSE;
+        do ++m; while (ISDIGIT(*m));
+        break;
     }
     return !*m;
 }
@@ -283,77 +303,77 @@ symname_p(const char *name)
 
     if (!m) return FALSE;
     switch (*m) {
-        case '\0':
-            return FALSE;
+    case '\0':
+        return FALSE;
 
-        case '$':
-            if (is_special_global_name(++m)) return TRUE;
-            goto id;
+    case '$':
+        if (is_special_global_name(++m)) return TRUE;
+        goto id;
 
-        case '@':
-            if (*++m == '@') ++m;
-            goto id;
+    case '@':
+        if (*++m == '@') ++m;
+        goto id;
 
-        case '<':
-            switch (*++m) {
-                case '<': ++m; break;
-                case '=': if (*++m == '>') ++m; break;
-                default: break;
-            }
-            break;
+    case '<':
+        switch (*++m) {
+        case '<': ++m; break;
+        case '=': if (*++m == '>') ++m; break;
+        default: break;
+        }
+        break;
 
-        case '>':
-            switch (*++m) {
-                case '>': case '=': ++m; break;
-                default: break;
-            }
-            break;
+    case '>':
+        switch (*++m) {
+        case '>': case '=': ++m; break;
+        default: break;
+        }
+        break;
 
-        case '=':
-            switch (*++m) {
-                case '~': ++m; break;
-                case '=': if (*++m == '=') ++m; break;
-                default: return FALSE;
-            }
-            break;
+    case '=':
+        switch (*++m) {
+        case '~': ++m; break;
+        case '=': if (*++m == '=') ++m; break;
+        default: return FALSE;
+        }
+        break;
 
-        case '*':
-            if (*++m == '*') ++m;
-            break;
-        case '!':
-            if (*++m == '=') ++m;
-            break;
-        case '+': case '-':
-            if (*++m == '@') ++m;
-            break;
-        case '|':
-            if (*++m == '|') ++m;
-            break;
-        case '&':
-            if (*++m == '&') ++m;
-            break;
+    case '*':
+        if (*++m == '*') ++m;
+        break;
+    case '!':
+        if (*++m == '=') ++m;
+        break;
+    case '+': case '-':
+        if (*++m == '@') ++m;
+        break;
+    case '|':
+        if (*++m == '|') ++m;
+        break;
+    case '&':
+        if (*++m == '&') ++m;
+        break;
 
-        case '^': case '/': case '%': case '~': case '`':
-            ++m;
-            break;
+    case '^': case '/': case '%': case '~': case '`':
+        ++m;
+        break;
 
-        case '[':
-            if (*++m != ']') return FALSE;
-            if (*++m == '=') ++m;
-            break;
+    case '[':
+        if (*++m != ']') return FALSE;
+        if (*++m == '=') ++m;
+        break;
 
-        default:
-            localid = !ISUPPER(*m);
+    default:
+        localid = !ISUPPER(*m);
 id:
-            if (*m != '_' && !ISALPHA(*m)) return FALSE;
-            while (is_identchar(*m)) m += 1;
-            if (localid) {
-                switch (*m) {
-                    case '!': case '?': case '=': ++m;
-                    default: break;
-                }
+        if (*m != '_' && !ISALPHA(*m)) return FALSE;
+        while (is_identchar(*m)) m += 1;
+        if (localid) {
+            switch (*m) {
+            case '!': case '?': case '=': ++m;
+            default: break;
             }
-            break;
+        }
+        break;
     }
     return *m ? FALSE : TRUE;
 }
@@ -377,8 +397,7 @@ sym_inspect(mrb_state *mrb, mrb_value sym)
     return str;
 }
 
-mrb_value
-mrb_sym2str(mrb_state *mrb, mrb_sym sym)
+mrb_value mrb_sym2str(mrb_state *mrb, mrb_sym sym)
 {
     size_t len;
     const char *name = mrb_sym2name_len(mrb, sym, len);
@@ -445,11 +464,11 @@ void mrb_init_symbol(mrb_state *mrb)
     RClass *sym;
 
     sym = mrb->symbol_class = mrb_define_class(mrb, "Symbol", mrb->object_class);
-    sym->define_method(mrb, "===",             sym_equal,               ARGS_REQ(1))            /* 15.2.11.3.1  */
-            .define_method(mrb, "id2name",         mrb_sym_to_s,            ARGS_NONE())        /* 15.2.11.3.2  */
-            .define_method(mrb, "to_s",            mrb_sym_to_s,            ARGS_NONE())        /* 15.2.11.3.3  */
-            .define_method(mrb, "to_sym",          sym_to_sym,              ARGS_NONE())        /* 15.2.11.3.4  */
-            .define_method(mrb, "inspect",         sym_inspect,             ARGS_NONE())        /* 15.2.11.3.5(x)  */
-            .define_method(mrb, "<=>",             sym_cmp,                 ARGS_REQ(1));
+    sym->define_method(mrb, "===",             sym_equal,               MRB_ARGS_REQ(1))            /* 15.2.11.3.1  */
+            .define_method(mrb, "id2name",         mrb_sym_to_s,            MRB_ARGS_NONE())        /* 15.2.11.3.2  */
+            .define_method(mrb, "to_s",            mrb_sym_to_s,            MRB_ARGS_NONE())        /* 15.2.11.3.3  */
+            .define_method(mrb, "to_sym",          sym_to_sym,              MRB_ARGS_NONE())        /* 15.2.11.3.4  */
+            .define_method(mrb, "inspect",         sym_inspect,             MRB_ARGS_NONE())        /* 15.2.11.3.5(x)  */
+            .define_method(mrb, "<=>",             sym_cmp,                 MRB_ARGS_REQ(1));
     mrb->init_sym = mrb_intern(mrb, "initialize");
 }

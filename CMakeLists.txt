@@ -26,8 +26,8 @@ ELSE()
     SET(WARNINGS "-Wall -Wno-missing-field-initializers -Werror-implicit-function-declaration -Wextra -Wno-unused-parameter -Wno-sign-compare -Wstrict-aliasing=2 -Wdisabled-optimization -Wpointer-arith -Wdeclaration-after-statement -Wbad-function-cast -Wcast-align -Wredundant-decls")
     ADD_DEFINITIONS(-D__STDC_LIMIT_MACROS)
 ENDIF()
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 ${WARNINGS}" )
-    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${WARNINGS}" )
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 ${WARNINGS}" )
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${WARNINGS}" )
 
 # Default build mode is Release With Debug Info unless specified
 if(NOT CMAKE_BUILD_TYPE)

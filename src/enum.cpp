@@ -6,8 +6,7 @@
 
 #include "mruby.h"
 
-void
-mrb_init_enumerable(mrb_state *mrb)
+void mrb_init_enumerable(mrb_state *mrb)
 {
     mrb_define_module(mrb, "Enumerable");
 }

@@ -215,7 +215,7 @@ static inline mrb_value mrb_symbol_value(mrb_sym i)
 static inline mrb_value mrb_obj_value(void *p)
 {
   mrb_value v;
-  RBasic *b = (struct RBasic*)p;
+  RBasic *b = (RBasic*)p;
 
   MRB_SET_VALUE(v, b->tt, value.p, p);
   return v;

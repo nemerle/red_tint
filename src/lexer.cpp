@@ -169,7 +169,7 @@ int mrb_parser_state::read_escape()
             for (i=0; i<2; i++) {
                 buf[i] = nextc();
                 if (buf[i] == -1) goto eof;
-                if (!isxdigit(buf[i])) {
+                if (!ISXDIGIT(buf[i])) {
                     pushback(buf[i]);
                     break;
                 }

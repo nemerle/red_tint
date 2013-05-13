@@ -36,7 +36,7 @@ mrb_mruby_print_gem_init(mrb_state* mrb)
 {
     RClass *krn;
   krn = mrb->kernel_module;
-    krn->define_method(mrb, "__printstr__", mrb_printstr, ARGS_REQ(1));
+    krn->define_method(mrb, "__printstr__", mrb_printstr, MRB_ARGS_REQ(1));
 }
 
 void

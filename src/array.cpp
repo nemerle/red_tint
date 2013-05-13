@@ -23,13 +23,10 @@
 
 RArray* RArray::ary_new_capa(mrb_state *mrb, size_t capa)
 {
-    size_t blen;
+    size_t blen = capa * sizeof(mrb_value) ;
 
-    if (capa > ARY_MAX_SIZE) {
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "array size too big");
-    }
-    blen = capa * sizeof(mrb_value) ;
-    if (blen < capa) {
+    // check for size_t wrap-around blen < capa -> wrap around occured.
+    if ( (capa > ARY_MAX_SIZE) || (blen < capa) ) {
         mrb_raise(mrb, E_ARGUMENT_ERROR, "array size too big");
     }
 
@@ -66,14 +63,15 @@ mrb_value mrb_ary_new(mrb_state *mrb)
  * see also http://togetter.com/li/462898
  *
  */
-static inline void
-array_copy(mrb_value *dst, const mrb_value *src, size_t size)
+static inline void array_copy(mrb_value *dst, const mrb_value *src, size_t size)
 {
-    size_t i;
+//    size_t i;
 
-    for (i = 0; i < size; i++) {
-        dst[i] = src[i];
-    }
+//    for (i = 0; i < size; i++) {
+//        dst[i] = src[i];
+//    }
+        assert(dst>(src+size) || (dst+size)<= src); // cannot overlap, otherwise we'd need to do memmove here
+        memcpy(dst,src,size*sizeof(mrb_value));
 }
 
 mrb_value mrb_assoc_new(mrb_state *mrb, const mrb_value &car, const mrb_value &cdr)
@@ -93,7 +91,8 @@ static void ary_fill_with_nil(mrb_value *ptr, mrb_int size)
 
 void RArray::ary_modify(mrb_state *mrb)
 {
-    if (this->flags & MRB_ARY_SHARED) {
+    if (0==(this->flags & MRB_ARY_SHARED))
+        return;
         mrb_shared_array *shared = m_aux.shared;
 
         if (shared->refcnt == 1 && m_ptr == shared->ptr) {
@@ -115,27 +114,23 @@ void RArray::ary_modify(mrb_state *mrb)
             m_aux.capa = m_len;
             mrb_ary_decref(mrb, shared);
         }
-        this->flags &= ~MRB_ARY_SHARED;
-    }
+    this->flags &= ~MRB_ARY_SHARED; // the array contents are no longer shared
 }
 
-void
-RArray::ary_make_shared(mrb_state *mrb)
+void RArray::ary_make_shared(mrb_state *mrb)
 {
-    if (!(this->flags & MRB_ARY_SHARED)) {
+    if (0!=(this->flags & MRB_ARY_SHARED))
+        return;
         mrb_shared_array *shared = (mrb_shared_array *)mrb->gc()._malloc(sizeof(mrb_shared_array));
 
         shared->refcnt = 1;
         if (m_aux.capa > m_len) {
-            m_ptr = shared->ptr = (mrb_value *)mrb->gc()._realloc(m_ptr, sizeof(mrb_value)*m_len+1);
+        m_ptr = (mrb_value *)mrb->gc()._realloc(m_ptr, sizeof(mrb_value)*m_len+1);
         }
-        else {
-            shared->ptr = m_ptr;
-        }
+        shared->ptr = m_ptr;
         shared->len = m_len;
         m_aux.shared = shared;
         this->flags |= MRB_ARY_SHARED;
-    }
 }
 
 void RArray::ary_expand_capa(mrb_state *mrb, size_t _len)
@@ -229,20 +224,17 @@ mrb_value RArray::concat_m(mrb_state *mrb, mrb_value self)
     return self;
 }
 
-mrb_value RArray::plus(mrb_state *mrb, mrb_value self)
+mrb_value RArray::plus(mrb_state *mrb) const
 {
-    RArray *a1 = mrb_ary_ptr(self);
-    RArray *a2;
-    mrb_value ary;
     mrb_value *ptr;
     mrb_int blen;
 
     mrb_get_args(mrb, "a", &ptr, &blen);
-    ary = RArray::new_capa(mrb, a1->m_len + blen);
-    a2 = mrb_ary_ptr(ary);
-    array_copy(a2->m_ptr, a1->m_ptr, a1->m_len);
-    array_copy(a2->m_ptr + a1->m_len, ptr, blen);
-    a2->m_len = a1->m_len + blen;
+    mrb_value ary = RArray::new_capa(mrb, m_len + blen);
+    RArray *a2 = mrb_ary_ptr(ary);
+    array_copy(a2->m_ptr, m_ptr, m_len);
+    array_copy(a2->m_ptr + m_len, ptr, blen);
+    a2->m_len = m_len + blen;
 
     return ary;
 }
@@ -268,23 +260,18 @@ mrb_value RArray::plus(mrb_state *mrb, mrb_value self)
 mrb_value RArray::cmp(mrb_state *mrb) const
 {
     mrb_value ary2;
-    RArray *a2;
     mrb_value r = mrb_nil_value();
-    mrb_int _len;
 
     mrb_get_args(mrb, "o", &ary2);
     if (!mrb_array_p(ary2))
         return r;
-    a2 = RARRAY(ary2);
+    RArray *a2 = RARRAY(ary2);
     if (m_len == a2->m_len && m_ptr == a2->m_ptr)
         return mrb_fixnum_value(0);
     else {
         mrb_sym cmp_sym = mrb_intern2(mrb, "<=>", 3);
 
-        _len = m_len;
-        if (_len > a2->m_len) {
-            _len = a2->m_len;
-        }
+        mrb_int _len = std::min(m_len,a2->m_len);
         assert(a2->m_ptr);
         assert(m_ptr);
         for (mrb_int i=0; i<_len; i++) {
@@ -294,7 +281,7 @@ mrb_value RArray::cmp(mrb_state *mrb) const
                 return r;
         }
     }
-    _len = m_len - a2->m_len;
+    mrb_int _len = m_len - a2->m_len;
     return mrb_fixnum_value((_len == 0)? 0: (_len > 0)? 1: -1);
 }
 
@@ -330,19 +317,19 @@ mrb_value RArray::times(mrb_state *mrb)
     RArray *a2;
     mrb_value ary;
     mrb_value *ptr;
-    mrb_int times;
+    mrb_int _times;
 
-    mrb_get_args(mrb, "i", &times);
-    if (times < 0) {
+    mrb_get_args(mrb, "i", &_times);
+    if (_times < 0) {
         mrb_raise(mrb, E_ARGUMENT_ERROR, "negative argument");
     }
-    if (times == 0)
+    if (_times == 0)
         return mrb_ary_new(mrb);
 
-    ary = RArray::new_capa(mrb, m_len * times);
+    ary = RArray::new_capa(mrb, m_len * _times);
     a2 = mrb_ary_ptr(ary);
     ptr = a2->m_ptr;
-    while(times--) {
+    while(_times--) {
         array_copy(ptr, m_ptr, m_len);
         ptr += m_len;
         a2->m_len += m_len;
@@ -356,11 +343,10 @@ mrb_value RArray::reverse_bang(mrb_state *mrb, mrb_value self)
     RArray *a = mrb_ary_ptr(self);
 
     if (a->m_len > 1) {
-        mrb_value *p1, *p2;
 
         a->ary_modify(mrb);
-        p1 = a->m_ptr;
-        p2 = a->m_ptr + a->m_len - 1;
+        mrb_value *p1 = a->m_ptr;
+        mrb_value *p2 = a->m_ptr + a->m_len - 1;
 
         while(p1 < p2) {
             mrb_value tmp = *p1;
@@ -373,15 +359,13 @@ mrb_value RArray::reverse_bang(mrb_state *mrb, mrb_value self)
 
 mrb_value RArray::reverse(mrb_state *mrb)
 {
-    mrb_value ary = RArray::new_capa(mrb, m_len);
+    mrb_value ary(RArray::new_capa(mrb, m_len));
     if (m_len <= 0)
         return ary;
     RArray *b = mrb_ary_ptr(ary);
-        mrb_value *p1, *p2, *e;
-
-        p1 = m_ptr;
-        e  = p1 + m_len;
-        p2 = b->m_ptr + m_len - 1;
+    mrb_value * p1  = m_ptr;
+    mrb_value * e   = p1 + m_len;
+    mrb_value * p2  = b->m_ptr + m_len - 1;
         while(p1 < e) {
             *p2-- = *p1++;
         }
@@ -391,11 +375,8 @@ mrb_value RArray::reverse(mrb_state *mrb)
 
 mrb_value RArray::new_from_values(mrb_state *mrb, mrb_int _size, const mrb_value *vals)
 {
-    mrb_value ary;
-    RArray *a;
-
-    ary = RArray::new_capa(mrb, _size);
-    a = mrb_ary_ptr(ary);
+    mrb_value ary = RArray::new_capa(mrb, _size);
+    RArray *a = mrb_ary_ptr(ary);
     array_copy(a->m_ptr, vals, _size);
     a->m_len = _size;
 
@@ -441,7 +422,6 @@ mrb_value RArray::shift(mrb_state *mrb, mrb_value self)
     if (a->m_len == 0)
         return mrb_nil_value();
     if (a->flags & MRB_ARY_SHARED) {
-//L_SHIFT:
         val = a->m_ptr[0];
         a->m_ptr++;
         a->m_len--;
@@ -455,7 +435,6 @@ mrb_value RArray::shift(mrb_state *mrb, mrb_value self)
         a->m_len--;
         return val;
     }
-    else {
         mrb_value *ptr = a->m_ptr;
         mrb_int size = a->m_len;
 
@@ -465,7 +444,6 @@ mrb_value RArray::shift(mrb_state *mrb, mrb_value self)
             ++ptr;
         }
         --a->m_len;
-    }
     return val;
 }
 
@@ -481,15 +459,14 @@ mrb_value RArray::unshift(mrb_state *mrb, const mrb_value &self, const mrb_value
             && a->m_aux.shared->refcnt == 1 /* shared only referenced from this array */
             && a->m_ptr - a->m_aux.shared->ptr >= 1) /* there's room for unshifted item */ {
         a->m_ptr--;
-        a->m_ptr[0] = item;
     }
     else {
         a->ary_modify(mrb);
         if (a->m_aux.capa < a->m_len + 1)
             a->ary_expand_capa(mrb, a->m_len + 1);
         value_move(a->m_ptr + 1, a->m_ptr, a->m_len);
-        a->m_ptr[0] = item;
     }
+    a->m_ptr[0] = item;
     a->m_len++;
     mrb->gc().mrb_write_barrier(a);
 
@@ -510,7 +487,8 @@ mrb_value RArray::unshift_m(mrb_state *mrb, mrb_value self)
     }
     else {
         a->ary_modify(mrb);
-        if (len == 0) return self;
+        if (len == 0)
+            return self;
         if (a->m_aux.capa < a->m_len + len)
             a->ary_expand_capa(mrb, a->m_len + len);
         value_move(a->m_ptr + len, a->m_ptr, a->m_len);
@@ -553,11 +531,11 @@ void RArray::set(mrb_state *mrb, mrb_int n, const mrb_value &val) /* rb_ary_stor
     mrb->gc().mrb_write_barrier(this);
 }
 
-mrb_value RArray::splice(mrb_state *mrb, const mrb_value &ary, mrb_int head, mrb_int len, mrb_value rpl)
+mrb_value RArray::splice(mrb_state *mrb, const mrb_value &ary, mrb_int head, mrb_int len, const mrb_value &rpl)
 {
     RArray *a = mrb_ary_ptr(ary);
     mrb_int tail, _size;
-    mrb_value *argv;
+    const mrb_value *argv;
     mrb_int i, argc;
 
     a->ary_modify(mrb);
@@ -584,7 +562,8 @@ mrb_value RArray::splice(mrb_state *mrb, const mrb_value &ary, mrb_int head, mrb
     }
     _size = head + argc;
 
-    if (tail < a->m_len) _size += a->m_len - tail;
+    if (tail < a->m_len)
+        _size += a->m_len - tail;
     if (_size > a->m_aux.capa)
         a->ary_expand_capa(mrb, _size);
 
@@ -596,7 +575,7 @@ mrb_value RArray::splice(mrb_state *mrb, const mrb_value &ary, mrb_int head, mrb
     }
 
     for(i = 0; i < argc; i++) {
-        *(a->m_ptr + head + i) = *(argv + i);
+        a->m_ptr[head + i] = argv[i];
     }
 
     a->m_len = _size;
@@ -628,8 +607,7 @@ mrb_value RArray::ary_subseq(mrb_state *mrb, mrb_int beg, mrb_int len)
     return mrb_obj_value(b);
 }
 
-mrb_value
-RArray::get(mrb_state *mrb)
+mrb_value RArray::get(mrb_state *mrb)
 {
     mrb_int index, len;
     mrb_value *argv;
@@ -747,14 +725,16 @@ mrb_value RArray::last(mrb_state *mrb)
         mrb_raise(mrb, E_ARGUMENT_ERROR, "wrong number of arguments");
     }
 
-    if (_len == 0) return (m_len > 0)? m_ptr[m_len - 1]: mrb_nil_value();
+    if (_len == 0)
+        return (m_len > 0)? m_ptr[m_len - 1]: mrb_nil_value();
 
     /* len == 1 */
     _size = mrb_fixnum(*vals);
     if (_size < 0) {
         mrb_raise(mrb, E_ARGUMENT_ERROR, "negative array size");
     }
-    if (_size > m_len) _size = m_len;
+    if (_size > m_len)
+        _size = m_len;
     if ((this->flags & MRB_ARY_SHARED) || _size > ARY_DEFAULT_LEN) {
         return ary_subseq(mrb, m_len - _size, _size);
     }
@@ -776,10 +756,9 @@ mrb_value RArray::index_m(mrb_state *mrb)
 mrb_value RArray::rindex_m(mrb_state *mrb)
 {
     mrb_value obj;
-    mrb_int i;
 
     mrb_get_args(mrb, "o", &obj);
-    for (i = m_len - 1; i >= 0; i--) {
+    for (mrb_int i = m_len - 1; i >= 0; i--) {
         if (mrb_equal(mrb, m_ptr[i], obj)) {
             return mrb_fixnum_value(i);
         }
@@ -892,7 +871,7 @@ mrb_value RArray::inspect(mrb_state *mrb)
     mrb_value tmp=mrb_ary_new(mrb);
     return RArray::inspect_ary(mrb, RARRAY(tmp));
 }
-mrb_value RArray::join_ary(mrb_state *mrb, mrb_value sep, RArray *list_arr)
+mrb_value RArray::join_ary(mrb_state *mrb, const mrb_value &sep, RArray *list_arr)
 {
     mrb_int i;
     mrb_value result, val, tmp;
@@ -944,8 +923,7 @@ str_join:
     return result;
 }
 
-mrb_value
-RArray::join(mrb_state *mrb, mrb_value sep)
+mrb_value RArray::join(mrb_state *mrb, mrb_value sep)
 {
     sep = mrb_obj_as_string(mrb, sep);
     mrb_value v = mrb_ary_new(mrb);
@@ -963,8 +941,7 @@ RArray::join(mrb_state *mrb, mrb_value sep)
  *     [ "a", "b", "c" ].join("-")   #=> "a-b-c"
  */
 
-mrb_value
-RArray::join_m(mrb_state *mrb)
+mrb_value RArray::join_m(mrb_state *mrb)
 {
     mrb_value sep = mrb_nil_value();
 
@@ -987,8 +964,7 @@ RArray::join_m(mrb_state *mrb)
  *
  */
 
-mrb_value
-RArray::mrb_ary_equal(mrb_state *mrb, mrb_value ary1)
+mrb_value RArray::mrb_ary_equal(mrb_state *mrb, mrb_value ary1)
 {
     RArray *self = RARRAY(ary1);
     mrb_value ary2;
@@ -996,28 +972,28 @@ RArray::mrb_ary_equal(mrb_state *mrb, mrb_value ary1)
 
     mrb_get_args(mrb, "o", &ary2);
     if (mrb_obj_equal(mrb, ary1, ary2)) {
-        equal_p = 1;
+        equal_p = true;
     }
     else if (mrb_special_const_p(ary2)) {
-        equal_p = 0;
+        equal_p = false;
     }
     else if (!mrb_array_p(ary2)) {
         if (!mrb_respond_to(mrb, ary2, mrb_intern2(mrb, "to_ary", 6))) {
-            equal_p = 0;
+            equal_p = false;
         }
         else {
             equal_p = mrb_equal(mrb, ary2, ary1);
         }
     }
     else if (self->m_len != RARRAY_LEN(ary2)) {
-        equal_p = 0;
+        equal_p = false;
     }
     else {
-        equal_p = 1;
+        equal_p = true;
         RArray *other = RARRAY(ary2);
         for (mrb_int i=0; i<self->m_len; i++) {
             if (!mrb_equal(mrb, self->m_ptr[i], other->m_ptr[i])) {
-                equal_p = 0;
+                equal_p = false;
                 break;
             }
         }
@@ -1051,9 +1027,8 @@ mrb_value RArray::mrb_ary_eql(mrb_state *mrb, mrb_value ary1)
         eql_p = false;
     }
     else {
-        mrb_int i;
-        eql_p = 1;
-        for (i=0; i<RARRAY_LEN(ary1); i++) {
+        eql_p = true;
+        for (mrb_int i=0; i<RARRAY_LEN(ary1); i++) {
             if (!mrb_eql(mrb, RARRAY(ary1)->ary_elt(i), RARRAY(ary2)->ary_elt(i))) {
                 eql_p = false;
                 break;
@@ -1069,36 +1044,36 @@ void mrb_init_array(mrb_state *mrb)
     RClass *a = mrb->array_class = mrb_define_class(mrb, "Array", mrb->object_class);
     a->instance_tt(MRB_TT_ARRAY)
             .include_module(mrb, "Enumerable")
-            .define_class_method(mrb, "[]",         RArray::s_create,       ARGS_ANY())    /* 15.2.12.4.1 */
-            .define_method(mrb, "*",                RArray::times,          ARGS_REQ(1))   /* 15.2.12.5.1  */
-            .define_method(mrb, "+",                RArray::plus,           ARGS_REQ(1)) /* 15.2.12.5.2  */
-            .define_method(mrb,  "<<",              RArray::push_m,         ARGS_REQ(1)) /* 15.2.12.5.3  */
-            .define_method(mrb,  "[]",              RArray::get,            ARGS_ANY())  /* 15.2.12.5.4  */
-            .define_method(mrb,  "[]=",             RArray::aset,           ARGS_ANY())  /* 15.2.12.5.5  */
-            .define_method(mrb,  "clear",           RArray::clear,          ARGS_NONE()) /* 15.2.12.5.6  */
-            .define_method(mrb,  "concat",          RArray::concat_m,       ARGS_REQ(1)) /* 15.2.12.5.8  */
-            .define_method(mrb,  "delete_at",       RArray::delete_at,      ARGS_REQ(1)) /* 15.2.12.5.9  */
-            .define_method(mrb,  "empty?",          RArray::empty_p,        ARGS_NONE()) /* 15.2.12.5.12 */
-            .define_method(mrb,  "first",           RArray::first,          ARGS_OPT(1)) /* 15.2.12.5.13 */
-            .define_method(mrb,  "index",           RArray::index_m,        ARGS_REQ(1)) /* 15.2.12.5.14 */
-            .define_method(mrb,  "initialize_copy", RArray::replace_m,      ARGS_REQ(1)) /* 15.2.12.5.16 */
-            .define_method(mrb,  "join",            RArray::join_m,         ARGS_ANY())  /* 15.2.12.5.17 */
-            .define_method(mrb,  "last",            RArray::last,           ARGS_ANY())  /* 15.2.12.5.18 */
-            .define_method(mrb,  "length",          RArray::size,           ARGS_NONE()) /* 15.2.12.5.19 */
-            .define_method(mrb,  "pop",             RArray::pop,            ARGS_NONE()) /* 15.2.12.5.21 */
-            .define_method(mrb,  "push",            RArray::push_m,         ARGS_ANY())  /* 15.2.12.5.22 */
-            .define_method(mrb,  "replace",         RArray::replace_m,      ARGS_REQ(1)) /* 15.2.12.5.23 */
-            .define_method(mrb,  "reverse",         RArray::reverse,        ARGS_NONE()) /* 15.2.12.5.24 */
-            .define_method(mrb,  "reverse!",        RArray::reverse_bang,   ARGS_NONE()) /* 15.2.12.5.25 */
-            .define_method(mrb,  "rindex",          RArray::rindex_m,       ARGS_REQ(1)) /* 15.2.12.5.26 */
-            .define_method(mrb,  "shift",           RArray::shift,          ARGS_NONE()) /* 15.2.12.5.27 */
-            .define_method(mrb,  "size",            RArray::size,           ARGS_NONE()) /* 15.2.12.5.28 */
-            .define_method(mrb,  "slice",           RArray::get,            ARGS_ANY())  /* 15.2.12.5.29 */
-            .define_method(mrb,  "unshift",         RArray::unshift_m,      ARGS_ANY())  /* 15.2.12.5.30 */
-            .define_method(mrb,  "inspect",         RArray::inspect,        ARGS_NONE()) /* 15.2.12.5.31 (x) */
+            .define_class_method(mrb, "[]",         RArray::s_create,       MRB_ARGS_ANY())    /* 15.2.12.4.1 */
+            .define_method(mrb, "*",                RArray::times,          MRB_ARGS_REQ(1))   /* 15.2.12.5.1  */
+            .define_method(mrb, "+",                RArray::plus,           MRB_ARGS_REQ(1)) /* 15.2.12.5.2  */
+            .define_method(mrb,  "<<",              RArray::push_m,         MRB_ARGS_REQ(1)) /* 15.2.12.5.3  */
+            .define_method(mrb,  "[]",              RArray::get,            MRB_ARGS_ANY())  /* 15.2.12.5.4  */
+            .define_method(mrb,  "[]=",             RArray::aset,           MRB_ARGS_ANY())  /* 15.2.12.5.5  */
+            .define_method(mrb,  "clear",           RArray::clear,          MRB_ARGS_NONE()) /* 15.2.12.5.6  */
+            .define_method(mrb,  "concat",          RArray::concat_m,       MRB_ARGS_REQ(1)) /* 15.2.12.5.8  */
+            .define_method(mrb,  "delete_at",       RArray::delete_at,      MRB_ARGS_REQ(1)) /* 15.2.12.5.9  */
+            .define_method(mrb,  "empty?",          RArray::empty_p,        MRB_ARGS_NONE()) /* 15.2.12.5.12 */
+            .define_method(mrb,  "first",           RArray::first,          MRB_ARGS_OPT(1)) /* 15.2.12.5.13 */
+            .define_method(mrb,  "index",           RArray::index_m,        MRB_ARGS_REQ(1)) /* 15.2.12.5.14 */
+            .define_method(mrb,  "initialize_copy", RArray::replace_m,      MRB_ARGS_REQ(1)) /* 15.2.12.5.16 */
+            .define_method(mrb,  "join",            RArray::join_m,         MRB_ARGS_ANY())  /* 15.2.12.5.17 */
+            .define_method(mrb,  "last",            RArray::last,           MRB_ARGS_ANY())  /* 15.2.12.5.18 */
+            .define_method(mrb,  "length",          RArray::size,           MRB_ARGS_NONE()) /* 15.2.12.5.19 */
+            .define_method(mrb,  "pop",             RArray::pop,            MRB_ARGS_NONE()) /* 15.2.12.5.21 */
+            .define_method(mrb,  "push",            RArray::push_m,         MRB_ARGS_ANY())  /* 15.2.12.5.22 */
+            .define_method(mrb,  "replace",         RArray::replace_m,      MRB_ARGS_REQ(1)) /* 15.2.12.5.23 */
+            .define_method(mrb,  "reverse",         RArray::reverse,        MRB_ARGS_NONE()) /* 15.2.12.5.24 */
+            .define_method(mrb,  "reverse!",        RArray::reverse_bang,   MRB_ARGS_NONE()) /* 15.2.12.5.25 */
+            .define_method(mrb,  "rindex",          RArray::rindex_m,       MRB_ARGS_REQ(1)) /* 15.2.12.5.26 */
+            .define_method(mrb,  "shift",           RArray::shift,          MRB_ARGS_NONE()) /* 15.2.12.5.27 */
+            .define_method(mrb,  "size",            RArray::size,           MRB_ARGS_NONE()) /* 15.2.12.5.28 */
+            .define_method(mrb,  "slice",           RArray::get,            MRB_ARGS_ANY())  /* 15.2.12.5.29 */
+            .define_method(mrb,  "unshift",         RArray::unshift_m,      MRB_ARGS_ANY())  /* 15.2.12.5.30 */
+            .define_method(mrb,  "inspect",         RArray::inspect,        MRB_ARGS_NONE()) /* 15.2.12.5.31 (x) */
             .define_alias(mrb,  "to_s", "inspect")                                       /* 15.2.12.5.32 (x) */
-            .define_method(mrb, "==",              RArray::mrb_ary_equal,   ARGS_REQ(1)) /* 15.2.12.5.33 (x) */
-            .define_method(mrb, "eql?",            RArray::mrb_ary_eql,     ARGS_REQ(1)) /* 15.2.12.5.34 (x) */
-            .define_method(mrb, "<=>",             RArray::cmp,             ARGS_REQ(1)) /* 15.2.12.5.36 (x) */
+            .define_method(mrb, "==",              RArray::mrb_ary_equal,   MRB_ARGS_REQ(1)) /* 15.2.12.5.33 (x) */
+            .define_method(mrb, "eql?",            RArray::mrb_ary_eql,     MRB_ARGS_REQ(1)) /* 15.2.12.5.34 (x) */
+            .define_method(mrb, "<=>",             RArray::cmp,             MRB_ARGS_REQ(1)) /* 15.2.12.5.36 (x) */
             .fin();
 }

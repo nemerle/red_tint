@@ -69,10 +69,9 @@ mrb_range_beg(mrb_state *mrb, mrb_value range)
  *     (1...10).end   #=> 10
  */
 
-mrb_value
-mrb_range_end(mrb_state *mrb, mrb_value range)
+mrb_value mrb_range_end(mrb_state *mrb, mrb_value range)
 {
-    struct RRange *r = mrb_range_ptr(range);
+    RRange *r = mrb_range_ptr(range);
 
     return r->edges->end;
 }
@@ -83,18 +82,16 @@ mrb_range_end(mrb_state *mrb, mrb_value range)
  *
  *  Returns <code>true</code> if <i>range</i> excludes its end value.
  */
-mrb_value
-mrb_range_excl(mrb_state *mrb, mrb_value range)
+mrb_value mrb_range_excl(mrb_state *mrb, mrb_value range)
 {
-    struct RRange *r = mrb_range_ptr(range);
+    RRange *r = mrb_range_ptr(range);
 
     return mrb_bool_value(r->excl);
 }
 
-static void
-range_init(mrb_state *mrb, mrb_value range, mrb_value beg, mrb_value end, int exclude_end)
+static void range_init(mrb_state *mrb, mrb_value range, mrb_value beg, mrb_value end, int exclude_end)
 {
-    struct RRange *r = mrb_range_ptr(range);
+    RRange *r = mrb_range_ptr(range);
 
     range_check(mrb, beg, end);
     r->excl = exclude_end;
@@ -117,7 +114,7 @@ mrb_value
 mrb_range_initialize(mrb_state *mrb, mrb_value range)
 {
     mrb_value beg, end;
-    int exclusive;
+    mrb_bool exclusive;
     int n;
 
     n = mrb_get_args(mrb, "oo|b", &beg, &end, &exclusive);
@@ -146,8 +143,8 @@ mrb_range_initialize(mrb_state *mrb, mrb_value range)
 mrb_value
 mrb_range_eq(mrb_state *mrb, mrb_value range)
 {
-    struct RRange *rr;
-    struct RRange *ro;
+    RRange *rr;
+    RRange *ro;
     mrb_value obj;
     mrb_bool eq_p;
 
@@ -438,20 +435,20 @@ mrb_init_range(mrb_state *mrb)
     mrb->define_class("Range", mrb->object_class)
             .instance_tt(MRB_TT_RANGE)
             .include_module(mrb, "Enumerable")
-            .define_method(mrb, "begin",           mrb_range_beg,         ARGS_NONE())      /* 15.2.14.4.3  */
-            .define_method(mrb, "end",             mrb_range_end,         ARGS_NONE())      /* 15.2.14.4.5  */
-            .define_method(mrb, "==",              mrb_range_eq,          ARGS_REQ(1))      /* 15.2.14.4.1  */
-            .define_method(mrb, "===",             mrb_range_include,     ARGS_REQ(1))      /* 15.2.14.4.2  */
-            .define_method(mrb, "each",            mrb_range_each,        ARGS_NONE())      /* 15.2.14.4.4  */
-            .define_method(mrb, "exclude_end?",    mrb_range_excl,        ARGS_NONE())      /* 15.2.14.4.6  */
-            .define_method(mrb, "first",           mrb_range_beg,         ARGS_NONE())      /* 15.2.14.4.7  */
-            .define_method(mrb, "include?",        mrb_range_include,     ARGS_REQ(1))      /* 15.2.14.4.8  */
-            .define_method(mrb, "initialize",      mrb_range_initialize,  ARGS_ANY())       /* 15.2.14.4.9  */
-            .define_method(mrb, "last",            mrb_range_end,         ARGS_NONE())      /* 15.2.14.4.10 */
-            .define_method(mrb, "member?",         mrb_range_include,     ARGS_REQ(1))      /* 15.2.14.4.11 */
-            .define_method(mrb, "to_s",            range_to_s,            ARGS_NONE())      /* 15.2.14.4.12(x) */
-            .define_method(mrb, "inspect",         range_inspect,         ARGS_NONE())      /* 15.2.14.4.13(x) */
-            .define_method(mrb, "eql?",            range_eql,             ARGS_REQ(1))      /* 15.2.14.4.14(x) */
-            .define_method(mrb, "initialize_copy", range_initialize_copy, ARGS_REQ(1))      /* 15.2.14.4.15(x) */
+            .define_method(mrb, "begin",           mrb_range_beg,         MRB_ARGS_NONE())      /* 15.2.14.4.3  */
+            .define_method(mrb, "end",             mrb_range_end,         MRB_ARGS_NONE())      /* 15.2.14.4.5  */
+            .define_method(mrb, "==",              mrb_range_eq,          MRB_ARGS_REQ(1))      /* 15.2.14.4.1  */
+            .define_method(mrb, "===",             mrb_range_include,     MRB_ARGS_REQ(1))      /* 15.2.14.4.2  */
+            .define_method(mrb, "each",            mrb_range_each,        MRB_ARGS_NONE())      /* 15.2.14.4.4  */
+            .define_method(mrb, "exclude_end?",    mrb_range_excl,        MRB_ARGS_NONE())      /* 15.2.14.4.6  */
+            .define_method(mrb, "first",           mrb_range_beg,         MRB_ARGS_NONE())      /* 15.2.14.4.7  */
+            .define_method(mrb, "include?",        mrb_range_include,     MRB_ARGS_REQ(1))      /* 15.2.14.4.8  */
+            .define_method(mrb, "initialize",      mrb_range_initialize,  MRB_ARGS_ANY())       /* 15.2.14.4.9  */
+            .define_method(mrb, "last",            mrb_range_end,         MRB_ARGS_NONE())      /* 15.2.14.4.10 */
+            .define_method(mrb, "member?",         mrb_range_include,     MRB_ARGS_REQ(1))      /* 15.2.14.4.11 */
+            .define_method(mrb, "to_s",            range_to_s,            MRB_ARGS_NONE())      /* 15.2.14.4.12(x) */
+            .define_method(mrb, "inspect",         range_inspect,         MRB_ARGS_NONE())      /* 15.2.14.4.13(x) */
+            .define_method(mrb, "eql?",            range_eql,             MRB_ARGS_REQ(1))      /* 15.2.14.4.14(x) */
+            .define_method(mrb, "initialize_copy", range_initialize_copy, MRB_ARGS_REQ(1))      /* 15.2.14.4.15(x) */
             .fin();
 }

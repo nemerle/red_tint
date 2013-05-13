@@ -84,8 +84,7 @@ RClass* mrb_define_module_id(mrb_state *mrb, mrb_sym name)
 {
     RClass *m = mrb_module_new(mrb);
 
-    mrb_obj_iv_set(mrb, (RObject*)mrb->object_class,
-                   name, mrb_obj_value(m));
+    mrb_obj_iv_set(mrb, (RObject*)mrb->object_class, name, mrb_obj_value(m));
     mrb_name_class(mrb, m, name);
 
     return m;
@@ -96,31 +95,29 @@ RClass* mrb_define_module(mrb_state *mrb, const char *name)
     return mrb_define_module_id(mrb, mrb_intern(mrb, name));
 }
 
-static void
-setup_class(mrb_state *mrb, mrb_value outer, RClass *c, mrb_sym id)
+static void setup_class(mrb_state *mrb, mrb_value outer, RClass *c, mrb_sym id)
 {
     mrb_name_class(mrb, c, id);
     mrb_const_set(mrb, outer, id, mrb_obj_value(c));
     mrb_obj_iv_set(mrb, c, mrb_intern2(mrb, "__outer__", 9), outer);
 }
 
-RClass*
-mrb_class_outer_module(mrb_state *mrb, struct RClass *c)
+RClass* mrb_class_outer_module(mrb_state *mrb, struct RClass *c)
 {
     mrb_value outer;
 
     outer = mrb_obj_iv_get(mrb, c, mrb_intern2(mrb, "__outer__", 9));
-    if (mrb_nil_p(outer)) return 0;
+    if (mrb_nil_p(outer))
+        return 0;
     return mrb_class_ptr(outer);
 }
 
 RClass* mrb_vm_define_module(mrb_state *mrb, mrb_value outer, mrb_sym id)
 {
     RClass *c;
-    mrb_value v;
 
     if (mrb_const_defined(mrb, outer, id)) {
-        v = mrb_const_get(mrb, outer, id);
+        mrb_value v = mrb_const_get(mrb, outer, id);
         c = mrb_class_ptr(v);
     }
     else {
@@ -134,8 +131,7 @@ RClass* mrb_define_class_id(mrb_state *mrb, mrb_sym name, RClass *super)
 {
     RClass *c = mrb_class_new(mrb, super);
 
-    mrb_obj_iv_set(mrb, (RObject*)mrb->object_class,
-                   name, mrb_obj_value(c));
+    mrb_obj_iv_set(mrb, (RObject*)mrb->object_class, name, mrb_obj_value(c));
     mrb_name_class(mrb, c, name);
 
     return c;
@@ -143,14 +139,12 @@ RClass* mrb_define_class_id(mrb_state *mrb, mrb_sym name, RClass *super)
 
 RClass* mrb_define_class(mrb_state *mrb, const char *name, RClass *super)
 {
-    RClass *c;
-    c = mrb_define_class_id(mrb, mrb_intern(mrb, name), super);
+    RClass *c = mrb_define_class_id(mrb, mrb_intern(mrb, name), super);
     return c;
 }
 RClass& mrb_state::define_class(const char *name, RClass *super)
 {
-    RClass *c;
-    c = mrb_define_class_id(this, mrb_intern(this, name), super);
+    RClass *c = mrb_define_class_id(this, mrb_intern(this, name), super);
     return *c;
 }
 
@@ -192,8 +186,7 @@ RClass* mrb_vm_define_class(mrb_state *mrb, mrb_value outer, mrb_value super, mr
     return c;
 }
 
-int
-mrb_class_defined(mrb_state *mrb, const char *name)
+int mrb_class_defined(mrb_state *mrb, const char *name)
 {
     return mrb_const_defined(mrb, mrb_obj_value(mrb->object_class), mrb_intern(mrb, name));
 }
@@ -337,7 +330,7 @@ to_hash(mrb_state *mrb, mrb_value val)
    a: Array [mrb_value*,mrb_int]
    f: Float [mrb_float]
    i: Integer [mrb_int]
-   b: Binary [int]
+   b: Boolean [mrb_bool]
    n: Symbol [mrb_sym]
    &: Block [mrb_value]
    *: rest argument [mrb_value*,int]
@@ -538,7 +531,7 @@ mrb_get_args(mrb_state *mrb, const char *format, ...)
                 break;
             case 'b':
             {
-                int *boolp = va_arg(ap, int*);
+                mrb_bool *boolp = va_arg(ap, mrb_bool*);
 
                 if (i < argc) {
                     mrb_value b = *sp++;
@@ -635,41 +628,7 @@ static RClass* boot_defclass(mrb_state *mrb, RClass *super)
 void
 mrb_include_module(mrb_state *mrb, RClass *c, RClass *m)
 {
-    RClass *ins_pos;
-
-    ins_pos = c;
-    while (m) {
-        RClass *p = c, *ic;
-        int superclass_seen = 0;
-
-        while(p) {
-            if (c != p && p->tt == MRB_TT_CLASS) {
-                superclass_seen = 1;
-            }
-            else if (p->mt == m->mt){
-                if (p->tt == MRB_TT_ICLASS && !superclass_seen) {
-                    ins_pos = p;
-                }
-                goto skip;
-            }
-            p = p->super;
-        }
-        ic = mrb->gc().obj_alloc<RClass>(MRB_TT_ICLASS, mrb->class_class);
-        if (m->tt == MRB_TT_ICLASS) {
-            ic->c = m->c;
-        }
-        else {
-            ic->c = m;
-        }
-        ic->mt = m->mt;
-        ic->iv = m->iv;
-        ic->super = ins_pos->super;
-        ins_pos->super = ic;
-        mrb->gc().mrb_field_write_barrier(ins_pos, ic);
-        ins_pos = ic;
-skip:
-        m = m->super;
-    }
+    c->include_module(mrb,m);
 }
 
 static mrb_value
@@ -749,7 +708,7 @@ mrb_mod_ancestors(mrb_state *mrb, mrb_value self)
         if (c->tt == MRB_TT_ICLASS) {
             RArray::push(mrb, result, mrb_obj_value(c->c));
         }
-        else {
+        else if (c->tt != MRB_TT_SCLASS) {
             RArray::push(mrb, result, mrb_obj_value(c));
         }
         c = c->super;
@@ -786,7 +745,7 @@ mrb_mod_included_modules(mrb_state *mrb, mrb_value self)
     return result;
 }
 
-mrb_value class_instance_method_list(mrb_state*, int, mrb_value*, struct RClass*, int);
+mrb_value class_instance_method_list(mrb_state*, mrb_bool, RClass*, int);
 
 /* 15.2.2.4.33 */
 /*
@@ -819,15 +778,13 @@ mrb_value class_instance_method_list(mrb_state*, int, mrb_value*, struct RClass*
 static mrb_value
 mrb_mod_instance_methods(mrb_state *mrb, mrb_value mod)
 {
-    mrb_value *argv;
-    int argc;
-    struct RClass *c = mrb_class_ptr(mod);
-
-    mrb_get_args(mrb, "*", &argv, &argc);
-    return class_instance_method_list(mrb, argc, argv, c, 0);
+    RClass *c = mrb_class_ptr(mod);
+    mrb_bool recur=true;
+    mrb_get_args(mrb, "|b", &recur);
+    return class_instance_method_list(mrb, recur, c, 0);
 }
 
-mrb_value mrb_yield_internal(mrb_state *mrb, mrb_value b, int argc, mrb_value *argv, mrb_value self, struct RClass *c);
+mrb_value mrb_yield_internal(mrb_state *mrb, mrb_value b, int argc, mrb_value *argv, mrb_value self, RClass *c);
 
 /* 15.2.2.4.35 */
 /*
@@ -840,11 +797,10 @@ mrb_value mrb_yield_internal(mrb_state *mrb, mrb_value b, int argc, mrb_value *a
  *  the result of evaluating its argument.
  */
 
-mrb_value
-mrb_mod_module_eval(mrb_state *mrb, mrb_value mod)
+mrb_value mrb_mod_module_eval(mrb_state *mrb, mrb_value mod)
 {
     mrb_value a, b;
-    struct RClass *c;
+    RClass *c;
 
     if (mrb_get_args(mrb, "|S&", &a, &b) == 1) {
         mrb_raise(mrb, E_NOTIMP_ERROR, "module_eval/class_eval with string not implemented");
@@ -853,8 +809,7 @@ mrb_mod_module_eval(mrb_state *mrb, mrb_value mod)
     return mrb_yield_internal(mrb, b, 0, 0, mod, c);
 }
 
-mrb_value
-mrb_singleton_class(mrb_state *mrb, mrb_value v)
+mrb_value mrb_singleton_class(mrb_state *mrb, mrb_value v)
 {
     RBasic *obj;
 
@@ -880,15 +835,13 @@ mrb_singleton_class(mrb_state *mrb, mrb_value v)
     return mrb_obj_value(obj->c);
 }
 
-void
-mrb_define_singleton_method(mrb_state *mrb, RObject *o, const char *name, mrb_func_t func, mrb_aspec aspec)
+void mrb_define_singleton_method(mrb_state *mrb, RObject *o, const char *name, mrb_func_t func, mrb_aspec aspec)
 {
     prepare_singleton_class(mrb, o);
     o->c->define_method_id(mrb, mrb_intern(mrb, name), func, aspec);
 }
 
-void
-mrb_define_class_method(mrb_state *mrb, RClass *c, const char *name, mrb_func_t func, mrb_aspec aspec)
+void mrb_define_class_method(mrb_state *mrb, RClass *c, const char *name, mrb_func_t func, mrb_aspec aspec)
 {
     mrb_define_singleton_method(mrb, (RObject*)c, name, func, aspec);
 }
@@ -904,11 +857,15 @@ RClass &RClass::include_module(mrb_state *mrb, RClass *m)
 
     while (m) {
         RClass *p = this, *ic;
-        int superclass_seen = 0;
+        bool superclass_seen = false;
+
+        if (this->mt == m->mt) {
+            mrb_raise(mrb, E_ARGUMENT_ERROR, "cyclic include detected");
+        }
 
         while(p) {
             if (this != p && p->tt == MRB_TT_CLASS) {
-                superclass_seen = 1;
+                superclass_seen = true;
             }
             else if (p->mt == m->mt){
                 if (p->tt == MRB_TT_ICLASS && !superclass_seen) {
@@ -976,8 +933,7 @@ RProc * mrb_method_search(mrb_state *mrb, RClass* c, mrb_sym mid)
     return m;
 }
 
-void
-mrb_obj_call_init(mrb_state *mrb, mrb_value obj, int argc, mrb_value *argv)
+void mrb_obj_call_init(mrb_state *mrb, mrb_value obj, int argc, mrb_value *argv)
 {
     mrb_funcall_argv(mrb, obj, mrb->init_sym, argc, argv);
 }
@@ -1205,8 +1161,7 @@ const char* mrb_class_name(mrb_state *mrb, RClass* c)
     return mrb_str_ptr(path)->ptr;
 }
 
-const char*
-mrb_obj_classname(mrb_state *mrb, mrb_value obj)
+const char* mrb_obj_classname(mrb_state *mrb, mrb_value obj)
 {
     return mrb_class_name(mrb, mrb_obj_class(mrb, obj));
 }
@@ -1217,8 +1172,7 @@ mrb_obj_classname(mrb_state *mrb, mrb_value obj)
  * \param super a reference to an object.
  * \exception TypeError if \a super is not a Class or \a super is a singleton class.
  */
-void
-mrb_check_inheritable(mrb_state *mrb, struct RClass *super)
+void mrb_check_inheritable(mrb_state *mrb, struct RClass *super)
 {
     if (super->tt != MRB_TT_CLASS) {
         mrb_raisef(mrb, E_TYPE_ERROR, "superclass must be a Class (%S given)", mrb_obj_value(super));
@@ -1237,8 +1191,7 @@ mrb_check_inheritable(mrb_state *mrb, struct RClass *super)
  * \exception TypeError \a super is not inheritable.
  * \exception TypeError \a super is the Class class.
  */
-RClass *
-        mrb_class_new(mrb_state *mrb, struct RClass *super)
+RClass * mrb_class_new(mrb_state *mrb, struct RClass *super)
 {
     struct RClass *c;
 
@@ -1284,8 +1237,7 @@ RClass* mrb_obj_class(mrb_state *mrb, mrb_value obj)
     return mrb_class_real(RClass::mrb_class(mrb, obj));
 }
 
-void
-mrb_alias_method(mrb_state *mrb, struct RClass *c, mrb_sym a, mrb_sym b)
+void mrb_alias_method(mrb_state *mrb, struct RClass *c, mrb_sym a, mrb_sym b)
 {
     RProc *m = mrb_method_search(mrb, c, b);
 
@@ -1332,6 +1284,7 @@ static mrb_value mrb_mod_to_s(mrb_state *mrb, mrb_value klass)
                 break;
         }
         mrb_str_cat(mrb, str, ">", 1);
+        return str;
     }
     else {
         RClass *c;
@@ -1764,48 +1717,48 @@ mrb_init_class(mrb_state *mrb)
     mrb_name_class(mrb, cls, mrb_intern(mrb, "Class"));
 
     MRB_SET_INSTANCE_TT(cls, MRB_TT_CLASS);
-    bob->define_method(mrb, "initialize",           mrb_bob_init,             ARGS_NONE())
-            .define_method(mrb, "!",                    mrb_bob_not,              ARGS_NONE())
-            .define_method(mrb, "method_missing",       mrb_bob_missing,          ARGS_ANY());  /* 15.3.1.3.30 */
+    bob->define_method(mrb, "initialize",           mrb_bob_init,             MRB_ARGS_NONE())
+            .define_method(mrb, "!",                    mrb_bob_not,              MRB_ARGS_NONE())
+            .define_method(mrb, "method_missing",       mrb_bob_missing,          MRB_ARGS_ANY());  /* 15.3.1.3.30 */
 
-    cls->define_class_method(mrb, "new",            mrb_class_new_class,      ARGS_ANY())
-            .define_method(mrb, "superclass",          mrb_class_superclass,     ARGS_NONE()) /* 15.2.3.3.4 */
-            .define_method(mrb, "new",                 mrb_instance_new,         ARGS_ANY())  /* 15.2.3.3.3 */
-            .define_method(mrb, "inherited",           mrb_bob_init,             ARGS_REQ(1))
+    cls->define_class_method(mrb, "new",            mrb_class_new_class,      MRB_ARGS_ANY())
+            .define_method(mrb, "superclass",          mrb_class_superclass,     MRB_ARGS_NONE()) /* 15.2.3.3.4 */
+            .define_method(mrb, "new",                 mrb_instance_new,         MRB_ARGS_ANY())  /* 15.2.3.3.3 */
+            .define_method(mrb, "inherited",           mrb_bob_init,             MRB_ARGS_REQ(1))
             .undef_method(mrb, "append_features")
             .undef_method(mrb, "extend_object")
             .fin();
     mod->undef_method(mrb, "new")
             .instance_tt(MRB_TT_MODULE)
-            .define_method(mrb, "class_variable_defined?", mrb_mod_cvar_defined,     ARGS_REQ(1))  /* 15.2.2.4.16 */
-            .define_method(mrb, "class_variable_get",      mrb_mod_cvar_get,         ARGS_REQ(1))  /* 15.2.2.4.17 */
-            .define_method(mrb, "class_variable_set",      mrb_mod_cvar_set,         ARGS_REQ(2)) /* 15.2.2.4.18 */
-            .define_method(mrb, "extend_object",           mrb_mod_extend_object,    ARGS_REQ(1)) /* 15.2.2.4.25 */
-            .define_method(mrb, "extended",                mrb_bob_init,             ARGS_REQ(1)) /* 15.2.2.4.26 */
-            .define_method(mrb, "include",                 mrb_mod_include,          ARGS_ANY())  /* 15.2.2.4.27 */
-            .define_method(mrb, "include?",                mrb_mod_include_p,        ARGS_REQ(1)) /* 15.2.2.4.28 */
-            .define_method(mrb, "append_features",         mrb_mod_append_features,  ARGS_REQ(1)) /* 15.2.2.4.10 */
-            .define_method(mrb, "class_eval",              mrb_mod_module_eval,      ARGS_ANY())  /* 15.2.2.4.15 */
-            .define_method(mrb, "included",                mrb_bob_init,             ARGS_REQ(1)) /* 15.2.2.4.29 */
-            .define_method(mrb, "included_modules",        mrb_mod_included_modules, ARGS_NONE()) /* 15.2.2.4.30 */
-            .define_method(mrb, "instance_methods",        mrb_mod_instance_methods, ARGS_ANY())  /* 15.2.2.4.33 */
-            .define_method(mrb, "method_defined?",         mrb_mod_method_defined,   ARGS_REQ(1)) /* 15.2.2.4.34 */
-            .define_method(mrb, "module_eval",             mrb_mod_module_eval,      ARGS_ANY())  /* 15.2.2.4.35 */
-            .define_method(mrb, "remove_class_variable",   mrb_mod_remove_cvar,      ARGS_REQ(1)) /* 15.2.2.4.39 */
-            .define_method(mrb, "remove_method",           mrb_mod_remove_method,    ARGS_ANY())  /* 15.2.2.4.41 */
-            .define_method(mrb, "to_s",                    mrb_mod_to_s,             ARGS_NONE())
-            .define_method(mrb, "inspect",                 mrb_mod_to_s,             ARGS_NONE())
-            .define_method(mrb, "alias_method",            mrb_mod_alias,            ARGS_ANY())  /* 15.2.2.4.8 */
-            .define_method(mrb, "ancestors",               mrb_mod_ancestors,        ARGS_NONE()) /* 15.2.2.4.9 */
-            .define_method(mrb, "undef_method",            mrb_mod_undef,            ARGS_ANY())  /* 15.2.2.4.41 */
-            .define_method(mrb, "const_defined?",          mrb_mod_const_defined,    ARGS_REQ(1)) /* 15.2.2.4.20 */
-            .define_method(mrb, "const_get",               mrb_mod_const_get,        ARGS_REQ(1)) /* 15.2.2.4.21 */
-            .define_method(mrb, "const_set",               mrb_mod_const_set,        ARGS_REQ(2)) /* 15.2.2.4.23 */
-            .define_method(mrb, "constants",               mrb_mod_constants,        ARGS_NONE()) /* 15.2.2.4.24 */
-            .define_method(mrb, "remove_const",            mrb_mod_remove_const,     ARGS_REQ(1)) /* 15.2.2.4.40 */
-            .define_method(mrb, "define_method",           mod_define_method,        ARGS_REQ(1))
-            .define_method(mrb, "class_variables",         mrb_mod_class_variables,  ARGS_NONE()) /* 15.2.2.4.19 */
-            .define_method(mrb, "===",                     mrb_mod_eqq,              ARGS_REQ(1))
-            .define_class_method(mrb, "constants",         mrb_mod_s_constants,      ARGS_ANY())  /* 15.2.2.3.1 */
+            .define_method(mrb, "class_variable_defined?", mrb_mod_cvar_defined,     MRB_ARGS_REQ(1))  /* 15.2.2.4.16 */
+            .define_method(mrb, "class_variable_get",      mrb_mod_cvar_get,         MRB_ARGS_REQ(1))  /* 15.2.2.4.17 */
+            .define_method(mrb, "class_variable_set",      mrb_mod_cvar_set,         MRB_ARGS_REQ(2)) /* 15.2.2.4.18 */
+            .define_method(mrb, "extend_object",           mrb_mod_extend_object,    MRB_ARGS_REQ(1)) /* 15.2.2.4.25 */
+            .define_method(mrb, "extended",                mrb_bob_init,             MRB_ARGS_REQ(1)) /* 15.2.2.4.26 */
+            .define_method(mrb, "include",                 mrb_mod_include,          MRB_ARGS_ANY())  /* 15.2.2.4.27 */
+            .define_method(mrb, "include?",                mrb_mod_include_p,        MRB_ARGS_REQ(1)) /* 15.2.2.4.28 */
+            .define_method(mrb, "append_features",         mrb_mod_append_features,  MRB_ARGS_REQ(1)) /* 15.2.2.4.10 */
+            .define_method(mrb, "class_eval",              mrb_mod_module_eval,      MRB_ARGS_ANY())  /* 15.2.2.4.15 */
+            .define_method(mrb, "included",                mrb_bob_init,             MRB_ARGS_REQ(1)) /* 15.2.2.4.29 */
+            .define_method(mrb, "included_modules",        mrb_mod_included_modules, MRB_ARGS_NONE()) /* 15.2.2.4.30 */
+            .define_method(mrb, "instance_methods",        mrb_mod_instance_methods, MRB_ARGS_OPT(1))  /* 15.2.2.4.33 */
+            .define_method(mrb, "method_defined?",         mrb_mod_method_defined,   MRB_ARGS_REQ(1)) /* 15.2.2.4.34 */
+            .define_method(mrb, "module_eval",             mrb_mod_module_eval,      MRB_ARGS_ANY())  /* 15.2.2.4.35 */
+            .define_method(mrb, "remove_class_variable",   mrb_mod_remove_cvar,      MRB_ARGS_REQ(1)) /* 15.2.2.4.39 */
+            .define_method(mrb, "remove_method",           mrb_mod_remove_method,    MRB_ARGS_ANY())  /* 15.2.2.4.41 */
+            .define_method(mrb, "to_s",                    mrb_mod_to_s,             MRB_ARGS_NONE())
+            .define_method(mrb, "inspect",                 mrb_mod_to_s,             MRB_ARGS_NONE())
+            .define_method(mrb, "alias_method",            mrb_mod_alias,            MRB_ARGS_ANY())  /* 15.2.2.4.8 */
+            .define_method(mrb, "ancestors",               mrb_mod_ancestors,        MRB_ARGS_NONE()) /* 15.2.2.4.9 */
+            .define_method(mrb, "undef_method",            mrb_mod_undef,            MRB_ARGS_ANY())  /* 15.2.2.4.41 */
+            .define_method(mrb, "const_defined?",          mrb_mod_const_defined,    MRB_ARGS_REQ(1)) /* 15.2.2.4.20 */
+            .define_method(mrb, "const_get",               mrb_mod_const_get,        MRB_ARGS_REQ(1)) /* 15.2.2.4.21 */
+            .define_method(mrb, "const_set",               mrb_mod_const_set,        MRB_ARGS_REQ(2)) /* 15.2.2.4.23 */
+            .define_method(mrb, "constants",               mrb_mod_constants,        MRB_ARGS_NONE()) /* 15.2.2.4.24 */
+            .define_method(mrb, "remove_const",            mrb_mod_remove_const,     MRB_ARGS_REQ(1)) /* 15.2.2.4.40 */
+            .define_method(mrb, "define_method",           mod_define_method,        MRB_ARGS_REQ(1))
+            .define_method(mrb, "class_variables",         mrb_mod_class_variables,  MRB_ARGS_NONE()) /* 15.2.2.4.19 */
+            .define_method(mrb, "===",                     mrb_mod_eqq,              MRB_ARGS_REQ(1))
+            .define_class_method(mrb, "constants",         mrb_mod_s_constants,      MRB_ARGS_ANY())  /* 15.2.2.3.1 */
             .fin();
 }

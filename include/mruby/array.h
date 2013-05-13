@@ -38,12 +38,11 @@ public:
     static mrb_value new_from_values(mrb_state *mrb, mrb_int size, const mrb_value *vals);
 static  void        concat(mrb_state *mrb, const mrb_value &self, const mrb_value &other);
     static mrb_value concat_m(mrb_state *mrb, mrb_value self);
-    static mrb_value plus(mrb_state *mrb, mrb_value self);
 static  void        replace(mrb_state *mrb, const mrb_value &self, const mrb_value &other);
     static mrb_value reverse_bang(mrb_state *mrb, mrb_value self);
 static  mrb_value   unshift(mrb_state *mrb, const mrb_value &self, const mrb_value &item);
     static mrb_value unshift_m(mrb_state *mrb, mrb_value self);
-static  mrb_value   splice(mrb_state *mrb, const mrb_value &ary, mrb_int head, mrb_int m_len, mrb_value rpl);
+static  mrb_value   splice(mrb_state *mrb, const mrb_value &ary, mrb_int head, mrb_int m_len, const mrb_value &rpl);
     static mrb_value aset(mrb_state *mrb, mrb_value self);
     static mrb_value delete_at(mrb_state *mrb, mrb_value self);
     static mrb_value clear(mrb_state *mrb, mrb_value self);
@@ -51,6 +50,7 @@ static  mrb_value   splice(mrb_state *mrb, const mrb_value &ary, mrb_int head, m
     static mrb_value splat(mrb_state *mrb, mrb_value v);
     static mrb_value replace_m(mrb_state *mrb, mrb_value self);
     static mrb_value shift(mrb_state *mrb, mrb_value self);
+                    FORWARD_TO_INSTANCE(plus)
     FORWARD_TO_INSTANCE(first)
     FORWARD_TO_INSTANCE(last)
     FORWARD_TO_INSTANCE(pop)
@@ -80,6 +80,7 @@ static  mrb_value   splice(mrb_state *mrb, const mrb_value &ary, mrb_int head, m
         return mrb_ary_ptr(self)->entry(offset);
     }
 
+        mrb_value   plus(mrb_state *mrb) const;
     void        push(mrb_state *mrb, mrb_value elem);
     mrb_value   pop(mrb_state *mrb);
     mrb_value   first(mrb_state *mrb);
@@ -107,7 +108,7 @@ protected:
 //    }
 static  RArray *    ary_new_capa(mrb_state *mrb, size_t capa);
     mrb_value   inspect_ary(mrb_state *mrb, RArray *list_arr);
-    mrb_value   join_ary(mrb_state *mrb, mrb_value sep, RArray *list_arr);
+        mrb_value   join_ary(mrb_state *mrb, const mrb_value &sep, RArray *list_arr);
     mrb_value   ary_subseq(mrb_state *mrb, mrb_int beg, mrb_int m_len);
     void ary_make_shared(mrb_state *mrb);
         void        ary_replace(mrb_state *mrb, const mrb_value *argv, mrb_int m_len);

@@ -496,7 +496,7 @@ void MemManager::obj_free(RBasic *obj)
         case MRB_TT_STRING:
             if (obj->flags & MRB_STR_SHARED)
                 mrb_str_decref(m_mrb, ((RString*)obj)->aux.shared);
-            else
+            else if ((obj->flags & MRB_STR_STATIC) == 0) // prevent freeing of static string
                 _free(((RString*)obj)->ptr);
             break;
 
@@ -1074,7 +1074,7 @@ gc_generational_mode_get(mrb_state *mrb, mrb_value self)
 static mrb_value
 gc_generational_mode_set(mrb_state *mrb, mrb_value self)
 {
-    int enable;
+    mrb_bool enable;
 
     mrb_get_args(mrb, "b", &enable);
     if (mrb->gc().generational_gc_mode() != enable)
@@ -1093,15 +1093,15 @@ void
 mrb_init_gc(mrb_state *mrb)
 {
     mrb->define_module("GC").
-            define_class_method(mrb, "start", gc_start, ARGS_NONE()).
-            define_class_method(mrb, "enable", gc_enable, ARGS_NONE()).
-            define_class_method(mrb, "disable", gc_disable, ARGS_NONE()).
-            define_class_method(mrb, "interval_ratio", gc_interval_ratio_get, ARGS_NONE()).
-            define_class_method(mrb, "interval_ratio=", gc_interval_ratio_set, ARGS_REQ(1)).
-            define_class_method(mrb, "step_ratio", gc_step_ratio_get, ARGS_NONE()).
-            define_class_method(mrb, "step_ratio=", gc_step_ratio_set, ARGS_REQ(1)).
-            define_class_method(mrb, "generational_mode=", gc_generational_mode_set, ARGS_REQ(1)).
-            define_class_method(mrb, "generational_mode", gc_generational_mode_get, ARGS_NONE())
+            define_class_method(mrb, "start", gc_start, MRB_ARGS_NONE()).
+            define_class_method(mrb, "enable", gc_enable, MRB_ARGS_NONE()).
+            define_class_method(mrb, "disable", gc_disable, MRB_ARGS_NONE()).
+            define_class_method(mrb, "interval_ratio", gc_interval_ratio_get, MRB_ARGS_NONE()).
+            define_class_method(mrb, "interval_ratio=", gc_interval_ratio_set, MRB_ARGS_REQ(1)).
+            define_class_method(mrb, "step_ratio", gc_step_ratio_get, MRB_ARGS_NONE()).
+            define_class_method(mrb, "step_ratio=", gc_step_ratio_set, MRB_ARGS_REQ(1)).
+            define_class_method(mrb, "generational_mode=", gc_generational_mode_set, MRB_ARGS_REQ(1)).
+            define_class_method(mrb, "generational_mode", gc_generational_mode_get, MRB_ARGS_NONE())
         #ifndef GC_TEST
             ;
 #else
