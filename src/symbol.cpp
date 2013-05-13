@@ -106,12 +106,12 @@ mrb_sym mrb_intern_str(mrb_state *mrb, mrb_value str)
     return mrb_intern2(mrb, RSTRING_PTR(str), RSTRING_LEN(str));
 }
 
-mrb_value mrb_cstr_interned(mrb_state *mrb, const char *name)
+mrb_value mrb_check_intern_cstr(mrb_state *mrb, const char *name)
 {
-    return mrb_interned(mrb, name, strlen(name));
+    return mrb_check_intern(mrb, name, strlen(name));
 }
 
-mrb_value mrb_interned(mrb_state *mrb, const char *name, size_t len)
+mrb_value mrb_check_intern(mrb_state *mrb, const char *name, size_t len)
 {
     SymTable &name2sym_tab(*mrb->name2sym);
     symbol_name sname {len,name};
@@ -122,9 +122,9 @@ mrb_value mrb_interned(mrb_state *mrb, const char *name, size_t len)
     return mrb_nil_value();
 }
 
-mrb_value mrb_str_interned(mrb_state *mrb, mrb_value str)
+mrb_value mrb_check_intern_str(mrb_state *mrb, mrb_value str)
 {
-    return mrb_interned(mrb, RSTRING_PTR(str), RSTRING_LEN(str));
+    return mrb_check_intern(mrb, RSTRING_PTR(str), RSTRING_LEN(str));
 }
 
 /* lenp must be a pointer to a size_t variable */
@@ -234,7 +234,7 @@ mrb_sym_to_s(mrb_state *mrb, mrb_value sym)
     size_t len;
 
     p = mrb_sym2name_len(mrb, id, len);
-    return mrb_str_new(mrb, p, len);
+    return mrb_str_new_static(mrb, p, len);
 }
 
 /* 15.2.11.3.4  */
@@ -401,14 +401,15 @@ mrb_value mrb_sym2str(mrb_state *mrb, mrb_sym sym)
 {
     size_t len;
     const char *name = mrb_sym2name_len(mrb, sym, len);
+    mrb_value str;
 
-    if (!name) return mrb_undef_value(); /* can't happen */
+    if (!name)
+        return mrb_undef_value(); /* can't happen */
+    str = mrb_str_new_static(mrb, name, len);
     if (symname_p(name) && strlen(name) == len) {
-        return mrb_str_new(mrb, name, len);
+        return str;
     }
-    else {
-        return mrb_str_dump(mrb, mrb_str_new(mrb, name, len));
-    }
+    return mrb_str_dump(mrb, str);
 }
 
 const char*
@@ -422,7 +423,7 @@ mrb_sym2name(mrb_state *mrb, mrb_sym sym)
         return name;
     }
     else {
-        mrb_value str = mrb_str_dump(mrb, mrb_str_new(mrb, name, len));
+        mrb_value str = mrb_str_dump(mrb, mrb_str_new_static(mrb, name, len));
         return RSTRING(str)->ptr;
     }
 }

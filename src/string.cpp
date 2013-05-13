@@ -289,12 +289,19 @@ str_make_shared(mrb_state *mrb, RString *s)
     if (!(s->flags & MRB_STR_SHARED)) {
         mrb_shared_string *shared = (mrb_shared_string *)mrb->gc()._malloc(sizeof(mrb_shared_string));
 
-        shared->refcnt = 1;
-        if (s->aux.capa > s->len) {
-            s->ptr = shared->ptr = (char *)mrb->gc()._realloc(s->ptr, s->len+1);
+        if (s->flags & MRB_STR_STATIC) {
+            shared->refcnt = -1;      /* should never be freed */
+            shared->ptr = s->ptr;
+            s->flags &= ~MRB_STR_STATIC;
         }
         else {
-            shared->ptr = s->ptr;
+            shared->refcnt = 1;
+            if (s->aux.capa > s->len) {
+                s->ptr = shared->ptr = (char *)mrb->gc()._realloc(s->ptr, s->len+1);
+            }
+            else {
+                shared->ptr = s->ptr;
+            }
         }
         shared->len = s->len;
         s->aux.shared = shared;
