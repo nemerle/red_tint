@@ -244,7 +244,7 @@ RClass * mrb_define_class_under(mrb_state *mrb, RClass *outer, const char *name,
         return c;
     }
     if (!super) {
-        mrb_warn("no super class for `%S::%S', Object assumed",
+        mrb_warn(mrb,"no super class for `%S::%S', Object assumed",
                  mrb_obj_value(outer), mrb_sym2str(mrb, id));
     }
     c = mrb_class_new(mrb, super);
@@ -701,9 +701,11 @@ static mrb_value
 mrb_mod_ancestors(mrb_state *mrb, mrb_value self)
 {
     mrb_value result;
-    struct RClass *c = mrb_class_ptr(self);
+    RClass *c = mrb_class_ptr(self);
 
     result = mrb_ary_new(mrb);
+    RArray::push(mrb,result,mrb_obj_value(c));
+    c = c->super;
     while (c) {
         if (c->tt == MRB_TT_ICLASS) {
             RArray::push(mrb, result, mrb_obj_value(c->c));

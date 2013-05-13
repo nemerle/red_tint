@@ -44,7 +44,7 @@ mrb_hash_ht_key(mrb_state *mrb, mrb_value key)
 
 #define KEY(key) mrb_hash_ht_key(mrb, key)
 
-void mrb_gc_mark_ht(mrb_state *mrb, struct RHash *hash)
+void mrb_gc_mark_hash(mrb_state *mrb, struct RHash *hash)
 {
     khiter_t k;
     khash_t(ht) *h = hash->ht;
@@ -61,13 +61,13 @@ void mrb_gc_mark_ht(mrb_state *mrb, struct RHash *hash)
     }
 }
 
-size_t mrb_gc_mark_ht_size(mrb_state *mrb, struct RHash *hash)
+size_t mrb_gc_mark_hash_size(mrb_state *mrb, struct RHash *hash)
 {
     if (!hash->ht) return 0;
     return kh_size(hash->ht)*2;
 }
 
-void mrb_gc_free_ht(mrb_state *mrb, struct RHash *hash)
+void mrb_gc_free_hash(mrb_state *mrb, struct RHash *hash)
 {
     if (hash->ht) kh_destroy(ht, hash->ht);
 }
@@ -311,12 +311,6 @@ mrb_hash_aget(mrb_state *mrb, mrb_value self)
 
     mrb_get_args(mrb, "o", &key);
     return mrb_hash_get(mrb, self, key);
-}
-
-mrb_value
-mrb_hash_lookup(mrb_state *mrb, mrb_value hash, mrb_value key)
-{
-    return mrb_hash_get(mrb, hash, key);
 }
 
 /*
@@ -598,29 +592,6 @@ mrb_hash_shift(mrb_state *mrb, mrb_value hash)
  *  <code><i>hsh</i>.dup.delete_if</code>.
  *
  */
-
-/*
- * call-seq:
- *   hsh.values_at(key, ...)   -> array
- *
- * Return an array containing the values associated with the given keys.
- * Also see <code>Hash.select</code>.
- *
- *   h = { "cat" => "feline", "dog" => "canine", "cow" => "bovine" }
- *   h.values_at("cow", "cat")  #=> ["bovine", "feline"]
- */
-
-mrb_value
-mrb_hash_values_at(mrb_state *mrb, int argc, mrb_value *argv, mrb_value hash)
-{
-    mrb_value result = RArray::new_capa(mrb, argc);
-    long i;
-
-    for (i=0; i<argc; i++) {
-        RArray::push(mrb, result, mrb_hash_get(mrb, hash, argv[i]));
-    }
-    return result;
-}
 
 /*
  *  call-seq:

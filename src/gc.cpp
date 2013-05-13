@@ -415,7 +415,7 @@ void MemManager::mark_children(RBasic *obj)
 
         case MRB_TT_HASH:
             mrb_gc_mark_iv(m_mrb, (RObject*)obj);
-            mrb_gc_mark_ht(m_mrb, (RHash*)obj);
+            mrb_gc_mark_hash(m_mrb, (RHash*)obj);
             break;
 
         case MRB_TT_STRING:
@@ -490,14 +490,11 @@ void MemManager::obj_free(RBasic *obj)
 
         case MRB_TT_HASH:
             mrb_gc_free_iv(m_mrb, (RObject*)obj);
-            mrb_gc_free_ht(m_mrb, (RHash*)obj);
+            mrb_gc_free_hash(m_mrb, (RHash*)obj);
             break;
 
         case MRB_TT_STRING:
-            if (obj->flags & MRB_STR_SHARED)
-                mrb_str_decref(m_mrb, ((RString*)obj)->aux.shared);
-            else if ((obj->flags & MRB_STR_STATIC) == 0) // prevent freeing of static string
-                _free(((RString*)obj)->ptr);
+            mrb_gc_free_str(m_mrb, (RString*)obj);
             break;
 
         case MRB_TT_RANGE:
@@ -620,7 +617,7 @@ size_t MemManager::gc_gray_mark(RBasic *obj)
 
         case MRB_TT_HASH:
             children += mrb_gc_mark_iv_size(m_mrb, (RObject*)obj);
-            children += mrb_gc_mark_ht_size(m_mrb, (RHash*)obj);
+            children += mrb_gc_mark_hash_size(m_mrb, (RHash*)obj);
             break;
 
         case MRB_TT_PROC:

@@ -335,7 +335,7 @@ void mrb_parser_state::backref_error(mrb_ast_node *n)
     } else if (c == NODE_BACK_REF) {
         yyerror_i("can't set variable $%c", ((BackRefNode *)n)->m_ref);
     } else {
-        mrb_bug("Internal error in backref_error() : node type == %d", c);
+        mrb_bug(m_mrb,"Internal error in backref_error() : node type == %d", c);
     }
 }
 int mrb_parser_state::paren_nest() {

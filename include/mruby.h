@@ -145,7 +145,6 @@ RClass * mrb_class_new(mrb_state *mrb, struct RClass *super);
 RClass * mrb_module_new(mrb_state *mrb);
 int mrb_class_defined(mrb_state *mrb, const char *name);
 RClass * mrb_class_get(mrb_state *mrb, const char *name);
-RClass * mrb_class_obj_get(mrb_state *mrb, const char *name);
 
 mrb_value mrb_obj_dup(mrb_state *mrb, mrb_value obj);
 mrb_value mrb_check_to_integer(mrb_state *mrb, mrb_value val, const char *method);
@@ -217,7 +216,7 @@ mrb_value mrb_top_self(mrb_state *);
 
 void mrb_p(mrb_state*, mrb_value);
 mrb_int mrb_obj_id(const mrb_value &obj);
-mrb_sym mrb_to_id(mrb_state *mrb, mrb_value name);
+mrb_sym mrb_obj_to_sym(mrb_state *mrb, mrb_value name);
 
 int mrb_obj_eq(mrb_state*, mrb_value, mrb_value);
 int mrb_obj_equal(mrb_state*, mrb_value, mrb_value);
@@ -272,33 +271,34 @@ NORET(void mrb_exc_raise(mrb_state *mrb, mrb_value exc));
 NORET(void mrb_raise(mrb_state *mrb, RClass *c, const char *msg));
 NORET(void mrb_raisef(mrb_state *mrb, RClass *c, const char *fmt, ...));
 NORET(void mrb_name_error(mrb_state *mrb, mrb_sym id, const char *fmt, ...));
-void mrb_warn(const char *fmt, ...);
-void mrb_bug(const char *fmt, ...);
+void mrb_warn(mrb_state *mrb, const char *fmt, ...);
+void mrb_bug(mrb_state *mrb, const char *fmt, ...);
+void mrb_print_backtrace(mrb_state *mrb);
 /* macros to get typical exception objects
  note:
  + those E_* macros requires mrb_state* variable named mrb.
  + exception objects obtained from those macros are local to mrb
  */
-#define A_RUNTIME_ERROR(x)          (mrb_class_obj_get((x), "RuntimeError"))
-#define E_RUNTIME_ERROR             (mrb_class_obj_get(mrb, "RuntimeError"))
-#define E_TYPE_ERROR                (mrb_class_obj_get(mrb, "TypeError"))
-#define I_TYPE_ERROR                (mrb_class_obj_get(this, "TypeError"))
-#define E_ARGUMENT_ERROR            (mrb_class_obj_get(mrb, "ArgumentError"))
-#define E_INDEX_ERROR               (mrb_class_obj_get(mrb, "IndexError"))
-#define E_RANGE_ERROR               (mrb_class_obj_get(mrb, "RangeError"))
-#define E_NAME_ERROR                (mrb_class_obj_get(mrb, "NameError"))
-#define E_NOMETHOD_ERROR            (mrb_class_obj_get(mrb, "NoMethodError"))
-#define I_NOMETHOD_ERROR            (mrb_class_obj_get(this, "NoMethodError"))
-#define E_SCRIPT_ERROR              (mrb_class_obj_get(mrb, "ScriptError"))
-#define E_SYNTAX_ERROR              (mrb_class_obj_get(mrb, "SyntaxError"))
-#define E_LOCALJUMP_ERROR           (mrb_class_obj_get(mrb, "LocalJumpError"))
-#define I_LOCALJUMP_ERROR           (mrb_class_obj_get(this, "LocalJumpError"))
-#define E_REGEXP_ERROR              (mrb_class_obj_get(mrb, "RegexpError"))
+#define A_RUNTIME_ERROR(x)          (mrb_class_get((x), "RuntimeError"))
+#define E_RUNTIME_ERROR             (mrb_class_get(mrb, "RuntimeError"))
+#define E_TYPE_ERROR                (mrb_class_get(mrb, "TypeError"))
+#define I_TYPE_ERROR                (mrb_class_get(this, "TypeError"))
+#define E_ARGUMENT_ERROR            (mrb_class_get(mrb, "ArgumentError"))
+#define E_INDEX_ERROR               (mrb_class_get(mrb, "IndexError"))
+#define E_RANGE_ERROR               (mrb_class_get(mrb, "RangeError"))
+#define E_NAME_ERROR                (mrb_class_get(mrb, "NameError"))
+#define E_NOMETHOD_ERROR            (mrb_class_get(mrb, "NoMethodError"))
+#define I_NOMETHOD_ERROR            (mrb_class_get(this, "NoMethodError"))
+#define E_SCRIPT_ERROR              (mrb_class_get(mrb, "ScriptError"))
+#define E_SYNTAX_ERROR              (mrb_class_get(mrb, "SyntaxError"))
+#define E_LOCALJUMP_ERROR           (mrb_class_get(mrb, "LocalJumpError"))
+#define I_LOCALJUMP_ERROR           (mrb_class_get(this, "LocalJumpError"))
+#define E_REGEXP_ERROR              (mrb_class_get(mrb, "RegexpError"))
 
-#define E_NOTIMP_ERROR              (mrb_class_obj_get(mrb, "NotImplementedError"))
-#define E_FLOATDOMAIN_ERROR         (mrb_class_obj_get(mrb, "FloatDomainError"))
+#define E_NOTIMP_ERROR              (mrb_class_get(mrb, "NotImplementedError"))
+#define E_FLOATDOMAIN_ERROR         (mrb_class_get(mrb, "FloatDomainError"))
 
-#define E_KEY_ERROR                 (mrb_class_obj_get(mrb, "KeyError"))
+#define E_KEY_ERROR                 (mrb_class_get(mrb, "KeyError"))
 
 mrb_value mrb_yield(mrb_state *mrb, mrb_value v, mrb_value blk);
 mrb_value mrb_yield_argv(mrb_state *mrb, mrb_value b, int argc, mrb_value *argv);

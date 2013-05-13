@@ -11,17 +11,12 @@
 
 extern const char mrb_digitmap[];
 
-struct mrb_shared_string {
-    int refcnt;
-    char *ptr;
-    mrb_int len;
-};
 struct RString : public RBasic {
     static const mrb_vtype ttype=MRB_TT_STRING;
     mrb_int len;
     union {
         mrb_int capa;
-        mrb_shared_string *shared;
+        struct mrb_shared_string *shared;
     } aux;
     char *ptr;
 };
@@ -36,10 +31,8 @@ extern "C" {
 #define RSTRING_LEN(s)    (RSTRING(s)->len)
 #define RSTRING_CAPA(s)   (RSTRING(s)->aux.capa)
 #define RSTRING_END(s)    (RSTRING(s)->ptr + RSTRING(s)->len)
-#define MRB_STR_SHARED      1
-#define MRB_STR_STATIC    (1<<1)
 
-void mrb_str_decref(mrb_state*, mrb_shared_string*);
+void mrb_gc_free_str(mrb_state*, RString*);
 mrb_value mrb_str_literal(mrb_state*, mrb_value);
 void mrb_str_concat(mrb_state*, mrb_value, mrb_value);
 mrb_value mrb_str_plus(mrb_state*, mrb_value, mrb_value);

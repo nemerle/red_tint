@@ -292,27 +292,31 @@ void mrb_name_error(mrb_state *mrb, mrb_sym id, const char *fmt, ...)
     mrb_exc_raise(mrb, exc);
 }
 
-void mrb_warn(const char *fmt, ...)
+void mrb_warn(mrb_state *mrb, const char *fmt, ...)
 {
 #ifdef ENABLE_STDIO
-    va_list args;
+    va_list ap;
+    mrb_value str;
 
-    va_start(args, fmt);
-    printf("warning: ");
-    vprintf(fmt, args);
-    va_end(args);
+    va_start(ap, fmt);
+    str = mrb_vformat(mrb, fmt, ap);
+    fputs("warning: ", stderr);
+    fwrite(RSTRING_PTR(str), RSTRING_LEN(str), 1, stderr);
+    va_end(ap);
 #endif
 }
 
-void mrb_bug(const char *fmt, ...)
+void mrb_bug(mrb_state *mrb, const char *fmt, ...)
 {
 #ifdef ENABLE_STDIO
-    va_list args;
+    va_list ap;
+    mrb_value str;
 
-    va_start(args, fmt);
-    printf("bug: ");
-    vprintf(fmt, args);
-    va_end(args);
+    va_start(ap, fmt);
+    str = mrb_vformat(mrb, fmt, ap);
+    fputs("bug: ", stderr);
+    fwrite(RSTRING_PTR(str), RSTRING_LEN(str), 1, stderr);
+    va_end(ap);
 #endif
     exit(EXIT_FAILURE);
 }
@@ -335,40 +339,40 @@ mrb_value make_exception(mrb_state *mrb, int argc, mrb_value *argv, int isstr)
 
     mesg = mrb_nil_value();
     switch (argc) {
-        case 0:
+    case 0:
+        break;
+    case 1:
+        if (mrb_nil_p(argv[0]))
             break;
-        case 1:
-            if (mrb_nil_p(argv[0]))
+        if (isstr) {
+            mesg = mrb_check_string_type(mrb, argv[0]);
+            if (!mrb_nil_p(mesg)) {
+                mesg = mrb_exc_new3(mrb, E_RUNTIME_ERROR, mesg);
                 break;
-            if (isstr) {
-                mesg = mrb_check_string_type(mrb, argv[0]);
-                if (!mrb_nil_p(mesg)) {
-                    mesg = mrb_exc_new3(mrb, E_RUNTIME_ERROR, mesg);
-                    break;
-                }
-            }
-            n = 0;
-            goto exception_call;
-
-        case 2:
-        case 3:
-            n = 1;
-exception_call:
-        {
-            mrb_sym exc = mrb_intern2(mrb, "exception", 9);
-            if (mrb_respond_to(mrb, argv[0], exc)) {
-                mesg = mrb_funcall_argv(mrb, argv[0], exc, n, argv+1);
-            }
-            else {
-                /* undef */
-                mrb_raise(mrb, E_TYPE_ERROR, "exception class/object expected");
             }
         }
+        n = 0;
+        goto exception_call;
 
-            break;
-        default:
-            mrb_raisef(mrb, E_ARGUMENT_ERROR, "wrong number of arguments (%S for 0..3)", mrb_fixnum_value(argc));
-            break;
+    case 2:
+    case 3:
+        n = 1;
+exception_call:
+    {
+        mrb_sym exc = mrb_intern2(mrb, "exception", 9);
+        if (mrb_respond_to(mrb, argv[0], exc)) {
+            mesg = mrb_funcall_argv(mrb, argv[0], exc, n, argv+1);
+        }
+        else {
+            /* undef */
+            mrb_raise(mrb, E_TYPE_ERROR, "exception class/object expected");
+        }
+    }
+
+        break;
+    default:
+        mrb_raisef(mrb, E_ARGUMENT_ERROR, "wrong number of arguments (%S for 0..3)", mrb_fixnum_value(argc));
+        break;
     }
     if (argc > 0) {
         if (!mrb_obj_is_kind_of(mrb, mesg, mrb->eException_class))

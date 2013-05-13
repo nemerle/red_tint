@@ -6,6 +6,9 @@
 
 #ifndef MRUBYCONF_H
 #define MRUBYCONF_H
+#ifndef __cplusplus
+# error "Only c++ for now"
+#endif
 
 #include <stdint.h>
 #include <stddef.h>
@@ -108,36 +111,8 @@ typedef short mrb_sym;
 #define DISABLE_DEBUG
 #endif
 
-#ifdef _MSC_VER
-# include <float.h>
-# define inline __inline
-# define snprintf _snprintf
-# define isnan _isnan
-# define isinf(n) (!_finite(n) && !_isnan(n))
-# define strtoll _strtoi64
-# define PRId32 "I32d"
-# define PRIi32 "I32i"
-# define PRIo32 "I32o"
-# define PRIx32 "I32x"
-# define PRIX32 "I32X"
-# define PRId64 "I64d"
-# define PRIi64 "I64i"
-# define PRIo64 "I64o"
-# define PRIx64 "I64x"
-# define PRIX64 "I64X"
-# ifdef __cplusplus
+#include <inttypes.h>
 typedef bool mrb_bool;
-# else
-typedef unsigned int mrb_bool;
-# endif
-#else
-# include <inttypes.h>
-# ifdef __cplusplus
-typedef bool mrb_bool;
-# else
-typedef _Bool mrb_bool;
-# endif
-#endif
 
 #ifdef ENABLE_STDIO
 # include <stdio.h>

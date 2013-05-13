@@ -4,6 +4,7 @@ find_package(BISON)
 bison_target(mruby parse.y "${CMAKE_CURRENT_BINARY_DIR}/parse.cpp")
 SET(MRUBY_SRC_C
     array.cpp
+    backtrace.cpp
     class.cpp
     codegen.cpp
     compar.cpp

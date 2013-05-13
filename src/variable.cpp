@@ -665,7 +665,7 @@ mrb_value mrb_mod_cv_get(mrb_state *mrb, RClass * c, mrb_sym sym)
         c = c->super;
     }
     mrb_name_error(mrb, sym, "uninitialized class variable %S in %S",
-               mrb_sym2str(mrb, sym), cls);
+               mrb_sym2str(mrb, sym), mrb_obj_value(cls));
     /* not reached */
     return mrb_nil_value();
 }
@@ -1013,15 +1013,6 @@ mrb_value
 mrb_attr_get(mrb_state *mrb, mrb_value obj, mrb_sym id)
 {
     return mrb_iv_get(mrb, obj, id);
-}
-
-RClass *
-mrb_class_obj_get(mrb_state *mrb, const char *name)
-{
-    mrb_value mod = mrb_obj_value(mrb->object_class);
-    mrb_sym sym = mrb_intern(mrb, name);
-
-    return mrb_class_ptr(mrb_const_get(mrb, mod, sym));
 }
 
 struct csym_arg {
