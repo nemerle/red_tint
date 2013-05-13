@@ -133,7 +133,6 @@ public:
     int new_sym(mrb_sym sym);
     int lv_idx(mrb_sym id);
     void for_body(node *tree);
-    int codegen(node *tree);
     mrb_sym attrsym(mrb_sym a);
     void    gen_call(CallNode *tree, mrb_sym name, int m_sp, int val);
     void    gen_assignment(mrb_ast_node *node, int m_sp, int val);
@@ -151,6 +150,8 @@ public:
     void    gen_lvar_assignment(int sp, LVarNode *node, int val);
     void    gen_colon2_assignment(int sp, Colon2Node *node, int val);
     void    gen_call_assignment(int val, int sp, CallNode *node);
+    void gen_call_common(mrb_sym _sym, int sendv, int noop, int idx, int val, int n, int blk);
+    int do_PostCount(mrb_ast_node *t);
 protected:
     void do_lambda_body(mrb_ast_node *body);
     void do_lambda_args(ArgsStore * args);
@@ -793,28 +794,6 @@ int codegen_scope::do_lambda_internal(DefCommonNode *tree)
     return idx;
 }
 
-int codegen_scope::codegen(node *tree)
-{
-    codegen_scope *scope = codegen_scope::create(m_mrb, this, tree->left());
-    int idx = scope->m_idx;
-
-    scope->codegen(tree->right(), true);
-    if (!m_iseq) {
-        scope->genop( MKOP_A(OP_STOP, 0));
-    }
-    else {
-        if (scope->m_nregs == 0) {
-            scope->genop( MKOP_A(OP_LOADNIL, 0));
-            scope->genop( MKOP_AB(OP_RETURN, 0, OP_R_NORMAL));
-        }
-        else {
-            scope->genop_peep(MKOP_AB(OP_RETURN, scope->m_sp, OP_R_NORMAL), false);
-        }
-    }
-    scope->finish();
-
-    return idx - m_idx;
-}
 int codegen_scope::visit(ScopeNode *n)
 {
     codegen_scope *scope = codegen_scope::create(m_mrb, this, n->locals());
@@ -910,42 +889,8 @@ int codegen_scope::gen_values(node *t, int val)
 
 #define CALL_MAXARGS 127
 
-void codegen_scope::gen_call(CallNode *node, mrb_sym name, int sp, int val)
+void codegen_scope::gen_call_common(mrb_sym _sym, int sendv, int noop, int idx, int val, int n, int blk)
 {
-    mrb_sym _sym = name ? name : node->m_method;
-    int idx;
-    int n = 0, noop = 0, sendv = 0, blk = 0;
-
-    codegen(node->m_receiver, true); /* receiver */
-    idx = new_msym(_sym);
-    CommandArgs *tree = node->m_cmd_args;
-    if (tree) {
-        n = gen_values(tree->m_args, true);
-        if (n < 0) {
-            n = noop = sendv = 1;
-            push_();
-        }
-    }
-    if (sp) {
-        if (sendv) {
-            pop_sp();
-            genop( MKOP_AB(OP_ARYPUSH, m_sp, sp));
-            push_();
-        }
-        else {
-            genop( MKOP_AB(OP_MOVE, m_sp, sp));
-            push_();
-            n++;
-        }
-    }
-    if (tree && tree->m_blk) {
-        noop = 1;
-        codegen(tree->m_blk, true);
-        pop_sp();
-    }
-    else {
-        blk = m_sp;
-    }
     pop_sp(n+1);
     {
         size_t len;
@@ -1001,6 +946,45 @@ void codegen_scope::gen_call(CallNode *node, mrb_sym name, int sp, int val)
     if (val) {
         push_();
     }
+}
+
+void codegen_scope::gen_call(CallNode *node, mrb_sym name, int sp, int val)
+{
+    mrb_sym _sym = name ? name : node->m_method;
+    int idx;
+    int n = 0, noop = 0, sendv = 0, blk = 0;
+
+    codegen(node->m_receiver, true); /* receiver */
+    idx = new_msym(_sym);
+    CommandArgs *tree = node->m_cmd_args;
+    if (tree) {
+        n = gen_values(tree->m_args, true);
+        if (n < 0) {
+            n = noop = sendv = 1;
+            push_();
+        }
+    }
+    if (sp) {
+        if (sendv) {
+            pop_sp();
+            genop( MKOP_AB(OP_ARYPUSH, m_sp, sp));
+            push_();
+        }
+        else {
+            genop( MKOP_AB(OP_MOVE, m_sp, sp));
+            push_();
+            n++;
+        }
+    }
+    if (tree && tree->m_blk) {
+        noop = 1;
+        codegen(tree->m_blk, true);
+        pop_sp();
+    }
+    else {
+        blk = m_sp;
+    }
+    gen_call_common(_sym, sendv, noop, idx, val, n, blk);
 }
 
 void codegen_scope::gen_lvar_assignment(int sp, LVarNode *node, int val)
@@ -1110,14 +1094,7 @@ void codegen_scope::gen_vmassignment(node *tree, int rhs, int val)
     }
     t = tree->right();
     if (t) {
-        int post = 0;
-        if (t->right()) {               /* post count */
-            p = t->right()->left();
-            while (p) {
-                post++;
-                p = p->right();
-            }
-        }
+        int post = do_PostCount(t);
         if (val) {
             genop( MKOP_AB(OP_MOVE, m_sp, rhs));
             push_();
@@ -1487,9 +1464,23 @@ void codegen_scope::visit(UndefNode *no) {
         push_();
     }
 }
+int codegen_scope::do_PostCount(mrb_ast_node *t)
+{
+    mrb_ast_node *p;
+    int post = 0;
+    if (t->right()) {         /* post count */
+        p = t->right()->left();
+        while (p) {
+            post++;
+            p = p->right();
+        }
+    }
+    return post;
+}
+
 void codegen_scope::visit(MAsgnNode *node) {
     bool val = m_val_stack.back();
-    mrb_ast_node *t = node->rhs(), *p;
+    mrb_ast_node *t = node->rhs();
     int rhs = m_sp;
 
     ArrayNode *n_arr = dynamic_cast<ArrayNode *>(t);
@@ -1515,13 +1506,7 @@ void codegen_scope::visit(MAsgnNode *node) {
         }
         t = tree->right();
         if (t) {
-            int post = 0;            if (t->right()) {         /* post count */
-                p = t->right()->left();
-                while (p) {
-                    post++;
-                    p = p->right();
-                }
-            }
+            int post = do_PostCount(t);
             if (t->left()) {         /* rest (len - pre - post) */
                 int rn = len - post - n;
 
@@ -1751,61 +1736,7 @@ void codegen_scope::visit(CallCommonNode *node) {
     else {
         blk = m_sp;
     }
-    pop_sp(n+1);
-    {
-        size_t len;
-        eOpEnum op = OP_LAST;
-        const char *name = mrb_sym2name_len(m_mrb, _sym, len);
-        bool was_peep = false;
-        if(!noop) {
-            if (len == 1 && name[0] == '+')  {
-                was_peep = true;
-                op = OP_ADD;
-            }
-            else if (len == 1 && name[0] == '-')  {
-                was_peep = true;
-                op = OP_SUB;
-            }
-            else if (len == 1 && name[0] == '*')  {
-                op = OP_MUL;
-            }
-            else if (len == 1 && name[0] == '/')  {
-                op = OP_DIV;
-            }
-            else if (len == 1 && name[0] == '<')  {
-                op = OP_LT;
-            }
-            else if (len == 2 && name[0] == '<' && name[1] == '=')  {
-                op = OP_LE;
-            }
-            else if (len == 1 && name[0] == '>')  {
-                op = OP_GT;
-            }
-            else if (len == 2 && name[0] == '>' && name[1] == '=')  {
-                op = OP_GE;
-            }
-            else if (len == 2 && name[0] == '=' && name[1] == '=')  {
-                op = OP_EQ;
-            }
-        }
-        if(op == OP_LAST) {
-            if (sendv)
-                n = CALL_MAXARGS;
-            op = OP_SENDB;
-            if (blk > 0) {                   /* no block */
-                op = OP_SEND;
-            }
-        }
-        mrb_code cd = MKOP_ABC(op, m_sp, idx, n);
-        if(was_peep)
-            genop_peep(cd,val);
-        else
-            genop( cd );
-
-    }
-    if (val) {
-        push_();
-    }
+    gen_call_common(_sym, sendv, noop, idx, val, n, blk);
 }
 void codegen_scope::visit(IfNode *node) {
     bool val = m_val_stack.back();

@@ -34,7 +34,7 @@ public:
     RClass & instance_tt(int tt) { flags = ((flags & ~0xff) | (char)tt); return *this;}
     //static RProc *method_search_vm(mrb_state *, RClass**, mrb_sym);
     static RProc* method_search_vm(mrb_state *mrb, RClass ** cp, mrb_sym mid);
-    static RClass * mrb_class(mrb_state *mrb, mrb_value v) {
+    static RClass * mrb_class(mrb_state *mrb, mrb_value &v) {
         switch (mrb_type(v)) {
             case MRB_TT_FALSE:
                 if (v.value.i)
@@ -52,6 +52,7 @@ public:
                 return mrb_obj_ptr(v)->c;
         }
     }
+    static const RClass * mrb_class(mrb_state *mrb, const mrb_value &v) { return const_cast<const RClass *>(mrb_class(mrb,const_cast<mrb_value &>(v))); }
     RClass &define_class_method(mrb_state *mrb, const char *name, mrb_func_t func, mrb_aspec aspec) {
         mrb_define_singleton_method(mrb, this, name, func, aspec);
         return *this;
@@ -138,7 +139,7 @@ extern "C" {
 RClass* mrb_define_class_id(mrb_state*, mrb_sym, RClass*);
 RClass* mrb_define_module_id(mrb_state*, mrb_sym);
 RClass *mrb_vm_define_class(mrb_state*, mrb_value, mrb_value, mrb_sym);
-RClass *mrb_vm_define_module(mrb_state*, mrb_value, mrb_sym);
+RClass *mrb_vm_define_module(mrb_state*, const mrb_value &, mrb_sym);
 
 RClass *mrb_class_outer_module(mrb_state*, RClass *);
 RProc *mrb_method_search_vm(mrb_state*, RClass**, mrb_sym);

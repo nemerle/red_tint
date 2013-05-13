@@ -315,10 +315,7 @@ mrb_funcall_with_block(mrb_state *mrb, mrb_value self, mrb_sym mid, int argc, mr
         }
     }
     else {
-        RProc *p;
-        RClass *c;
         mrb_sym undef = 0;
-        mrb_callinfo *ci;
         int n;
 
         if (!mrb->stack) {
@@ -328,15 +325,15 @@ mrb_funcall_with_block(mrb_state *mrb, mrb_value self, mrb_sym mid, int argc, mr
         if (argc < 0) {
             mrb_raisef(mrb, E_ARGUMENT_ERROR, "negative argc for funcall (%S)", mrb_fixnum_value(argc));
         }
-        c = RClass::mrb_class(mrb, self);
-        p = RClass::method_search_vm(mrb, &c, mid);
+        RClass *c = RClass::mrb_class(mrb, self);
+        RProc *p = RClass::method_search_vm(mrb, &c, mid);
         if (!p) {
             undef = mid;
             mid = mrb_intern2(mrb, "method_missing", 14);
             p = RClass::method_search_vm(mrb, &c, mid);
             n++; argc++;
         }
-        ci = cipush(mrb);
+        mrb_callinfo *ci = cipush(mrb);
         ci->mid = mid;
         ci->proc = p;
         ci->stackidx = mrb->stack - mrb->stbase;
@@ -513,7 +510,21 @@ mrb_value mrb_gv_val_get(mrb_state *mrb, mrb_sym sym);
 void mrb_gv_val_set(mrb_state *mrb, mrb_sym sym, mrb_value val);
 
 #define CALL_MAXARGS 127
+RProc * mrb_state::prepare_method_missing(RClass *c,mrb_sym mid_,int &a,int &n,mrb_value *regs) {
+    RProc *m = nullptr;
+    mrb_value sym = mrb_symbol_value(mid_);
 
+    mrb_sym missing_id = mrb_intern2(this, "method_missing", 14);
+    m = RClass::method_search_vm(this, &c, missing_id);
+    if (n == CALL_MAXARGS) {
+        RArray::unshift(this, regs[a+1], sym);
+    }
+    else {
+        value_move(regs+a+2, regs+a+1, ++n);
+        regs[a+1] = sym;
+    }
+    return m;
+}
 mrb_value mrb_state::mrb_run(RProc *proc, mrb_value self)
 {
     /* assert(mrb_proc_cfunc_p(proc)) */
@@ -827,9 +838,7 @@ L_SEND:
             /* A B C  R(A) := call(R(A),Sym(B),R(A+1),... ,R(A+C-1)) */
             int a = GETARG_A(i);
             int n = GETARG_C(i);
-            struct RProc *m;
-            struct RClass *c;
-            mrb_callinfo *ci;
+
             mrb_value recv, result;
             mrb_sym mid = syms[GETARG_B(i)];
 
@@ -842,51 +851,42 @@ L_SEND:
                     SET_NIL_VALUE(regs[a+n+1]);
                 }
             }
-            c = RClass::mrb_class(this, recv);
-            m = RClass::method_search_vm(this, &c, mid);
-            if (!m) {
-                mrb_value sym = mrb_symbol_value(mid);
 
-                mid = mrb_intern2(this, "method_missing", 14);
-                m = RClass::method_search_vm(this, &c, mid);
-                if (n == CALL_MAXARGS) {
-                    RArray::unshift(this, regs[a+1], sym);
-                }
-                else {
-                    value_move(regs+a+2, regs+a+1, ++n);
-                    regs[a+1] = sym;
-                }
+            RClass *c = RClass::mrb_class(this, recv);
+            RProc *m = RClass::method_search_vm(this, &c, mid);
+            if (!m) {
+                m = prepare_method_missing(c,mid,a,n,regs);
             }
 
             /* push callinfo */
-            ci = cipush(this);
-            ci->mid = mid;
-            ci->proc = m;
-            ci->stackidx = this->stack - this->stbase;
+            mrb_callinfo *_ci = cipush(this);
+            _ci->mid = mid;
+            _ci->proc = m;
+            _ci->stackidx = this->stack - this->stbase;
             if (n == CALL_MAXARGS) {
-                ci->argc = -1;
+                _ci->argc = -1;
             }
             else {
-                ci->argc = n;
+                _ci->argc = n;
             }
-            ci->target_class = c;
+            _ci->target_class = c;
             if (c->tt == MRB_TT_ICLASS) {
-                ci->target_class = c->c;
+                _ci->target_class = c->c;
             }
             else
-                ci->target_class = c;
-            ci->pc = pc + 1;
-            ci->acc = a;
+                _ci->target_class = c;
+            _ci->pc = pc + 1;
+            _ci->acc = a;
 
             /* prepare stack */
             this->stack += a;
 
             if (MRB_PROC_CFUNC_P(m)) {
                 if (n == CALL_MAXARGS) {
-                    ci->nregs = 3;
+                    _ci->nregs = 3;
                 }
                 else {
-                    ci->nregs = n + 2;
+                    _ci->nregs = n + 2;
                 }
                 result = m->body.func(this, recv);
                 this->stack[0] = result;
@@ -903,12 +903,12 @@ L_SEND:
                 irep = m->body.irep;
                 pool = irep->pool;
                 syms = irep->syms;
-                ci->nregs = irep->nregs;
-                if (ci->argc < 0) {
+                _ci->nregs = irep->nregs;
+                if (_ci->argc < 0) {
                     stack_extend(this, (irep->nregs < 3) ? 3 : irep->nregs, 3);
                 }
                 else {
-                    stack_extend(this, irep->nregs,  ci->argc+2);
+                    stack_extend(this, irep->nregs,  _ci->argc+2);
                 }
                 regs = this->stack;
                 pc = irep->iseq;
@@ -984,8 +984,8 @@ L_SEND:
             /* A B C  R(A) := super(R(A+1),... ,R(A+C-1)) */
             mrb_value recv;
             mrb_callinfo *ci = this->ci;
-            struct RProc *m;
-            struct RClass *c;
+            RProc *m;
+            RClass *c;
             mrb_sym mid = ci->mid;
             int a = GETARG_A(i);
             int n = GETARG_C(i);
@@ -994,15 +994,7 @@ L_SEND:
             c = this->ci->target_class->super;
             m = RClass::method_search_vm(this, &c, mid);
             if (!m) {
-                mid = mrb_intern2(this, "method_missing", 14);
-                m = RClass::method_search_vm(this, &c, mid);
-                if (n == CALL_MAXARGS) {
-                    RArray::unshift(this, regs[a+1], mrb_symbol_value(ci->mid));
-                }
-                else {
-                    value_move(regs+a+2, regs+a+1, ++n);
-                    SET_SYM_VALUE(regs[a+1], ci->mid);
-                }
+                m = prepare_method_missing(c,ci->mid,a,n,regs);
             }
 
             /* push callinfo */
@@ -1066,7 +1058,7 @@ L_SEND:
 
             if (lv == 0) stack = regs + 1;
             else {
-                struct REnv *e = uvenv(this, lv-1);
+                REnv *e = uvenv(this, lv-1);
                 if (!e) {
                     mrb_value exc;
                     static const char m[] = "super called outside of method";
@@ -1080,18 +1072,17 @@ L_SEND:
                 regs[a] = RArray::new_from_values(this, m1+m2, stack);
             }
             else {
-                mrb_value *pp = NULL;
-                struct RArray *rest;
+                mrb_value *pp = nullptr;
                 int len = 0;
 
                 if (mrb_array_p(stack[m1])) {
-                    struct RArray *ary = mrb_ary_ptr(stack[m1]);
+                    RArray *ary = mrb_ary_ptr(stack[m1]);
 
                     pp = ary->m_ptr;
                     len = ary->m_len;
                 }
                 regs[a] = RArray::new_capa(this, m1+len+m2);
-                rest = mrb_ary_ptr(regs[a]);
+                RArray *rest = mrb_ary_ptr(regs[a]);
                 stack_copy(rest->m_ptr, stack, m1);
                 if (len > 0) {
                     stack_copy(rest->m_ptr+m1, pp, len);
@@ -1115,10 +1106,10 @@ L_SEND:
             int r  = (ax>>12)&0x1;
             int m2 = (ax>>7)&0x1f;
             /* unused
-      int k  = (ax>>2)&0x1f;
-      int kd = (ax>>1)&0x1;
-      int b  = (ax>>0)& 0x1;
-      */
+              int k  = (ax>>2)&0x1f;
+              int kd = (ax>>1)&0x1;
+              int b  = (ax>>0)& 0x1;
+              */
             int argc = this->ci->argc;
             mrb_value *argv = regs+1;
             mrb_value *argv0 = argv;
@@ -1303,43 +1294,30 @@ L_RESCUE:
             /* A B C  return call(R(A),Sym(B),R(A+1),... ,R(A+C-1)) */
             int a = GETARG_A(i);
             int n = GETARG_C(i);
-            struct RProc *m;
-            struct RClass *c;
-            mrb_callinfo *ci;
+
             mrb_value recv;
             mrb_sym mid = syms[GETARG_B(i)];
 
             recv = regs[a];
-            c = RClass::mrb_class(this, recv);
-            m = RClass::method_search_vm(this, &c, mid);
+            RClass *c = RClass::mrb_class(this, recv);
+            RProc *m = RClass::method_search_vm(this, &c, mid);
             if (!m) {
-                mrb_value sym = mrb_symbol_value(mid);
-
-                mid = mrb_intern2(this, "method_missing", 14);
-                m = RClass::method_search_vm(this, &c, mid);
-                if (n == CALL_MAXARGS) {
-                    RArray::unshift(this, regs[a+1], sym);
-                }
-                else {
-                    value_move(regs+a+2, regs+a+1, ++n);
-                    regs[a+1] = sym;
-                }
+                m = prepare_method_missing(c,mid,a,n,regs);
             }
-
 
             /* replace callinfo */
-            ci = this->ci;
-            ci->mid = mid;
-            ci->target_class = m->target_class;
+            mrb_callinfo *_ci = this->ci;
+            _ci->mid = mid;
+            _ci->target_class = m->target_class;
             if (n == CALL_MAXARGS) {
-                ci->argc = -1;
+                _ci->argc = -1;
             }
             else {
-                ci->argc = n;
+                _ci->argc = n;
             }
 
             /* move stack */
-            value_move(this->stack, &regs[a], ci->argc+1);
+            value_move(this->stack, &regs[a], _ci->argc+1);
 
             if (MRB_PROC_CFUNC_P(m)) {
                 this->stack[0] = m->body.func(this, recv);
@@ -1351,11 +1329,11 @@ L_RESCUE:
                 irep = m->body.irep;
                 pool = irep->pool;
                 syms = irep->syms;
-                if (ci->argc < 0) {
+                if (_ci->argc < 0) {
                     stack_extend(this, (irep->nregs < 3) ? 3 : irep->nregs, 3);
                 }
                 else {
-                    stack_extend(this, irep->nregs,  ci->argc+2);
+                    stack_extend(this, irep->nregs,  _ci->argc+2);
                 }
                 regs = this->stack;
                 pc = irep->iseq;
@@ -1375,7 +1353,7 @@ L_RESCUE:
 
             if (lv == 0) stack = regs + 1;
             else {
-                struct REnv *e = uvenv(this, lv-1);
+                REnv *e = uvenv(this, lv-1);
                 if (!e) {
                     localjump_error(this, LOCALJUMP_ERROR_YIELD);
                     goto L_RAISE;
@@ -1826,17 +1804,15 @@ L_RESCUE:
 
         CASE(OP_CLASS) {
             /* A B    R(A) := newclass(R(A),Sym(B),R(A+1)) */
-            struct RClass *c = 0;
             int a = GETARG_A(i);
-            mrb_value base, super;
             mrb_sym id = syms[GETARG_B(i)];
 
-            base = regs[a];
-            super = regs[a+1];
+            mrb_value base  = regs[a];
+            mrb_value super = regs[a+1];
             if (mrb_nil_p(base)) {
                 base = mrb_obj_value(this->ci->target_class);
             }
-            c = mrb_vm_define_class(this, base, super, id);
+            RClass *c = mrb_vm_define_class(this, base, super, id);
             regs[a] = mrb_obj_value(c);
             gc().arena_restore(ai);
             NEXT;
@@ -1844,16 +1820,13 @@ L_RESCUE:
 
         CASE(OP_MODULE) {
             /* A B            R(A) := newmodule(R(A),Sym(B)) */
-            struct RClass *c = 0;
             int a = GETARG_A(i);
-            mrb_value base;
             mrb_sym id = syms[GETARG_B(i)];
-
-            base = regs[a];
+            mrb_value base = regs[a];
             if (mrb_nil_p(base)) {
                 base = mrb_obj_value(this->ci->target_class);
             }
-            c = mrb_vm_define_module(this, base, id);
+            RClass *c = mrb_vm_define_module(this, base, id);
             regs[a] = mrb_obj_value(c);
             gc().arena_restore(ai);
             NEXT;
@@ -1862,12 +1835,10 @@ L_RESCUE:
         CASE(OP_EXEC) {
             /* A Bx   R(A) := blockexec(R(A),SEQ[Bx]) */
             int a = GETARG_A(i);
-            mrb_callinfo *ci;
             mrb_value recv = regs[a];
-            struct RProc *p;
 
             /* prepare stack */
-            ci = cipush(this);
+            mrb_callinfo *ci = cipush(this);
             ci->pc = pc + 1;
             ci->acc = a;
             ci->mid = 0;
@@ -1878,7 +1849,7 @@ L_RESCUE:
             /* prepare stack */
             this->stack += a;
 
-            p = mrb_proc_new(this, this->irep[irep->idx+GETARG_Bx(i)]);
+            RProc *p = mrb_proc_new(this, this->irep[irep->idx+GETARG_Bx(i)]);
             p->target_class = ci->target_class;
             ci->proc = p;
 
@@ -1969,15 +1940,12 @@ L_STOP:
         CASE(OP_ERR) {
             /* Bx     raise RuntimeError with message Lit(Bx) */
             mrb_value msg = pool[GETARG_Bx(i)];
-            mrb_value exc;
+            RClass *excep_class = A_RUNTIME_ERROR(this);
 
-            if (GETARG_A(i) == 0) {
-                exc = mrb_exc_new3(this, A_RUNTIME_ERROR(this), msg);
+            if (GETARG_A(i) != 0) {
+                excep_class = I_LOCALJUMP_ERROR;
             }
-            else {
-                exc = mrb_exc_new3(this, I_LOCALJUMP_ERROR, msg);
-            }
-            m_exc = mrb_obj_ptr(exc);
+            m_exc = mrb_obj_ptr(mrb_exc_new3(this, excep_class, msg));
             goto L_RAISE;
         }
     }

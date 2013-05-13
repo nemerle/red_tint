@@ -112,7 +112,7 @@ RClass* mrb_class_outer_module(mrb_state *mrb, struct RClass *c)
     return mrb_class_ptr(outer);
 }
 
-RClass* mrb_vm_define_module(mrb_state *mrb, mrb_value outer, mrb_sym id)
+RClass* mrb_vm_define_module(mrb_state *mrb, const mrb_value &outer, mrb_sym id)
 {
     RClass *c;
 
@@ -1090,7 +1090,7 @@ static mrb_value mrb_bob_missing(mrb_state *mrb, mrb_value mod)
     return mrb_nil_value();
 }
 
-mrb_bool mrb_obj_respond_to(RClass* c, mrb_sym mid)
+mrb_bool mrb_obj_respond_to(const RClass* c, mrb_sym mid)
 {
     khiter_t k;
 
@@ -1111,7 +1111,7 @@ mrb_bool mrb_obj_respond_to(RClass* c, mrb_sym mid)
     return false;         /* no method */
 }
 
-int mrb_respond_to(mrb_state *mrb, mrb_value obj, mrb_sym mid)
+int mrb_respond_to(mrb_state *mrb, const mrb_value &obj, mrb_sym mid)
 {
     return mrb_obj_respond_to(RClass::mrb_class(mrb, obj), mid);
 }

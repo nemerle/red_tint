@@ -124,6 +124,7 @@ public:
     mrb_value mrb_run(RProc *proc, mrb_value self);
 protected:
     RClass * class_from_sym(RClass *klass, mrb_sym id);
+    RProc *prepare_method_missing(RClass *c, mrb_sym mid, int &a, int &n, mrb_value *regs);
 };
 
 typedef mrb_value (*mrb_func_t)(mrb_state *mrb, mrb_value);
@@ -148,7 +149,7 @@ RClass * mrb_class_get(mrb_state *mrb, const char *name);
 
 mrb_value mrb_obj_dup(mrb_state *mrb, mrb_value obj);
 mrb_value mrb_check_to_integer(mrb_state *mrb, mrb_value val, const char *method);
-mrb_bool mrb_obj_respond_to(struct RClass* c, mrb_sym mid);
+mrb_bool mrb_obj_respond_to(const RClass *c, mrb_sym mid);
 RClass * mrb_define_class_under(mrb_state *mrb, RClass *outer, const char *name, struct RClass *super);
 RClass * mrb_define_module_under(mrb_state *mrb, RClass *outer, const char *name);
 
@@ -323,7 +324,7 @@ void mrb_define_global_const(mrb_state *mrb, const char *name, mrb_value val);
 mrb_value mrb_block_proc(void);
 mrb_value mrb_attr_get(mrb_state *mrb, mrb_value obj, mrb_sym id);
 
-int mrb_respond_to(mrb_state *mrb, mrb_value obj, mrb_sym mid);
+int mrb_respond_to(mrb_state *mrb, const mrb_value &obj, mrb_sym mid);
 bool mrb_obj_is_instance_of(mrb_state *mrb, mrb_value obj, struct RClass* c);
 
 /* memory pool implementation */

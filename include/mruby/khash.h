@@ -107,7 +107,7 @@ struct kh_T {
             h->m_size = h->n_occupied = 0;
         }
     }
-    iterator get(const khkey_t &key)
+    iterator get(const khkey_t &key) const
     {
         khint_t k = __hash_func(this->mrb,key) & (this->mask);
         while (!__ac_isempty(this->e_flags, this->d_flags, k)) {
@@ -398,8 +398,8 @@ extern "C" {
 #endif  /* KHASH_H */
 
 struct IntHashFunc {
-    khint_t operator()(mrb_state *,khint_t key) { return (khint_t)((key)^((key)<<2)^((key)>>2)); }
+    khint_t operator()(mrb_state *,khint_t key) const { return (khint_t)((key)^((key)<<2)^((key)>>2)); }
 };
 struct IntHashEq {
-    khint_t operator()(mrb_state *,khint_t a,khint_t b) { return a==b; }
+    khint_t operator()(mrb_state *,khint_t a,khint_t b) const { return a==b; }
 };

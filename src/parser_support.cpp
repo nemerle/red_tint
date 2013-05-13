@@ -102,43 +102,46 @@ void parser_dump(mrb_state *mrb, RescueNode *rn, int offset) {
         parser_dump(mrb, rn->r_else(), offset+2);
     }
 }
-void parser_dump(mrb_state *mrb, LambdaCommonNode *ln, int offset) {
-    if (ln->args()) {
-        ArgsStore *n = ln->args();
+void args_dump(ArgsStore *n, int offset, mrb_state *mrb)
+{
+    if(n==nullptr)
+        return;
+    if (n->m_mandatory) {
+        dump_prefix(offset+1);
+        printf("mandatory args:\n");
+        dump_recur(mrb, n->m_mandatory, offset+2);
+    }
+    if (n->m_opt) {
+        dump_prefix(offset+1);
+        printf("optional args:\n");
+        {
+            mrb_ast_node *n2 = n->m_opt;
 
-        if (n->m_mandatory) {
-            dump_prefix(offset+1);
-            printf("mandatory args:\n");
-            dump_recur(mrb, n->m_mandatory, offset+2);
-        }
-        if (n->m_opt) {
-            dump_prefix(offset+1);
-            printf("optional args:\n");
-            {
-                mrb_ast_node *n2 = n->m_opt;
-
-                while (n2) {
-                    dump_prefix(offset+2);
-                    printf("%s=", mrb_sym2name(mrb, sym(n2->left()->left())));
-                    parser_dump(mrb, n2->left()->right(), 0);
-                    n2 = n2->right();
-                }
+            while (n2) {
+                dump_prefix(offset+2);
+                printf("%s=", mrb_sym2name(mrb, sym(n2->left()->left())));
+                parser_dump(mrb, n2->left()->right(), 0);
+                n2 = n2->right();
             }
         }
-        if (n->m_rest) {
-            dump_prefix(offset+1);
-            printf("rest=*%s\n", mrb_sym2name(mrb, n->m_rest));
-        }
-        if (n->m_post_mandatory) {
-            dump_prefix(offset+1);
-            printf("post mandatory args:\n");
-            dump_recur(mrb, n->m_post_mandatory, offset+2);
-        }
-        if (n->m_blk) {
-            dump_prefix(offset+1);
-            printf("blk=&%s\n", mrb_sym2name(mrb, n->m_blk));
-        }
     }
+    if (n->m_rest) {
+        dump_prefix(offset+1);
+        printf("rest=*%s\n", mrb_sym2name(mrb, n->m_rest));
+    }
+    if (n->m_post_mandatory) {
+        dump_prefix(offset+1);
+        printf("post mandatory args:\n");
+        dump_recur(mrb, n->m_post_mandatory, offset+2);
+    }
+    if (n->m_blk) {
+        dump_prefix(offset+1);
+        printf("blk=&%s\n", mrb_sym2name(mrb, n->m_blk));
+    }
+}
+
+void parser_dump(mrb_state *mrb, LambdaCommonNode *ln, int offset) {
+    args_dump(ln->args(), offset, mrb);
     dump_prefix(offset+1);
     printf("body:\n");
     parser_dump(mrb, ln->body(), offset+2);
@@ -160,42 +163,7 @@ void parser_dump(mrb_state *mrb, DefCommonNode *dn, int offset) {
             printf("\n");
         }
     }
-    if (dn->args()) {
-        ArgsStore *n = dn->args();
-
-        if (n->m_mandatory) {
-            dump_prefix(offset+1);
-            printf("mandatory args:\n");
-            dump_recur(mrb, n->m_mandatory, offset+2);
-        }
-        if (n->m_opt) {
-            dump_prefix(offset+1);
-            printf("optional args:\n");
-            {
-                mrb_ast_node *n2 = n->m_opt;
-
-                while (n2) {
-                    dump_prefix(offset+2);
-                    printf("%s=", mrb_sym2name(mrb, sym(n2->left()->left())));
-                    parser_dump(mrb, n2->left()->right(), 0);
-                    n2 = n2->right();
-                }
-            }
-        }
-        if (n->m_rest) {
-            dump_prefix(offset+1);
-            printf("rest=*%s\n", mrb_sym2name(mrb, n->m_rest));
-        }
-        if (n->m_post_mandatory) {
-            dump_prefix(offset+1);
-            printf("post mandatory args:\n");
-            dump_recur(mrb, n->m_post_mandatory, offset+2);
-        }
-        if (n->m_blk) {
-            dump_prefix(offset+1);
-            printf("blk=&%s\n", mrb_sym2name(mrb, n->m_blk));
-        }
-    }
+    args_dump(dn->args(), offset, mrb);
     parser_dump(mrb, dn->body(), offset+1);
 }
 void parser_dump(mrb_state *mrb, EnsureNode *dn, int offset) {

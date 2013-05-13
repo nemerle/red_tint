@@ -264,6 +264,7 @@ mrb_str_new_cstr(mrb_state *mrb, const char *p)
 
     return mrb_obj_value(s);
 }
+
 mrb_value mrb_str_new_static(mrb_state *mrb, const char *p, size_t len) {
     RString *s = mrb_obj_alloc_string(mrb);
     s->len=len;
@@ -273,8 +274,7 @@ mrb_value mrb_str_new_static(mrb_state *mrb, const char *p, size_t len) {
     return mrb_obj_value(s);
 }
 
-void
-mrb_gc_free_str(mrb_state *mrb, struct RString *str)
+void mrb_gc_free_str(mrb_state *mrb, struct RString *str)
 {
     if (str->flags & MRB_STR_SHARED)
         str_decref(mrb, str->aux.shared);
@@ -282,8 +282,7 @@ mrb_gc_free_str(mrb_state *mrb, struct RString *str)
         mrb->gc()._free(str->ptr);
 }
 
-char *
-mrb_str_to_cstr(mrb_state *mrb, mrb_value str0)
+char * mrb_str_to_cstr(mrb_state *mrb, mrb_value str0)
 {
     RString *s;
 
@@ -374,8 +373,7 @@ mrb_str_body(mrb_value str, int *len_p)
  *
  *  Returns a new string object containing a copy of <i>str</i>.
  */
-void
-mrb_str_concat(mrb_state *mrb, mrb_value self, mrb_value other)
+void mrb_str_concat(mrb_state *mrb, mrb_value self, mrb_value other)
 {
     RString *s1 = mrb_str_ptr(self), *s2;
     int len;
@@ -1834,26 +1832,27 @@ mrb_str_scan(mrb_state *mrb, mrb_value str)
     return mrb_nil_value();
 }
 
-static const char isspacetable[256] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-};
+//static const char isspacetable[256] = {
+//    0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0,
+//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+//    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+//};
 
-#define ascii_isspace(c) isspacetable[(uint8_t)(c)]
+#define ascii_isspace(c) isspace(c)
+//isspacetable[(uint8_t)(c)]
 
 /* 15.2.10.5.35 */
 

@@ -19,7 +19,7 @@ struct symbol_name {
 };
 
 struct SymHashFunc {
-    inline khint_t operator()(mrb_state *mrb, const symbol_name &s)
+    inline khint_t operator()(mrb_state *mrb, const symbol_name &s) const
     {
         khint_t h = 0;
         size_t i;
@@ -32,7 +32,7 @@ struct SymHashFunc {
     }
 };
 struct SymHashEqual {
-    khint_t operator()(mrb_state *,const symbol_name &a,const symbol_name &b)
+    khint_t operator()(mrb_state *,const symbol_name &a,const symbol_name &b) const
     {
         return (a.len == b.len && memcmp(a.name, b.name, a.len) == 0);
     }

@@ -276,7 +276,7 @@ public:
         }
         return false;
     }
-    mrb_bool iv_get(mrb_state *mrb, mrb_sym sym)
+    mrb_bool iv_get(mrb_state *mrb, mrb_sym sym) const
     {
         khiter_t k = h->get(sym);
         if (k != h->end() ) {
@@ -760,18 +760,17 @@ mrb_vm_cv_set(mrb_state *mrb, mrb_sym sym, mrb_value v)
     c->iv->iv_put(mrb, sym, v);
 }
 
-mrb_bool
-mrb_const_defined(mrb_state *mrb, mrb_value mod, mrb_sym sym)
+mrb_bool mrb_const_defined(mrb_state *mrb, const mrb_value &mod, mrb_sym sym)
 {
-    struct RClass *m = mrb_class_ptr(mod);
-    iv_tbl *t = m->iv;
+    const RClass *m = mrb_class_ptr(mod);
+    const iv_tbl *t = m->iv;
 
     if (!t) return FALSE;
     return t->iv_get(mrb, sym);
 }
 
 static void
-mod_const_check(mrb_state *mrb, mrb_value mod)
+mod_const_check(mrb_state *mrb, const mrb_value &mod)
 {
     switch (mrb_type(mod)) {
         case MRB_TT_CLASS:
