@@ -3,20 +3,26 @@
 **
 ** See Copyright Notice in mruby.h
 */
-
 #pragma once
 
-#include "mruby.h"
-#include "mruby/node.h"
+#include <string>
 #include <setjmp.h>
 #include <vector>
 #include <memory>
+
+#include "mruby.h"
+#include "mruby/node.h"
+
+struct mrb_parser_state;
+
 /* load context */
 struct mrbc_context {
     mrb_sym *syms;
     int slen;
     char *filename;
     short lineno;
+    int (*partial_hook)(mrb_parser_state*);
+    void *partial_data;
     mrb_bool capture_errors:1;
     mrb_bool dump_result:1;
     mrb_bool no_exec:1;
@@ -97,10 +103,12 @@ struct mrb_parser_state {
     mrb_state *m_mrb;
     mrb_pool *pool;
     mrb_ast_node *cells;
+    std::string source;
     const char *s, *send;
 #ifdef ENABLE_STDIO
     FILE *f;
 #endif
+    mrbc_context *m_cxt;
     const char *m_filename;
     int m_lineno;
     int m_column;
@@ -267,11 +275,12 @@ public:
 mrb_parser_state* mrb_parse_file(mrb_state*,FILE*,mrbc_context*);
 #endif
 mrb_parser_state* mrb_parse_string(mrb_state*,const char*,mrbc_context*);
-mrb_parser_state* mrb_parse_nstring(mrb_state*,const char*,int,mrbc_context*);
+mrb_parser_state* mrb_parse_nstring(mrb_state*,const std::string &str,mrbc_context*);
 
 mrbc_context* mrbc_context_new(mrb_state *mrb);
 void mrbc_context_free(mrb_state *mrb, mrbc_context *cxt);
 const char *mrbc_filename(mrb_state *mrb, mrbc_context *c, const char *s);
+void mrbc_partial_hook(mrb_state *mrb, mrbc_context *c, int (*partial_hook)(mrb_parser_state*), void*data);
 mrb_parser_state* mrb_parser_new(mrb_state*);
 void mrb_parser_free(mrb_parser_state*);
 void mrb_parser_parse(mrb_parser_state*,mrbc_context*);
@@ -282,6 +291,6 @@ mrb_value mrb_load_file(mrb_state*,FILE*);
 mrb_value mrb_load_file_cxt(mrb_state*,FILE*, mrbc_context *cxt);
 #endif
 mrb_value mrb_load_string(mrb_state *mrb, const char *s);
-mrb_value mrb_load_nstring(mrb_state *mrb, const char *s, int len);
+mrb_value mrb_load_nstring(mrb_state *mrb, const std::string &s);
 mrb_value mrb_load_string_cxt(mrb_state *mrb, const char *s, mrbc_context *cxt);
-mrb_value mrb_load_nstring_cxt(mrb_state *mrb, const char *s, int len, mrbc_context *cxt);
+mrb_value mrb_load_nstring_cxt(mrb_state *mrb, const std::string &s, mrbc_context *cxt);

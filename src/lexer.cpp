@@ -248,20 +248,30 @@ int mrb_parser_state::nextc()
     else {
 #ifdef ENABLE_STDIO
         if (this->f) {
-            if (feof(this->f)) return -1;
+            if (feof(this->f)) goto end_retry;
             c = fgetc(this->f);
-            if (c == EOF) return -1;
+            if (c == EOF) goto end_retry;
         }
         else
 #endif
             if (!this->s || this->s >= this->send) {
-                return -1;
+                goto end_retry;
             }
             else {
                 c = (unsigned char)*this->s++;
             }
     }
     m_column++;
+    return c;
+end_retry:
+    if (!m_cxt)
+        return -1;
+    mrbc_context *cxt = m_cxt;
+    if (cxt->partial_hook(this) < 0)
+        return -1;
+    m_cxt = nullptr;
+    c = nextc();
+    m_cxt = cxt;
     return c;
 }
 void mrb_parser_state::skip(char term)

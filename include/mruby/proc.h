@@ -11,34 +11,34 @@
 struct REnv;
 struct RProc : public RBasic {
     static const mrb_vtype ttype=MRB_TT_PROC;
-  union {
-    mrb_irep *irep;
-    mrb_func_t func;
-  } body;
-  RClass *target_class;
-  REnv *env;
-  void copy_from(RProc *src) {
-      flags = src->flags;
-      body  = src->body;
-      target_class = src->target_class;
-      env   = src->env;
-  }
-  static RProc *alloc(mrb_state *mrb) {
-      return (RProc*)mrb->gc().mrb_obj_alloc(MRB_TT_PROC, mrb->proc_class);
-  }
-  static RProc *copy_construct(mrb_state *mrb,RProc *from) {
-      RProc * r = alloc(mrb);
-      r->copy_from(from);
-      return r;
-  }
+    union {
+        mrb_irep *irep;
+        mrb_func_t func;
+    } body;
+    RClass *target_class;
+    REnv *env;
+    void copy_from(RProc *src) {
+        flags = src->flags;
+        body  = src->body;
+        target_class = src->target_class;
+        env   = src->env;
+    }
+    static RProc *alloc(mrb_state *mrb) {
+        return (RProc*)mrb->gc().mrb_obj_alloc(MRB_TT_PROC, mrb->proc_class);
+    }
+    static RProc *copy_construct(mrb_state *mrb,RProc *from) {
+        RProc * r = alloc(mrb);
+        r->copy_from(from);
+        return r;
+    }
 };
 struct REnv : public RBasic {
-  mrb_value *stack;
-  mrb_sym mid;
-  int cioff;
-  static REnv *alloc(mrb_state *mrb) {
-      return (REnv *)mrb->gc().mrb_obj_alloc(MRB_TT_ENV, (RClass*)mrb->ci->proc->env);
-  }
+    mrb_value *stack;
+    mrb_sym mid;
+    int cioff;
+    static REnv *alloc(mrb_state *mrb) {
+        return (REnv *)mrb->gc().mrb_obj_alloc(MRB_TT_ENV, (RClass*)mrb->m_ci->proc->env);
+    }
 };
 
 /* aspec access */

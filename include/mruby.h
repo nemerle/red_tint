@@ -56,28 +56,31 @@ struct mrb_callinfo {
     int eidx;
     REnv *env;
 };
-
+struct SysInterface {
+    virtual void print_f(const char *fmt, ...);
+    virtual void error_f(const char *fmt,...);
+};
 struct mrb_state {
     void *jmp;
     MemManager m_gc;
 
-    mrb_value *stack;
+    mrb_value *m_stack;
     mrb_value *stbase, *stend;
 
-    mrb_callinfo *ci;
+    mrb_callinfo *m_ci;
     mrb_callinfo *cibase, *ciend;
 
     mrb_code **rescue;
-    int rsize;
+    int m_rsize;
     RProc **ensure;
     int esize;
 
     RObject *m_exc;
     struct iv_tbl *globals;
 
-    struct mrb_irep **irep;
+    struct mrb_irep **m_irep;
     size_t irep_len, irep_capa;
-
+    SysInterface sys; // TODO: convert to pointer
     mrb_sym init_sym;
     RObject *top_self;
     RClass *object_class;
@@ -122,9 +125,12 @@ public:
     RClass &define_class(const char *name, RClass *super);
     mrb_value const_get(mrb_value mod, mrb_sym sym);
     mrb_value mrb_run(RProc *proc, mrb_value self);
+    void codedump_all(int start);
 protected:
     RClass * class_from_sym(RClass *klass, mrb_sym id);
-    RProc *prepare_method_missing(RClass *c, mrb_sym mid, int &a, int &n, mrb_value *regs);
+    RProc *prepare_method_missing(RClass *c, mrb_sym mid, const int &a, int &n, mrb_value *regs);
+private:
+    void codedump(int n);
 };
 
 typedef mrb_value (*mrb_func_t)(mrb_state *mrb, mrb_value);
@@ -178,7 +184,7 @@ int mrb_get_args(mrb_state *mrb, const char *format, ...);
 
 mrb_value mrb_funcall(mrb_state*, mrb_value, const char*, int,...);
 mrb_value mrb_funcall_argv(mrb_state*, mrb_value, mrb_sym, int, mrb_value*);
-mrb_value mrb_funcall_with_block(mrb_state*, mrb_value, mrb_sym, int, mrb_value*, mrb_value);
+mrb_value mrb_funcall_with_block(mrb_state*, mrb_value, mrb_sym, int, const mrb_value *, mrb_value);
 mrb_sym mrb_intern_cstr(mrb_state*,const char*);
 mrb_sym mrb_intern2(mrb_state*,const char*,size_t);
 mrb_sym mrb_intern_str(mrb_state*,mrb_value);

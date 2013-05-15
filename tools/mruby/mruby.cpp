@@ -1,3 +1,8 @@
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "mruby.h"
 #include "mruby/proc.h"
 #include "mruby/array.h"
@@ -5,9 +10,6 @@
 #include "mruby/compile.h"
 #include "mruby/dump.h"
 #include "mruby/variable.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 #ifndef ENABLE_STDIO
 static void
@@ -24,7 +26,7 @@ p(mrb_state *mrb, mrb_value obj)
 void mrb_show_version(mrb_state *);
 void mrb_show_copyright(mrb_state *);
 
-struct _args {
+struct mrbc_args {
     FILE *rfp;
     char* cmdline;
     mrb_bool fname        : 1;
@@ -57,10 +59,10 @@ usage(const char *name)
 }
 
 static int
-parse_args(mrb_state *mrb, int argc, char **argv, struct _args *args)
+parse_args(mrb_state *mrb, int argc, char **argv, struct mrbc_args *args)
 {
     char **origargv = argv;
-    static const struct _args args_zero = { 0 };
+    static const struct mrbc_args args_zero = { 0 };
 
     *args = args_zero;
 
@@ -152,7 +154,7 @@ append_cmdline:
 }
 
 static void
-cleanup(mrb_state *mrb, struct _args *args)
+cleanup(mrb_state *mrb, struct mrbc_args *args)
 {
     if (args->rfp && args->rfp != stdin)
         fclose(args->rfp);
@@ -169,7 +171,7 @@ main(int argc, char **argv)
     mrb_state *mrb = mrb_open();
     int n = -1;
     int i;
-    struct _args args;
+    struct mrbc_args args;
     mrb_value ARGV;
 
     if (mrb == NULL) {
@@ -196,7 +198,7 @@ main(int argc, char **argv)
             fprintf(stderr, "failed to load mrb file: %s\n", args.cmdline);
         }
         else if (!args.check_syntax) {
-            mrb->mrb_run(mrb_proc_new(mrb, mrb->irep[n]), mrb_top_self(mrb));
+            mrb->mrb_run(mrb_proc_new(mrb, mrb->m_irep[n]), mrb_top_self(mrb));
             n = 0;
             if (mrb->m_exc) {
                 mrb_print_backtrace(mrb);

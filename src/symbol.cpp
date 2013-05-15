@@ -147,7 +147,6 @@ const char* mrb_sym2name_len(mrb_state *mrb, mrb_sym sym, size_t &lenp)
 void mrb_symtbl_free(mrb_state *mrb)
 {
     SymTable &h(*mrb->name2sym);
-    khiter_t k;
 
     for (SymTable::iterator k = h.begin(); k != h.end(); k++)
         if (h.exist(k))

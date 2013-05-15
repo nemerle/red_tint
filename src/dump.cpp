@@ -272,7 +272,7 @@ static int mrb_write_section_irep(mrb_state *mrb, size_t start_index, uint8_t *b
     section_size += sizeof(struct rite_section_irep_header);
 
     for (irep_no = start_index; irep_no < mrb->irep_len; irep_no++) {
-        int result = write_irep_record(mrb, mrb->irep[irep_no], cur, &rlen);
+        int result = write_irep_record(mrb, mrb->m_irep[irep_no], cur, &rlen);
         if (result != MRB_DUMP_OK) {
             return result;
         }
@@ -362,7 +362,7 @@ static int mrb_write_section_lineno(mrb_state *mrb, int start_index, uint8_t *bi
     section_size += sizeof(struct rite_section_lineno_header);
 
     for (irep_no = start_index; irep_no < mrb->irep_len; irep_no++) {
-        rlen = write_lineno_record(mrb, mrb->irep[irep_no], cur);
+        rlen = write_lineno_record(mrb, mrb->m_irep[irep_no], cur);
         cur += rlen;
         section_size += rlen;
     }
@@ -407,7 +407,7 @@ static int mrb_dump_irep(mrb_state *mrb, size_t start_index, int debug_info, uin
 
     section_irep_size = sizeof(struct rite_section_irep_header);
     for (irep_no = start_index; irep_no < mrb->irep_len; irep_no++) {
-        section_irep_size += get_irep_record_size(mrb, mrb->irep[irep_no]);
+        section_irep_size += get_irep_record_size(mrb, mrb->m_irep[irep_no]);
     }
     section_size += section_irep_size;
 
@@ -415,7 +415,7 @@ static int mrb_dump_irep(mrb_state *mrb, size_t start_index, int debug_info, uin
     if(debug_info) {
         section_lineno_size += sizeof(struct rite_section_lineno_header);
         for (irep_no = start_index; irep_no < mrb->irep_len; irep_no++) {
-            section_lineno_size += get_debug_record_size(mrb, mrb->irep[irep_no]);
+            section_lineno_size += get_debug_record_size(mrb, mrb->m_irep[irep_no]);
         }
         section_size += section_lineno_size;
     }

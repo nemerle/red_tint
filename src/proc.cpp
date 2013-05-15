@@ -13,11 +13,10 @@ static mrb_code call_iseq[] = {
     MKOP_A(OP_CALL, 0),
 };
 
-RProc *
-mrb_proc_new(mrb_state *mrb, mrb_irep *irep)
+RProc * mrb_proc_new(mrb_state *mrb, mrb_irep *irep)
 {
     RProc *p = RProc::alloc(mrb);
-    p->target_class = (mrb->ci) ? mrb->ci->target_class : nullptr;
+    p->target_class = (mrb->m_ci) ? mrb->m_ci->target_class : nullptr;
     p->body.irep = irep;
     p->env = nullptr;
 
@@ -25,18 +24,18 @@ mrb_proc_new(mrb_state *mrb, mrb_irep *irep)
 }
 
 static inline void
-closure_setup(mrb_state *mrb, struct RProc *p, int nlocals)
+closure_setup(mrb_state *mrb, RProc *p, int nlocals)
 {
 
-    if (!mrb->ci->env) {
+    if (!mrb->m_ci->env) {
         REnv * e = REnv::alloc(mrb);
         e->flags= (unsigned int)nlocals;
-        e->mid = mrb->ci->mid;
-        e->cioff = mrb->ci - mrb->cibase;
-        e->stack = mrb->stack;
-        mrb->ci->env = e;
+        e->mid = mrb->m_ci->mid;
+        e->cioff = mrb->m_ci - mrb->cibase;
+        e->stack = mrb->m_stack;
+        mrb->m_ci->env = e;
     }
-    p->env = mrb->ci->env;
+    p->env = mrb->m_ci->env;
 }
 
 RProc *
@@ -44,7 +43,7 @@ mrb_closure_new(mrb_state *mrb, mrb_irep *irep)
 {
     RProc *p = mrb_proc_new(mrb, irep);
 
-    closure_setup(mrb, p, mrb->ci->proc->body.irep->nlocals);
+    closure_setup(mrb, p, mrb->m_ci->proc->body.irep->nlocals);
     return p;
 }
 

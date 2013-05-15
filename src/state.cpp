@@ -100,6 +100,7 @@ void mrb_irep_free(mrb_state *mrb, struct mrb_irep *irep)
         mm._free(irep->iseq);
     mm._free(irep->pool);
     mm._free(irep->syms);
+    mm._free((void *)irep->filename);
     mm._free(irep->lines);
     mm._free(irep);
 }
@@ -116,9 +117,9 @@ void mrb_close(mrb_state *mrb)
     mm._free(mrb->stbase);
     mm._free(mrb->cibase);
     for (i=0; i<mrb->irep_len; i++) {
-        mrb_irep_free(mrb, mrb->irep[i]);
+        mrb_irep_free(mrb, mrb->m_irep[i]);
     }
-    mm._free(mrb->irep);
+    mm._free(mrb->m_irep);
     mm._free(mrb->rescue);
     mm._free(mrb->ensure);
     mrb_symtbl_free(mrb);
@@ -136,11 +137,11 @@ mrb_irep* mrb_add_irep(mrb_state *mrb)
     static constexpr mrb_irep mrb_irep_zero = { 0 };
     mrb_irep *irep;
     MemManager &mm(mrb->gc());
-    if (!mrb->irep) {
+    if (!mrb->m_irep) {
         size_t max = MRB_IREP_ARRAY_INIT_SIZE;
 
         if (mrb->irep_len > max) max = mrb->irep_len+1;
-        mrb->irep = (mrb_irep **) mm._calloc(max, sizeof(mrb_irep*));
+        mrb->m_irep = (mrb_irep **) mm._calloc(max, sizeof(mrb_irep*));
         mrb->irep_capa = max;
     }
     else if (mrb->irep_capa <= mrb->irep_len) {
@@ -149,14 +150,14 @@ mrb_irep* mrb_add_irep(mrb_state *mrb)
         while (mrb->irep_capa <= mrb->irep_len) {
             mrb->irep_capa *= 2;
         }
-        mrb->irep = (mrb_irep **)mm._realloc(mrb->irep, sizeof(mrb_irep*)*mrb->irep_capa);
+        mrb->m_irep = (mrb_irep **)mm._realloc(mrb->m_irep, sizeof(mrb_irep*)*mrb->irep_capa);
         for (i = old_capa; i < mrb->irep_capa; i++) {
-            mrb->irep[i] = nullptr;
+            mrb->m_irep[i] = nullptr;
         }
     }
     irep = (mrb_irep *)mm._malloc(sizeof(mrb_irep));
     *irep = mrb_irep_zero;
-    mrb->irep[mrb->irep_len] = irep;
+    mrb->m_irep[mrb->irep_len] = irep;
     irep->idx = mrb->irep_len++;
 
     return irep;

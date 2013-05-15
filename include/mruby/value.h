@@ -11,55 +11,55 @@
 struct RClass;
 
 enum mrb_vtype {
-  MRB_TT_FALSE = 0,   /*   0 */
-  MRB_TT_FREE,        /*   1 */
-  MRB_TT_TRUE,        /*   2 */
-  MRB_TT_FIXNUM,      /*   3 */
-  MRB_TT_SYMBOL,      /*   4 */
-  MRB_TT_UNDEF,       /*   5 */
-  MRB_TT_FLOAT,       /*   6 */
-  MRB_TT_VOIDP,       /*   7 */
-  MRB_TT_OBJECT,      /*   8 */
-  MRB_TT_CLASS,       /*   9 */
-  MRB_TT_MODULE,      /*  10 */
-  MRB_TT_ICLASS,      /*  11 */
-  MRB_TT_SCLASS,      /*  12 */
-  MRB_TT_PROC,        /*  13 */
-  MRB_TT_ARRAY,       /*  14 */
-  MRB_TT_HASH,        /*  15 */
-  MRB_TT_STRING,      /*  16 */
-  MRB_TT_RANGE,       /*  17 */
-  MRB_TT_EXCEPTION,   /*  18 */
-  MRB_TT_FILE,        /*  19 */
-  MRB_TT_ENV,         /*  20 */
-  MRB_TT_DATA,        /*  21 */
-  MRB_TT_MAXDEFINE    /*  22 */
+    MRB_TT_FALSE = 0,   /*   0 */
+    MRB_TT_FREE,        /*   1 */
+    MRB_TT_TRUE,        /*   2 */
+    MRB_TT_FIXNUM,      /*   3 */
+    MRB_TT_SYMBOL,      /*   4 */
+    MRB_TT_UNDEF,       /*   5 */
+    MRB_TT_FLOAT,       /*   6 */
+    MRB_TT_VOIDP,       /*   7 */
+    MRB_TT_OBJECT,      /*   8 */
+    MRB_TT_CLASS,       /*   9 */
+    MRB_TT_MODULE,      /*  10 */
+    MRB_TT_ICLASS,      /*  11 */
+    MRB_TT_SCLASS,      /*  12 */
+    MRB_TT_PROC,        /*  13 */
+    MRB_TT_ARRAY,       /*  14 */
+    MRB_TT_HASH,        /*  15 */
+    MRB_TT_STRING,      /*  16 */
+    MRB_TT_RANGE,       /*  17 */
+    MRB_TT_EXCEPTION,   /*  18 */
+    MRB_TT_FILE,        /*  19 */
+    MRB_TT_ENV,         /*  20 */
+    MRB_TT_DATA,        /*  21 */
+    MRB_TT_MAXDEFINE    /*  22 */
 };
 
 struct mrb_value {
-  union {
-    void *p;
-    mrb_float f;
-    mrb_int i;
-    mrb_sym sym;
-  } value;
-  enum mrb_vtype tt; // TODO: use c++11 typed unions.
+    union {
+        void *p;
+        mrb_float f;
+        mrb_int i;
+        mrb_sym sym;
+    } value;
+    enum mrb_vtype tt; // TODO: use c++11 typed unions.
 };
 
 #define mrb_type(o)   (o).tt
 #define mrb_float(o)  (o).value.f
 
 #define MRB_SET_VALUE(o, ttt, attr, v) do {\
-  (o).tt = ttt;\
-  (o).attr = v;\
-} while (0)
+    (o).tt = ttt;\
+    (o).attr = v;\
+    } while (0)
 
 static inline mrb_value mrb_float_value(mrb_float f)
 {
-  mrb_value v;
+    mrb_value v;
 
-  MRB_SET_VALUE(v, MRB_TT_FLOAT, value.f, f);
-  return v;
+    MRB_SET_VALUE(v, MRB_TT_FLOAT, value.f, f);
+    return v;
 }
 #else  /* MRB_NAN_BOXING */
 
@@ -68,29 +68,29 @@ static inline mrb_value mrb_float_value(mrb_float f)
 #endif
 
 enum mrb_vtype {
-  MRB_TT_FALSE = 1,   /*   1 */
-  MRB_TT_FREE,        /*   2 */
-  MRB_TT_TRUE,        /*   3 */
-  MRB_TT_FIXNUM,      /*   4 */
-  MRB_TT_SYMBOL,      /*   5 */
-  MRB_TT_UNDEF,       /*   6 */
-  MRB_TT_FLOAT,       /*   7 */
-  MRB_TT_VOIDP,       /*   8 */
-  MRB_TT_OBJECT,      /*   9 */
-  MRB_TT_CLASS,       /*  10 */
-  MRB_TT_MODULE,      /*  11 */
-  MRB_TT_ICLASS,      /*  12 */
-  MRB_TT_SCLASS,      /*  13 */
-  MRB_TT_PROC,        /*  14 */
-  MRB_TT_ARRAY,       /*  15 */
-  MRB_TT_HASH,        /*  16 */
-  MRB_TT_STRING,      /*  17 */
-  MRB_TT_RANGE,       /*  18 */
-  MRB_TT_EXCEPTION,   /*  19 */
-  MRB_TT_FILE,        /*  20 */
-  MRB_TT_ENV,         /*  21 */
-  MRB_TT_DATA,        /*  22 */
-  MRB_TT_MAXDEFINE    /*  23 */
+    MRB_TT_FALSE = 1,   /*   1 */
+    MRB_TT_FREE,        /*   2 */
+    MRB_TT_TRUE,        /*   3 */
+    MRB_TT_FIXNUM,      /*   4 */
+    MRB_TT_SYMBOL,      /*   5 */
+    MRB_TT_UNDEF,       /*   6 */
+    MRB_TT_FLOAT,       /*   7 */
+    MRB_TT_VOIDP,       /*   8 */
+    MRB_TT_OBJECT,      /*   9 */
+    MRB_TT_CLASS,       /*  10 */
+    MRB_TT_MODULE,      /*  11 */
+    MRB_TT_ICLASS,      /*  12 */
+    MRB_TT_SCLASS,      /*  13 */
+    MRB_TT_PROC,        /*  14 */
+    MRB_TT_ARRAY,       /*  15 */
+    MRB_TT_HASH,        /*  16 */
+    MRB_TT_STRING,      /*  17 */
+    MRB_TT_RANGE,       /*  18 */
+    MRB_TT_EXCEPTION,   /*  19 */
+    MRB_TT_FILE,        /*  20 */
+    MRB_TT_ENV,         /*  21 */
+    MRB_TT_DATA,        /*  22 */
+    MRB_TT_MAXDEFINE    /*  23 */
 };
 
 #ifdef MRB_ENDIAN_BIG
@@ -100,19 +100,19 @@ enum mrb_vtype {
 #endif
 
 typedef struct mrb_value {
-  union {
-    mrb_float f;
-    struct {
-      MRB_ENDIAN_LOHI(
-    uint32_t ttt;
-        ,union {
-      void *p;
-      mrb_int i;
-      mrb_sym sym;
-    } value;
-       )
+    union {
+        mrb_float f;
+        struct {
+            MRB_ENDIAN_LOHI(
+                    uint32_t ttt;
+            ,union {
+                void *p;
+                mrb_int i;
+                mrb_sym sym;
+            } value;
+            )
+        };
     };
-  };
 } mrb_value;
 
 #define mrb_tt(o)     ((o).ttt & 0xff)
@@ -121,22 +121,22 @@ typedef struct mrb_value {
 #define mrb_float(o)  (o).f
 
 #define MRB_SET_VALUE(o, tt, attr, v) do {\
-  (o).ttt = mrb_mktt(tt);\
-  (o).attr = v;\
-} while (0)
+    (o).ttt = mrb_mktt(tt);\
+    (o).attr = v;\
+    } while (0)
 
 static inline mrb_value
 mrb_float_value(mrb_float f)
 {
-  mrb_value v;
+    mrb_value v;
 
-  if (f != f) {
-    v.ttt = 0x7ff80000;
-    v.value.i = 0;
-  } else {
-    v.f = f;
-  }
-  return v;
+    if (f != f) {
+        v.ttt = 0x7ff80000;
+        v.value.i = 0;
+    } else {
+        v.f = f;
+    }
+    return v;
 }
 #endif	/* MRB_NAN_BOXING */
 
@@ -187,7 +187,7 @@ struct RBasic {
 #define mrb_basic(v)     mrb_basic_ptr(v)
 
 struct RObject : public RBasic {
-  struct iv_tbl *iv;
+    struct iv_tbl *iv;
 };
 
 #define mrb_obj_ptr(v)   ((struct RObject*)((v).value.p))
@@ -198,74 +198,74 @@ struct RObject : public RBasic {
 
 static inline mrb_value mrb_fixnum_value(mrb_int i)
 {
-  mrb_value v;
+    mrb_value v;
 
-  MRB_SET_VALUE(v, MRB_TT_FIXNUM, value.i, i);
-  return v;
+    MRB_SET_VALUE(v, MRB_TT_FIXNUM, value.i, i);
+    return v;
 }
 
 static inline mrb_value mrb_symbol_value(mrb_sym i)
 {
-  mrb_value v;
+    mrb_value v;
 
-  MRB_SET_VALUE(v, MRB_TT_SYMBOL, value.sym, i);
-  return v;
+    MRB_SET_VALUE(v, MRB_TT_SYMBOL, value.sym, i);
+    return v;
 }
 
 static inline mrb_value mrb_obj_value(void *p)
 {
-  mrb_value v;
-  RBasic *b = (RBasic*)p;
+    mrb_value v;
+    RBasic *b = (RBasic*)p;
 
-  MRB_SET_VALUE(v, b->tt, value.p, p);
-  return v;
+    MRB_SET_VALUE(v, b->tt, value.p, p);
+    return v;
 }
 
 static inline mrb_value mrb_voidp_value(void *p)
 {
-  mrb_value v;
+    mrb_value v;
 
-  MRB_SET_VALUE(v, MRB_TT_VOIDP, value.p, p);
-  return v;
+    MRB_SET_VALUE(v, MRB_TT_VOIDP, value.p, p);
+    return v;
 }
 
 static inline mrb_value mrb_false_value(void)
 {
-  mrb_value v;
+    mrb_value v;
 
-  MRB_SET_VALUE(v, MRB_TT_FALSE, value.i, 1);
-  return v;
+    MRB_SET_VALUE(v, MRB_TT_FALSE, value.i, 1);
+    return v;
 }
 
 static inline mrb_value mrb_nil_value(void)
 {
-  mrb_value v;
+    mrb_value v;
 
-  MRB_SET_VALUE(v, MRB_TT_FALSE, value.i, 0);
-  return v;
+    MRB_SET_VALUE(v, MRB_TT_FALSE, value.i, 0);
+    return v;
 }
 
 static inline mrb_value mrb_true_value(void)
 {
-  mrb_value v;
+    mrb_value v;
 
-  MRB_SET_VALUE(v, MRB_TT_TRUE, value.i, 1);
-  return v;
+    MRB_SET_VALUE(v, MRB_TT_TRUE, value.i, 1);
+    return v;
 }
 
 static inline mrb_value mrb_undef_value(void)
 {
-  mrb_value v;
+    mrb_value v;
 
-  MRB_SET_VALUE(v, MRB_TT_UNDEF, value.i, 0);
-  return v;
+    MRB_SET_VALUE(v, MRB_TT_UNDEF, value.i, 0);
+    return v;
 }
 
 static inline mrb_value mrb_bool_value(mrb_bool boolean)
 {
-  mrb_value v;
+    mrb_value v;
 
-  MRB_SET_VALUE(v, boolean ? MRB_TT_TRUE : MRB_TT_FALSE, value.i, 1);
-  return v;
+    MRB_SET_VALUE(v, boolean ? MRB_TT_TRUE : MRB_TT_FALSE, value.i, 1);
+    return v;
 }
 

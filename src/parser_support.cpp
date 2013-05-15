@@ -12,7 +12,6 @@ static mrb_sym sym(mrb_ast_node *x) { return ((mrb_sym)(intptr_t)(x));}
 //#define sym(x)
 #ifdef ENABLE_STDIO
 void parser_dump(mrb_state *mrb, mrb_ast_node *tree, int offset);
-void codedump_all(mrb_state*, int);
 
 static void dump_prefix(int offset)
 {
@@ -808,10 +807,10 @@ load_exec(mrb_state *mrb, mrb_parser_state *p, mrbc_context *c)
         return mrb_nil_value();
     }
     if (c) {
-        if (c->dump_result) codedump_all(mrb, n);
+        if (c->dump_result) mrb->codedump_all(n);
         if (c->no_exec) return mrb_fixnum_value(n);
     }
-    v = mrb->mrb_run(mrb_proc_new(mrb, mrb->irep[n]), mrb_top_self(mrb));
+    v = mrb->mrb_run(mrb_proc_new(mrb, mrb->m_irep[n]), mrb_top_self(mrb));
     if (mrb->m_exc) return mrb_nil_value();
     return v;
 }
@@ -831,21 +830,20 @@ mrb_load_file(mrb_state *mrb, FILE *f)
 #endif
 
 mrb_value
-mrb_load_nstring_cxt(mrb_state *mrb, const char *s, int len, mrbc_context *c)
+mrb_load_nstring_cxt(mrb_state *mrb, const std::string & s, mrbc_context *c)
 {
-    return load_exec(mrb, mrb_parse_nstring(mrb, s, len, c), c);
+    return load_exec(mrb, mrb_parse_nstring(mrb, s, c), c);
 }
 
 mrb_value
-mrb_load_nstring(mrb_state *mrb, const char *s, int len)
+mrb_load_nstring(mrb_state *mrb, const std::string & s)
 {
-    return mrb_load_nstring_cxt(mrb, s, len, NULL);
+    return mrb_load_nstring_cxt(mrb, s, NULL);
 }
 
-mrb_value
-mrb_load_string_cxt(mrb_state *mrb, const char *s, mrbc_context *c)
+mrb_value mrb_load_string_cxt(mrb_state *mrb, const char *s, mrbc_context *c)
 {
-    return mrb_load_nstring_cxt(mrb, s, strlen(s), c);
+    return mrb_load_nstring_cxt(mrb, s, c);
 }
 
 mrb_value
@@ -888,14 +886,13 @@ mrb_parser_new(mrb_state *mrb)
     yydebug = 1;
 #endif
 
-    p->m_lex_strterm = NULL;
+    p->m_lex_strterm = nullptr;
     p->heredocs = p->parsing_heredoc = NULL;
 
     return p;
 }
 
-void
-mrb_parser_free(mrb_parser_state *p) {
+void mrb_parser_free(mrb_parser_state *p) {
     p->pool->mrb_pool_close();
 }
 
@@ -907,8 +904,7 @@ mrbc_context* mrbc_context_new(mrb_state *mrb)
     return c;
 }
 
-void
-mrbc_context_free(mrb_state *mrb, mrbc_context *cxt)
+void mrbc_context_free(mrb_state *mrb, mrbc_context *cxt)
 {
     mrb->gc()._free(cxt->syms);
     mrb->gc()._free(cxt);
@@ -928,14 +924,14 @@ const char* mrbc_filename(mrb_state *mrb, mrbc_context *c, const char *s)
 }
 
 #ifdef ENABLE_STDIO
-mrb_parser_state*
-mrb_parse_file(mrb_state *mrb, FILE *f, mrbc_context *c)
+mrb_parser_state* mrb_parse_file(mrb_state *mrb, FILE *f, mrbc_context *c)
 {
     mrb_parser_state *p;
 
     p = mrb_parser_new(mrb);
-    if (!p) return 0;
-    p->s = p->send = NULL;
+    if (!p)
+        return 0;
+    p->s = p->send = nullptr;
     p->f = f;
 
     mrb_parser_parse(p, c);
@@ -943,23 +939,22 @@ mrb_parse_file(mrb_state *mrb, FILE *f, mrbc_context *c)
 }
 #endif
 
-mrb_parser_state*
-mrb_parse_nstring(mrb_state *mrb, const char *s, int len, mrbc_context *c)
+mrb_parser_state* mrb_parse_nstring(mrb_state *mrb, const std::string &str, mrbc_context *c)
 {
     mrb_parser_state *p;
 
     p = mrb_parser_new(mrb);
     if (!p)
         return 0;
-    p->s = s;
-    p->send = s + len;
+    p->source = str;
+    p->s = p->source.c_str();
+    p->send = p->s + p->source.size();
 
     mrb_parser_parse(p, c);
     return p;
 }
 
-mrb_parser_state*
-mrb_parse_string(mrb_state *mrb, const char *s, mrbc_context *c)
+mrb_parser_state* mrb_parse_string(mrb_state *mrb, const char *s, mrbc_context *c)
 {
-    return mrb_parse_nstring(mrb, s, strlen(s), c);
+    return mrb_parse_nstring(mrb, s, c);
 }

@@ -177,7 +177,7 @@ static mrb_value exc_equal(mrb_state *mrb, mrb_value exc)
 
 static void exc_debug_info(mrb_state *mrb, RObject *exc)
 {
-    mrb_callinfo *ci = mrb->ci;
+    mrb_callinfo *ci = mrb->m_ci;
     mrb_code *pc = ci->pc;
 
     mrb_obj_iv_set(mrb, exc, mrb_intern2(mrb, "ciidx", 5), mrb_fixnum_value(ci - mrb->cibase));

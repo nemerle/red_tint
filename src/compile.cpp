@@ -49,7 +49,7 @@ mrb_ast_node* mrb_parser_state::cons(mrb_ast_node *car, mrb_ast_node *cdr)
     }
     c->init(car,cdr,m_lineno);
     return c;
- }
+}
 mrb_ast_node* mrb_parser_state::append(mrb_ast_node *a, mrb_ast_node *b)
 {
     mrb_ast_node *c = a;
@@ -358,6 +358,9 @@ void mrb_parser_state::parser_init_cxt(mrbc_context *cxt)
         }
     }
     m_capture_errors = cxt->capture_errors;
+    if(cxt->partial_hook) {
+        m_cxt = cxt;
+    }
 }
 
 void mrb_parser_state::parser_update_cxt(mrbc_context *cxt)
@@ -374,6 +377,12 @@ void mrb_parser_state::parser_update_cxt(mrbc_context *cxt)
 
 extern void codedump_all(mrb_state*, int);
 extern void parser_dump(mrb_state *mrb, mrb_ast_node *tree, int offset);
+
+void mrbc_partial_hook(mrb_state *mrb, mrbc_context *c, int (*func)(mrb_parser_state*), void *data)
+{
+    c->partial_hook = func;
+    c->partial_data = data;
+}
 
 void mrb_parser_parse(mrb_parser_state *p, mrbc_context *c) {
     if (setjmp(p->jmp) != 0) {

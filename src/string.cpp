@@ -1226,62 +1226,6 @@ mrb_str_buf_append(mrb_state *mrb, mrb_value str, mrb_value str2)
     return str;
 }
 
-/* 15.2.10.5.18 */
-/*
- *  call-seq:
- *     str.gsub(pattern, replacement)       => new_str
- *     str.gsub(pattern) {|match| block }   => new_str
- *
- *  Returns a copy of <i>str</i> with <em>all</em> occurrences of <i>pattern</i>
- *  replaced with either <i>replacement</i> or the value of the block. The
- *  <i>pattern</i> will typically be a <code>Regexp</code>; if it is a
- *  <code>String</code> then no regular expression metacharacters will be
- *  interpreted (that is <code>/\d/</code> will match a digit, but
- *  <code>'\d'</code> will match a backslash followed by a 'd').
- *
- *  If a string is used as the replacement, special variables from the match
- *  (such as <code>$&</code> and <code>$1</code>) cannot be substituted into it,
- *  as substitution into the string occurs before the pattern match
- *  starts. However, the sequences <code>\1</code>, <code>\2</code>, and so on
- *  may be used to interpolate successive groups in the match.
- *
- *  In the block form, the current match string is passed in as a parameter, and
- *  variables such as <code>$1</code>, <code>$2</code>, <code>$`</code>,
- *  <code>$&</code>, and <code>$'</code> will be set appropriately. The value
- *  returned by the block will be substituted for the match on each call.
- *
- *  When neither a block nor a second argument is supplied, an
- *  <code>Enumerator</code> is returned.
- *
- *     "hello".gsub(/[aeiou]/, '*')                  #=> "h*ll*"
- *     "hello".gsub(/([aeiou])/, '<\1>')             #=> "h<e>ll<o>"
- *     "hello".gsub(/./) {|s| s.ord.to_s + ' '}      #=> "104 101 108 108 111 "
- *     "hello".gsub(/(?<foo>[aeiou])/, '{\k<foo>}')  #=> "h{e}ll{o}"
- *     'hello'.gsub(/[eo]/, 'e' => 3, 'o' => '*')    #=> "h3ll*"
- */
-static mrb_value
-mrb_str_gsub(mrb_state *mrb, mrb_value self)
-{
-    mrb_raise(mrb, E_NOTIMP_ERROR, "Regexp Class not implemented");
-    return mrb_nil_value();
-}
-
-/* 15.2.10.5.19 */
-/*
- *  call-seq:
- *     str.gsub!(pattern, replacement)        => str or nil
- *     str.gsub!(pattern) {|match| block }    => str or nil
- *
- *  Performs the substitutions of <code>String#gsub</code> in place, returning
- *  <i>str</i>, or <code>nil</code> if no substitutions were performed.
- */
-static mrb_value
-mrb_str_gsub_bang(mrb_state *mrb, mrb_value self)
-{
-    mrb_raise(mrb, E_NOTIMP_ERROR, "Regexp Class not implemented");
-    return mrb_nil_value();
-}
-
 mrb_int
 mrb_str_hash(mrb_state *mrb, mrb_value str)
 {
@@ -1586,26 +1530,6 @@ mrb_check_string_type(mrb_state *mrb, mrb_value str)
     return mrb_check_convert_type(mrb, str, MRB_TT_STRING, "String", "to_str");
 }
 
-/* 15.2.10.5.27 */
-/*
- *  call-seq:
- *     str.match(pattern)   => matchdata or nil
- *
- *  Converts <i>pattern</i> to a <code>Regexp</code> (if it isn't already one),
- *  then invokes its <code>match</code> method on <i>str</i>.
- *
- *     'hello'.match('(.)\1')      #=> #<MatchData:0x401b3d30>
- *     'hello'.match('(.)\1')[0]   #=> "ll"
- *     'hello'.match(/(.)\1/)[0]   #=> "ll"
- *     'hello'.match('xx')         #=> nil
- */
-static mrb_value
-mrb_str_match_m(mrb_state *mrb, mrb_value self)
-{
-    mrb_raise(mrb, E_NOTIMP_ERROR, "Regexp Class not implemented");
-    return mrb_nil_value();
-}
-
 /* ---------------------------------- */
 /* 15.2.10.5.29 */
 /*
@@ -1794,65 +1718,7 @@ mrb_str_rindex_m(mrb_state *mrb, mrb_value str)
     return mrb_nil_value();
 }
 
-/* 15.2.10.5.32 */
-/*
- *  call-seq:
- *     str.scan(pattern)                         => array
- *     str.scan(pattern) {|match, ...| block }   => str
- *
- *  Both forms iterate through <i>str</i>, matching the pattern (which may be a
- *  <code>Regexp</code> or a <code>String</code>). For each match, a result is
- *  generated and either added to the result array or passed to the block. If
- *  the pattern contains no groups, each individual result consists of the
- *  matched string, <code>$&</code>.  If the pattern contains groups, each
- *  individual result is itself an array containing one entry per group.
- *
- *     a = "cruel world"
- *     a.scan(/\w+/)        #=> ["cruel", "world"]
- *     a.scan(/.../)        #=> ["cru", "el ", "wor"]
- *     a.scan(/(...)/)      #=> [["cru"], ["el "], ["wor"]]
- *     a.scan(/(..)(..)/)   #=> [["cr", "ue"], ["l ", "wo"]]
- *
- *  And the block form:
- *
- *     a.scan(/\w+/) {|w| print "<<#{w}>> " }
- *     print "\n"
- *     a.scan(/(.)(.)/) {|x,y| print y, x }
- *     print "\n"
- *
- *  <em>produces:</em>
- *
- *     <<cruel>> <<world>>
- *     rceu lowlr
- */
-static mrb_value
-mrb_str_scan(mrb_state *mrb, mrb_value str)
-{
-    mrb_raise(mrb, E_NOTIMP_ERROR, "Regexp Class not implemented");
-    return mrb_nil_value();
-}
-
-//static const char isspacetable[256] = {
-//    0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0,
-//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-//};
-
 #define ascii_isspace(c) isspace(c)
-//isspacetable[(uint8_t)(c)]
 
 /* 15.2.10.5.35 */
 
@@ -2019,70 +1885,6 @@ mrb_str_split_m(mrb_state *mrb, mrb_value str)
     }
 
     return result;
-}
-
-
-/* 15.2.10.5.37 */
-/*
- *  call-seq:
- *     str.sub!(pattern, replacement)          => str or nil
- *     str.sub!(pattern) {|match| block }      => str or nil
- *
- *  Performs the substitutions of <code>String#sub</code> in place,
- *  returning <i>str</i>, or <code>nil</code> if no substitutions were
- *  performed.
- */
-static mrb_value
-mrb_str_sub_bang(mrb_state *mrb, mrb_value str)
-{
-    mrb_raise(mrb, E_NOTIMP_ERROR, "Regexp Class not implemented");
-    return mrb_nil_value();
-}
-
-/* 15.2.10.5.36 */
-
-/*
- *  call-seq:
- *     str.sub(pattern, replacement)         -> new_str
- *     str.sub(pattern, hash)                -> new_str
- *     str.sub(pattern) {|match| block }     -> new_str
- *
- *  Returns a copy of <i>str</i> with the <em>first</em> occurrence of
- *  <i>pattern</i> substituted for the second argument. The <i>pattern</i> is
- *  typically a <code>Regexp</code>; if given as a <code>String</code>, any
- *  regular expression metacharacters it contains will be interpreted
- *  literally, e.g. <code>'\\\d'</code> will match a backlash followed by 'd',
- *  instead of a digit.
- *
- *  If <i>replacement</i> is a <code>String</code> it will be substituted for
- *  the matched text. It may contain back-references to the pattern's capture
- *  groups of the form <code>\\\d</code>, where <i>d</i> is a group number, or
- *  <code>\\\k<n></code>, where <i>n</i> is a group name. If it is a
- *  double-quoted string, both back-references must be preceded by an
- *  additional backslash. However, within <i>replacement</i> the special match
- *  variables, such as <code>&$</code>, will not refer to the current match.
- *
- *  If the second argument is a <code>Hash</code>, and the matched text is one
- *  of its keys, the corresponding value is the replacement string.
- *
- *  In the block form, the current match string is passed in as a parameter,
- *  and variables such as <code>$1</code>, <code>$2</code>, <code>$`</code>,
- *  <code>$&</code>, and <code>$'</code> will be set appropriately. The value
- *  returned by the block will be substituted for the match on each call.
- *
- *     "hello".sub(/[aeiou]/, '*')                  #=> "h*llo"
- *     "hello".sub(/([aeiou])/, '<\1>')             #=> "h<e>llo"
- *     "hello".sub(/./) {|s| s.ord.to_s + ' ' }     #=> "104 ello"
- *     "hello".sub(/(?<foo>[aeiou])/, '*\k<foo>*')  #=> "h*e*llo"
- *     'Is SHELL your preferred shell?'.sub(/[[:upper:]]{2,}/, ENV)
- *      #=> "Is /bin/bash your preferred shell?"
- */
-
-static mrb_value
-mrb_str_sub(mrb_state *mrb, mrb_value self)
-{
-    mrb_raise(mrb, E_NOTIMP_ERROR, "Regexp Class not implemented");
-    return mrb_nil_value();
 }
 
 mrb_value
@@ -2585,7 +2387,7 @@ mrb_str_dump(mrb_state *mrb, mrb_value str)
     return mrb_obj_value(result);
 }
 
-mrb_value mrb_str_cat(mrb_state *mrb, mrb_value str, const char *ptr, size_t len)
+mrb_value mrb_str_cat(mrb_state *mrb, mrb_value str, const char *ptr, int len)
 {
     if (len < 0) {
         mrb_raise(mrb, E_ARGUMENT_ERROR, "negative string size (or size too big)");

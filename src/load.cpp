@@ -34,20 +34,20 @@ static void irep_free(size_t sirep, mrb_state *mrb)
     void *p;
 
     for (i = sirep; i < mrb->irep_len; i++) {
-        if (mrb->irep[i]) {
-            p = mrb->irep[i]->iseq;
+        if (mrb->m_irep[i]) {
+            p = mrb->m_irep[i]->iseq;
             if (p)
                 mrb->m_gc._free(p);
 
-            p = mrb->irep[i]->pool;
+            p = mrb->m_irep[i]->pool;
             if (p)
                 mrb->m_gc._free(p);
 
-            p = mrb->irep[i]->syms;
+            p = mrb->m_irep[i]->syms;
             if (p)
                 mrb->m_gc._free(p);
 
-            mrb->m_gc._free(mrb->irep[i]);
+            mrb->m_gc._free(mrb->m_irep[i]);
         }
     }
 }
@@ -202,12 +202,11 @@ error_exit:
 static int
 read_rite_lineno_record(mrb_state *mrb, const uint8_t *bin, size_t irepno, uint32_t *len)
 {
-    int ret;
     size_t i, fname_len, niseq;
     char *fname;
     uint16_t *lines;
+    int ret = MRB_DUMP_OK;
 
-    ret = MRB_DUMP_OK;
     *len = 0;
     bin += sizeof(uint32_t); // record size
     *len += sizeof(uint32_t);
@@ -216,8 +215,7 @@ read_rite_lineno_record(mrb_state *mrb, const uint8_t *bin, size_t irepno, uint3
     *len += sizeof(uint16_t);
     fname = (char *)mrb->gc()._malloc(fname_len + 1);
     if (fname == NULL) {
-        ret = MRB_DUMP_GENERAL_FAILURE;
-        goto error_exit;
+        return MRB_DUMP_GENERAL_FAILURE;
     }
     memcpy(fname, bin, fname_len);
     fname[fname_len] = '\0';
@@ -230,8 +228,7 @@ read_rite_lineno_record(mrb_state *mrb, const uint8_t *bin, size_t irepno, uint3
 
     lines = (uint16_t *)mrb->gc()._malloc(niseq * sizeof(uint16_t));
     if (lines == nullptr) {
-        ret = MRB_DUMP_GENERAL_FAILURE;
-        goto error_exit;
+        return MRB_DUMP_GENERAL_FAILURE;
     }
     for (i = 0; i < niseq; i++) {
         lines[i] = bin_to_uint16(bin);
@@ -239,13 +236,9 @@ read_rite_lineno_record(mrb_state *mrb, const uint8_t *bin, size_t irepno, uint3
         *len += sizeof(uint16_t);
     }
 
-    mrb->irep[irepno]->filename = fname;
-    mrb->irep[irepno]->lines = lines;
+    mrb->m_irep[irepno]->filename = fname;
+    mrb->m_irep[irepno]->lines = lines;
 
-error_exit:
-    if (fname) {
-        mrb->gc()._free(fname);
-    }
     return ret;
 }
 
@@ -366,7 +359,7 @@ mrb_load_irep(mrb_state *mrb, const uint8_t *bin)
         irep_error(mrb, n);
         return mrb_nil_value();
     }
-    return mrb->mrb_run(mrb_proc_new(mrb, mrb->irep[n]), mrb_top_self(mrb));
+    return mrb->mrb_run(mrb_proc_new(mrb, mrb->m_irep[n]), mrb_top_self(mrb));
 }
 
 #ifdef ENABLE_STDIO
@@ -517,6 +510,6 @@ mrb_load_irep_file(mrb_state *mrb, FILE* fp)
         irep_error(mrb, n);
         return mrb_nil_value();
     }
-    return mrb->mrb_run(mrb_proc_new(mrb, mrb->irep[n]), mrb_top_self(mrb));
+    return mrb->mrb_run(mrb_proc_new(mrb, mrb->m_irep[n]), mrb_top_self(mrb));
 }
 #endif /* ENABLE_STDIO */

@@ -539,35 +539,35 @@ void MemManager::root_scan_phase()
     mark(m_mrb->m_exc); /* mark exception */
 
     /* mark stack */
-    e = m_mrb->stack - m_mrb->stbase;
-    if (m_mrb->ci)
-        e += m_mrb->ci->nregs;
+    e = m_mrb->m_stack - m_mrb->stbase;
+    if (m_mrb->m_ci)
+        e += m_mrb->m_ci->nregs;
     if (m_mrb->stbase + e > m_mrb->stend)
         e = m_mrb->stend - m_mrb->stbase;
     for (i=0; i<e; i++) {
         mrb_gc_mark_value(m_mrb, m_mrb->stbase[i]);
     }
     /* mark ensure stack */
-    e = (m_mrb->ci) ? m_mrb->ci->eidx : 0;
+    e = (m_mrb->m_ci) ? m_mrb->m_ci->eidx : 0;
     for (i=0; i<e; i++) {
         mark(m_mrb->ensure[i]);
     }
     /* mark closure */
-    for (ci = m_mrb->cibase; ci <= m_mrb->ci; ci++) {
+    for (ci = m_mrb->cibase; ci <= m_mrb->m_ci; ci++) {
         if (!ci)
             continue;
         mark(ci->env);
         mark(ci->proc);
         mark(ci->target_class);
     }
-    if (nullptr==m_mrb->irep)
+    if (nullptr==m_mrb->m_irep)
         return;
 
     /* mark irep pool */
     size_t len = m_mrb->irep_len;
     if (len > m_mrb->irep_capa) len = m_mrb->irep_capa;
     for (i=0; i<len; i++) {
-        mrb_irep *irep = m_mrb->irep[i];
+        mrb_irep *irep = m_mrb->m_irep[i];
         if (!irep)
             continue;
         for (int j=0; j<irep->plen; j++) {

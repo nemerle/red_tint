@@ -135,7 +135,7 @@ bool is_code_block_open(mrb_parser_state *parser)
 void mrb_show_version(mrb_state *);
 void mrb_show_copyright(mrb_state *);
 
-struct _args {
+struct mrbc_args {
     bool verbose;
     int argc;
     char** argv;
@@ -160,9 +160,9 @@ usage(const char *name)
 }
 
 static int
-parse_args(mrb_state *mrb, int argc, char **argv, struct _args *args)
+parse_args(mrb_state *mrb, int argc, char **argv, struct mrbc_args *args)
 {
-    static const struct _args args_zero = { 0 };
+    static const struct mrbc_args args_zero = { 0 };
 
     *args = args_zero;
 
@@ -199,7 +199,7 @@ parse_args(mrb_state *mrb, int argc, char **argv, struct _args *args)
 }
 
 static void
-cleanup(mrb_state *mrb, struct _args *args)
+cleanup(mrb_state *mrb, struct mrbc_args *args)
 {
     mrb_close(mrb);
 }
@@ -238,7 +238,7 @@ main(int argc, char **argv)
     struct mrb_parser_state *parser;
     mrb_state *mrb;
     mrb_value result;
-    struct _args args;
+    struct mrbc_args args;
     int n;
     int code_block_open = FALSE;
     int ai;
@@ -334,7 +334,7 @@ main(int argc, char **argv)
                 /* evaluate the bytecode */
                 result = mrb->mrb_run(
                                  /* pass a proc for evaulation */
-                                 mrb_proc_new(mrb, mrb->irep[n]),
+                                 mrb_proc_new(mrb, mrb->m_irep[n]),
                                  mrb_top_self(mrb));
                 /* did an exception occur? */
                 if (mrb->m_exc) {

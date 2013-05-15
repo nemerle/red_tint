@@ -3,6 +3,7 @@
 **
 ** See Copyright Notice in mruby.h
 */
+#include <stdarg.h>
 
 #include "mruby.h"
 
@@ -62,4 +63,16 @@ mrb_core_final(mrb_state *mrb)
 #ifndef DISABLE_GEMS
   mrb_final_mrbgems(mrb); DONE;
 #endif
+}
+void SysInterface::print_f(const char *fmt,...) {
+    va_list argptr;
+    va_start(argptr, fmt);
+    vprintf(fmt, argptr);
+    va_end(argptr);
+}
+void SysInterface::error_f(const char *fmt,...) {
+    va_list argptr;
+    va_start(argptr, fmt);
+    vfprintf(stderr,fmt, argptr);
+    va_end(argptr);
 }

@@ -215,7 +215,7 @@ mrb_f_send(mrb_state *mrb, mrb_value self)
 static mrb_value
 mrb_f_block_given_p_m(mrb_state *mrb, mrb_value self)
 {
-    mrb_callinfo *ci = mrb->ci;
+    mrb_callinfo *ci = mrb->m_ci;
     mrb_value *bp;
     mrb_bool given_p;
 
@@ -882,7 +882,7 @@ mrb_f_raise(mrb_state *mrb, mrb_value self)
         /* fall through */
     default:
         exc = mrb_make_exception(mrb, argc, a);
-        mrb_obj_iv_set(mrb, mrb_obj_ptr(exc), mrb_intern2(mrb, "lastpc", 6), mrb_voidp_value(mrb->ci->pc));
+        mrb_obj_iv_set(mrb, mrb_obj_ptr(exc), mrb_intern2(mrb, "lastpc", 6), mrb_voidp_value(mrb->m_ci->pc));
         mrb_exc_raise(mrb, exc);
         break;
     }

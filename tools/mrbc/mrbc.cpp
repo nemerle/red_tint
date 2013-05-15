@@ -6,222 +6,299 @@
 #include "mruby/dump.h"
 #include "mruby/proc.h"
 
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "mruby.h"
+#include "mruby/compile.h"
+#include "mruby/dump.h"
+#include "mruby/proc.h"
+
 #define RITEBIN_EXT ".mrb"
 #define C_EXT       ".c"
+
 void mrb_show_version(mrb_state *);
 void mrb_show_copyright(mrb_state *);
 void parser_dump(mrb_state*, struct mrb_ast_node*, int);
 void codedump_all(mrb_state*, int);
+static char *
+get_outfilename(mrb_state *mrb, char *infile, const char *ext);
 
-struct _args {
-  FILE *rfp;
-  FILE *wfp;
-  char *filename;
-  char *initname;
-  char *ext;
-  mrb_bool check_syntax : 1;
-  mrb_bool verbose      : 1;
-  mrb_bool debug_info   : 1;
+struct mrbc_args {
+    int argc;
+    char **argv;
+    int idx;
+    const char *prog;
+    const char *outfile;
+    const char *initname;
+    mrb_bool check_syntax : 1;
+    mrb_bool verbose      : 1;
+    mrb_bool debug_info   : 1;
 };
 
 static void
 usage(const char *name)
 {
-  static const char *const usage_msg[] = {
-  "switches:",
-  "-c           check syntax only",
-  "-o<outfile>  place the output into <outfile>",
-  "-v           print version number, then trun on verbose mode",
-  "-g           produce debugging information",
-  "-B<symbol>   binary <symbol> output in C language format",
-  "--verbose    run at verbose mode",
-  "--version    print the version",
-  "--copyright  print the copyright",
-  NULL
-  };
-  const char *const *p = usage_msg;
+    static const char *const usage_msg[] = {
+        "switches:",
+        "-c           check syntax only",
+        "-o<outfile>  place the output into <outfile>",
+        "-v           print version number, then turn on verbose mode",
+        "-g           produce debugging information",
+        "-B<symbol>   binary <symbol> output in C language format",
+        "--verbose    run at verbose mode",
+        "--version    print the version",
+        "--copyright  print the copyright",
+        NULL
+    };
+    const char *const *p = usage_msg;
 
-  printf("Usage: %s [switches] programfile\n", name);
-  while(*p)
-  printf("  %s\n", *p++);
+    printf("Usage: %s [switches] programfile\n", name);
+    while (*p)
+        printf("  %s\n", *p++);
 }
 
-static char *
-get_outfilename(char *infile, char *ext)
+static char * get_outfilename(mrb_state *mrb, char *infile, const char *ext)
 {
-  char *outfile;
-  char *p;
+    char *outfile;
+    char *p;
 
-  outfile = (char*)malloc(strlen(infile) + strlen(ext) + 1);
-  strcpy(outfile, infile);
-  if (*ext) {
-    if ((p = strrchr(outfile, '.')) == NULL)
-      p = &outfile[strlen(outfile)];
-    strcpy(p, ext);
-  }
+    outfile = (char*)mrb->gc()._malloc(strlen(infile) + strlen(ext) + 1);
+    strcpy(outfile, infile);
+    if (*ext) {
+        if ((p = strrchr(outfile, '.')) == NULL)
+            p = &outfile[strlen(outfile)];
+        strcpy(p, ext);
+    }
 
-  return outfile;
+    return outfile;
 }
 
-static int
-parse_args(mrb_state *mrb, int argc, char **argv, struct _args *args)
+static int parse_args(mrb_state *mrb, int argc, char **argv, mrbc_args *args)
 {
-  char *infile = NULL;
-  char *outfile = NULL;
-  char **origargv = argv;
-  int result = EXIT_SUCCESS;
-  static const struct _args args_zero = { 0 };
+    char *outfile = nullptr;
+    static const mrbc_args args_zero = { 0 };
+    int i;
 
-  *args = args_zero;
-  args->ext = RITEBIN_EXT;
+    *args = args_zero;
+    args->argc = argc;
+    args->argv = argv;
+    args->prog = argv[0];
 
-  for (argc--,argv++; argc > 0; argc--,argv++) {
-    if (**argv == '-') {
-      if (strlen(*argv) == 1) {
-        args->filename = infile = "-";
-        args->rfp = stdin;
-        break;
-      }
-
-      switch ((*argv)[1]) {
-      case 'o':
-        if (outfile) {
-          printf("%s: An output file is already specified. (%s)\n",
-                 *origargv, outfile);
-          result = EXIT_FAILURE;
-          goto exit;
+    for (i=1; i<argc; i++) {
+        if (argv[i][0] == '-') {
+            switch ((argv[i])[1]) {
+            case 'o':
+                if (args->outfile) {
+                    fprintf(stderr, "%s: an output file is already specified. (%s)\n",
+                            args->prog, outfile);
+                    return -1;
+                }
+                if (argv[i][2] == '\0' && argv[i+1]) {
+                    i++;
+                    args->outfile = get_outfilename(mrb, argv[i], "");
+                }
+                else {
+                    args->outfile = get_outfilename(mrb, argv[i] + 2, "");
+                }
+                break;
+            case 'B':
+                if (argv[i][2] == '\0' && argv[i+1]) {
+                    i++;
+                    args->initname = argv[i];
+                }
+                else {
+                    args->initname = argv[i]+2;
+                }
+                if (*args->initname == '\0') {
+                    fprintf(stderr, "%s: function name is not specified.\n", args->prog);
+                    return -1;
+                }
+                break;
+            case 'c':
+                args->check_syntax = 1;
+                break;
+            case 'v':
+                if (!args->verbose) mrb_show_version(mrb);
+                args->verbose = 1;
+                break;
+            case 'g':
+                args->debug_info = 1;
+                break;
+            case '-':
+                if (argv[i][1] == '\n') {
+                    return i;
+                }
+                if (strcmp(argv[i] + 2, "version") == 0) {
+                    mrb_show_version(mrb);
+                    exit(EXIT_SUCCESS);
+                }
+                else if (strcmp(argv[i] + 2, "verbose") == 0) {
+                    args->verbose = 1;
+                    break;
+                }
+                else if (strcmp(argv[i] + 2, "copyright") == 0) {
+                    mrb_show_copyright(mrb);
+                    exit(EXIT_SUCCESS);
+                }
+                return -1;
+            default:
+                return i;
+            }
         }
-        outfile = get_outfilename((*argv) + 2, "");
-        break;
-      case 'B':
-        args->ext = C_EXT;
-        args->initname = (*argv) + 2;
-        if (*args->initname == '\0') {
-          printf("%s: Function name is not specified.\n", *origargv);
-          result = EXIT_FAILURE;
-          goto exit;
+        else {
+            break;
         }
-        break;
-      case 'c':
-        args->check_syntax = 1;
-        break;
-      case 'v':
-        if(!args->verbose) mrb_show_version(mrb);
-        args->verbose = 1;
-        break;
-      case 'g':
-        args->debug_info = 1;
-        break;
-      case '-':
-        if (strcmp((*argv) + 2, "version") == 0) {
-          mrb_show_version(mrb);
-          exit(EXIT_SUCCESS);
-        }
-        else if (strcmp((*argv) + 2, "verbose") == 0) {
-          args->verbose = 1;
-          break;
-        }
-        else if (strcmp((*argv) + 2, "copyright") == 0) {
-          mrb_show_copyright(mrb);
-          exit(EXIT_SUCCESS);
-        }
-        result = EXIT_FAILURE;
-        goto exit;
-      default:
-        break;
-      }
     }
-    else if (args->rfp == NULL) {
-      args->filename = infile = *argv;
-      if ((args->rfp = fopen(infile, "r")) == NULL) {
-        printf("%s: Cannot open program file. (%s)\n", *origargv, infile);
-        goto exit;
-      }
-    }
-  }
-
-  if (infile == NULL) {
-    result = EXIT_FAILURE;
-    goto exit;
-  }
-  if (!args->check_syntax) {
-    if (outfile == NULL) {
-      if (strcmp("-", infile) == 0) {
-        outfile = infile;
-      }
-      else {
-        outfile = get_outfilename(infile, args->ext);
-      }
-    }
-    if (strcmp("-", outfile) == 0) {
-      args->wfp = stdout;
-    }
-    else if ((args->wfp = fopen(outfile, "wb")) == NULL) {
-      printf("%s: Cannot open output file. (%s)\n", *origargv, outfile);
-      result = EXIT_FAILURE;
-      goto exit;
-    }
-  }
- exit:
-  if (outfile && infile != outfile) free(outfile);
-  return result;
+    return i;
 }
 
 static void
-cleanup(mrb_state *mrb, struct _args *args)
+cleanup(mrb_state *mrb, struct mrbc_args *args)
 {
-  if (args->rfp)
-    fclose(args->rfp);
-  if (args->wfp)
-    fclose(args->wfp);
-  mrb_close(mrb);
+    if (args->outfile)
+        mrb->gc()._free((void*)args->outfile);
+    mrb_close(mrb);
+}
+
+static int partial_hook(mrb_parser_state *p)
+{
+    mrbc_context *c = p->m_cxt;
+    mrbc_args *args = (struct mrbc_args *)c->partial_data;
+
+    if (p->f) fclose(p->f);
+    if (args->idx >= args->argc) {
+        p->f = NULL;
+        return -1;
+    }
+    mrbc_filename(p->m_mrb, c, args->argv[args->idx++]);
+    p->f = fopen(c->filename, "r");
+    if (p->f == NULL) {
+        fprintf(stderr, "%s: cannot open program file. (%s)\n", args->prog, c->filename);
+        return -1;
+    }
+    p->m_filename = c->filename;
+    p->m_lineno = 1;
+    return 0;
+}
+
+static int
+load_file(mrb_state *mrb, struct mrbc_args *args)
+{
+    mrbc_context *c;
+    mrb_value result;
+    char *input = args->argv[args->idx];
+    FILE *infile;
+
+    c = mrbc_context_new(mrb);
+    if (args->verbose)
+        c->dump_result = 1;
+    c->no_exec = 1;
+    if (input[0] == '-' && input[1] == '\0') {
+        infile = stdin;
+    }
+    else if ((infile = fopen(input, "r")) == NULL) {
+        fprintf(stderr, "%s: cannot open program file. (%s)\n", args->prog, input);
+        return EXIT_FAILURE;
+    }
+    mrbc_filename(mrb, c, input);
+    args->idx++;
+    if (args->idx < args->argc) {
+        mrbc_partial_hook(mrb, c, partial_hook, (void*)args);
+    }
+
+    result = mrb_load_file_cxt(mrb, infile, c);
+    if (mrb_undef_p(result) || mrb_fixnum(result) < 0) {
+        mrbc_context_free(mrb, c);
+        return EXIT_FAILURE;
+    }
+    mrbc_context_free(mrb, c);
+    return EXIT_SUCCESS;
+}
+
+static int
+dump_file(mrb_state *mrb, FILE *wfp, const char *outfile, struct mrbc_args *args)
+{
+    int n = MRB_DUMP_OK;
+
+    if (args->initname) {
+        n = mrb_dump_irep_cfunc(mrb, 0, args->debug_info, wfp, args->initname);
+        if (n == MRB_DUMP_INVALID_ARGUMENT) {
+            fprintf(stderr, "%s: invalid C language symbol name\n", args->initname);
+        }
+    }
+    else {
+        n = mrb_dump_irep_binary(mrb, 0, args->debug_info, wfp);
+    }
+    if (n != MRB_DUMP_OK) {
+        fprintf(stderr, "%s: error in mrb dump (%s) %d\n", args->prog, outfile, n);
+    }
+    return n;
 }
 
 int
 main(int argc, char **argv)
 {
-  mrb_state *mrb = mrb_open();
-  int n = -1;
-  struct _args args;
-  mrbc_context *c;
-  mrb_value result;
+    mrb_state *mrb = mrb_open();
+    int n, result;
+    struct mrbc_args args;
+    FILE *wfp = stdout;
 
-  if (mrb == NULL) {
-    fputs("Invalid mrb_state, exiting mrbc\n", stderr);
-    return EXIT_FAILURE;
-  }
+    if (mrb == NULL) {
+        fputs("Invalid mrb_state, exiting mrbc\n", stderr);
+        return EXIT_FAILURE;
+    }
 
-  n = parse_args(mrb, argc, argv, &args);
-  if (n < 0 || args.rfp == NULL) {
-    cleanup(mrb, &args);
-    usage(argv[0]);
-    return n;
-  }
+    n = parse_args(mrb, argc, argv, &args);
+    if (n < 0) {
+        cleanup(mrb, &args);
+        usage(argv[0]);
+        return EXIT_FAILURE;
+    }
+    if (n == argc) {
+        fprintf(stderr, "%s: no program file given\n", args.prog);
+        return EXIT_FAILURE;
+    }
+    if (args.outfile == NULL) {
+        if (n + 1 == argc) {
+            args.outfile = get_outfilename(mrb, argv[n], args.initname ? C_EXT : RITEBIN_EXT);
+        }
+        else {
+            fprintf(stderr, "%s: output file should be specified to compile multiple files\n", args.prog);
+            return EXIT_FAILURE;
+        }
+    }
 
-  c = mrbc_context_new(mrb);
-  if (args.verbose)
-    c->dump_result = 1;
-  c->no_exec = 1;
-  c->filename = args.filename;
-  result = mrb_load_file_cxt(mrb, args.rfp, c);
-  if (mrb_undef_p(result) || mrb_fixnum(result) < 0) {
+    args.idx = n;
+    if (load_file(mrb, &args) == EXIT_FAILURE) {
+        cleanup(mrb, &args);
+        return EXIT_FAILURE;
+    }
+    if (args.check_syntax) {
+        printf("%s:%s:Syntax OK", args.prog, argv[n]);
+    }
+
+    if (args.check_syntax) {
+        cleanup(mrb, &args);
+        return EXIT_SUCCESS;
+    }
+
+    if (args.outfile && (strcmp("-", args.outfile) != 0)) {
+        wfp = fopen(args.outfile, "w");
+        if (wfp == nullptr) {
+            fprintf(stderr, "%s: cannot open output file:(%s)\n", args.prog, args.outfile);
+            return EXIT_FAILURE;
+        }
+    }
+    result = dump_file(mrb, wfp, args.outfile, &args);
+    if(wfp!=stdout)
+        fclose(wfp);
     cleanup(mrb, &args);
-    return EXIT_FAILURE;
-  }
-  if (args.check_syntax) {
-    puts("Syntax OK");
-    cleanup(mrb, &args);
+    if (result != MRB_DUMP_OK) {
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
-  }
-  if (args.initname) {
-    n = mrb_dump_irep_cfunc(mrb, n, args.debug_info, args.wfp, args.initname);
-  }
-  else {
-    n = mrb_dump_irep_binary(mrb, n, args.debug_info, args.wfp);
-  }
-
-  cleanup(mrb, &args);
-  return EXIT_SUCCESS;
 }
 
 void
