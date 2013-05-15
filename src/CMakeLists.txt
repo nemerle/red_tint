@@ -6,6 +6,7 @@ SET(MRUBY_SRC_C
     array.cpp
     backtrace.cpp
     class.cpp
+    code_dump.cpp
     codegen.cpp
     compar.cpp
     compile.cpp
