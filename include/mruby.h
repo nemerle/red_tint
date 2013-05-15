@@ -65,15 +65,15 @@ struct mrb_state {
     MemManager m_gc;
 
     mrb_value *m_stack;
-    mrb_value *stbase, *stend;
+    mrb_value *m_stbase, *stend;
 
     mrb_callinfo *m_ci;
     mrb_callinfo *cibase, *ciend;
 
     mrb_code **rescue;
     int m_rsize;
-    RProc **ensure;
-    int esize;
+    RProc **m_ensure;
+    int m_esize;
 
     RObject *m_exc;
     struct iv_tbl *globals;

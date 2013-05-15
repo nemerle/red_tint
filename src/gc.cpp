@@ -539,18 +539,18 @@ void MemManager::root_scan_phase()
     mark(m_mrb->m_exc); /* mark exception */
 
     /* mark stack */
-    e = m_mrb->m_stack - m_mrb->stbase;
+    e = m_mrb->m_stack - m_mrb->m_stbase;
     if (m_mrb->m_ci)
         e += m_mrb->m_ci->nregs;
-    if (m_mrb->stbase + e > m_mrb->stend)
-        e = m_mrb->stend - m_mrb->stbase;
+    if (m_mrb->m_stbase + e > m_mrb->stend)
+        e = m_mrb->stend - m_mrb->m_stbase;
     for (i=0; i<e; i++) {
-        mrb_gc_mark_value(m_mrb, m_mrb->stbase[i]);
+        mrb_gc_mark_value(m_mrb, m_mrb->m_stbase[i]);
     }
     /* mark ensure stack */
     e = (m_mrb->m_ci) ? m_mrb->m_ci->eidx : 0;
     for (i=0; i<e; i++) {
-        mark(m_mrb->ensure[i]);
+        mark(m_mrb->m_ensure[i]);
     }
     /* mark closure */
     for (ci = m_mrb->cibase; ci <= m_mrb->m_ci; ci++) {

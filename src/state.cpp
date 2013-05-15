@@ -114,14 +114,14 @@ void mrb_close(mrb_state *mrb)
 
     /* free */
     mrb_gc_free_gv(mrb);
-    mm._free(mrb->stbase);
+    mm._free(mrb->m_stbase);
     mm._free(mrb->cibase);
     for (i=0; i<mrb->irep_len; i++) {
         mrb_irep_free(mrb, mrb->m_irep[i]);
     }
     mm._free(mrb->m_irep);
     mm._free(mrb->rescue);
-    mm._free(mrb->ensure);
+    mm._free(mrb->m_ensure);
     mrb_symtbl_free(mrb);
     mm.mrb_heap_free();
     mm.mrb_alloca_free();
