@@ -17,7 +17,6 @@ static void printstr(const mrb_state *, const mrb_value &obj)
     }
 #endif
 }
-extern "C" {
 void mrb_p(mrb_state *mrb, mrb_value obj)
 {
 #ifdef ENABLE_STDIO
@@ -25,7 +24,6 @@ void mrb_p(mrb_state *mrb, mrb_value obj)
     printstr(mrb, obj);
     putc('\n', stdout);
 #endif
-}
 }
 void mrb_show_version(mrb_state *mrb)
 {

@@ -25,14 +25,40 @@
 ** [ MIT license: http://www.opensource.org/licenses/mit-license.php ]
 */
 
-#ifndef MRUBY_H
-#define MRUBY_H
+#pragma once
 #include <memory>
 #include <cstring>
 #include "mrbconf.h"
 #include "mruby/value.h"
+#include "mruby/array.h"
 #include "mruby/mem_manager.h"
 
+/* macros to get typical exception objects
+ note:
+ + those E_* macros requires mrb_state* variable named mrb.
+ + exception objects obtained from those macros are local to mrb
+ */
+#define A_RUNTIME_ERROR(x)          (mrb_class_get((x), "RuntimeError"))
+#define E_RUNTIME_ERROR             (mrb_class_get(mrb, "RuntimeError"))
+#define E_TYPE_ERROR                (mrb_class_get(mrb, "TypeError"))
+#define I_TYPE_ERROR                (this->class_get("TypeError"))
+#define E_ARGUMENT_ERROR            (mrb_class_get(mrb, "ArgumentError"))
+#define I_ARGUMENT_ERROR            (this->class_get("ArgumentError"))
+#define E_INDEX_ERROR               (mrb_class_get(mrb, "IndexError"))
+#define E_RANGE_ERROR               (mrb_class_get(mrb, "RangeError"))
+#define E_NAME_ERROR                (mrb_class_get(mrb, "NameError"))
+#define E_NOMETHOD_ERROR            (mrb_class_get(mrb, "NoMethodError"))
+#define I_NOMETHOD_ERROR            (mrb_class_get(this, "NoMethodError"))
+#define E_SCRIPT_ERROR              (mrb_class_get(mrb, "ScriptError"))
+#define E_SYNTAX_ERROR              (mrb_class_get(mrb, "SyntaxError"))
+#define E_LOCALJUMP_ERROR           (mrb_class_get(mrb, "LocalJumpError"))
+#define I_LOCALJUMP_ERROR           (mrb_class_get(this, "LocalJumpError"))
+#define E_REGEXP_ERROR              (mrb_class_get(mrb, "RegexpError"))
+
+#define E_NOTIMP_ERROR              (mrb_class_get(mrb, "NotImplementedError"))
+#define E_FLOATDOMAIN_ERROR         (mrb_class_get(mrb, "FloatDomainError"))
+
+#define E_KEY_ERROR                 (mrb_class_get(mrb, "KeyError"))
 typedef uint32_t mrb_code;
 typedef uint32_t mrb_aspec;
 struct RClass;
@@ -42,6 +68,16 @@ struct mrb_state;
 struct mrb_pool;
 RClass *mrb_define_class(mrb_state *, const char*, RClass*);
 RClass *mrb_define_module(mrb_state *, const char*);
+#ifndef __clang__
+#define NORET(x)  x __attribute__ ((noreturn))
+#else
+#define NORET(x)  [[noreturn]] x
+#endif
+mrb_value mrb_exc_new(mrb_state *mrb, struct RClass *c, const char *ptr, long len);
+NORET(void mrb_exc_raise(mrb_state *mrb, mrb_value exc));
+NORET(void mrb_raise(mrb_state *mrb, RClass *c, const char *msg));
+NORET(void mrb_raisef(mrb_state *mrb, RClass *c, const char *fmt, ...));
+NORET(void mrb_name_error(mrb_state *mrb, mrb_sym id, const char *fmt, ...));
 
 struct mrb_callinfo {
     mrb_sym mid;
@@ -135,9 +171,6 @@ private:
 
 typedef mrb_value (*mrb_func_t)(mrb_state *mrb, mrb_value);
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
 
 mrb_value mrb_singleton_class(mrb_state*, mrb_value);
 void mrb_include_module(mrb_state*, RClass*, RClass*);
@@ -246,7 +279,7 @@ mrb_value mrb_any_to_s(mrb_state *mrb, mrb_value obj);
 const char * mrb_obj_classname(mrb_state *mrb, mrb_value obj);
 RClass* mrb_obj_class(mrb_state *mrb, mrb_value obj);
 mrb_value mrb_class_path(mrb_state *mrb, RClass *c);
-mrb_value mrb_convert_type(mrb_state *mrb, mrb_value val, mrb_int type, const char *tname, const char *method);
+mrb_value mrb_convert_type(mrb_state *mrb, const mrb_value &val, mrb_int type, const char *tname, const char *method);
 int mrb_obj_is_kind_of(mrb_state *mrb, mrb_value obj, RClass *c);
 mrb_value mrb_obj_inspect(mrb_state *mrb, mrb_value self);
 mrb_value mrb_obj_clone(mrb_state *mrb, mrb_value self);
@@ -268,44 +301,9 @@ mrb_value mrb_obj_clone(mrb_state *mrb, mrb_value self);
 #define TOLOWER(c) (ISASCII(c) ? tolower((int)(unsigned char)(c)) : (c))
 #endif
 
-#ifndef __clang__
-#define NORET(x)  x __attribute__ ((noreturn))
-#else
-#define NORET(x)  [[noreturn]] x
-#endif
-mrb_value mrb_exc_new(mrb_state *mrb, struct RClass *c, const char *ptr, long len);
-NORET(void mrb_exc_raise(mrb_state *mrb, mrb_value exc));
-NORET(void mrb_raise(mrb_state *mrb, RClass *c, const char *msg));
-NORET(void mrb_raisef(mrb_state *mrb, RClass *c, const char *fmt, ...));
-NORET(void mrb_name_error(mrb_state *mrb, mrb_sym id, const char *fmt, ...));
 void mrb_warn(mrb_state *mrb, const char *fmt, ...);
 void mrb_bug(mrb_state *mrb, const char *fmt, ...);
 void mrb_print_backtrace(mrb_state *mrb);
-/* macros to get typical exception objects
- note:
- + those E_* macros requires mrb_state* variable named mrb.
- + exception objects obtained from those macros are local to mrb
- */
-#define A_RUNTIME_ERROR(x)          (mrb_class_get((x), "RuntimeError"))
-#define E_RUNTIME_ERROR             (mrb_class_get(mrb, "RuntimeError"))
-#define E_TYPE_ERROR                (mrb_class_get(mrb, "TypeError"))
-#define I_TYPE_ERROR                (mrb_class_get(this, "TypeError"))
-#define E_ARGUMENT_ERROR            (mrb_class_get(mrb, "ArgumentError"))
-#define E_INDEX_ERROR               (mrb_class_get(mrb, "IndexError"))
-#define E_RANGE_ERROR               (mrb_class_get(mrb, "RangeError"))
-#define E_NAME_ERROR                (mrb_class_get(mrb, "NameError"))
-#define E_NOMETHOD_ERROR            (mrb_class_get(mrb, "NoMethodError"))
-#define I_NOMETHOD_ERROR            (mrb_class_get(this, "NoMethodError"))
-#define E_SCRIPT_ERROR              (mrb_class_get(mrb, "ScriptError"))
-#define E_SYNTAX_ERROR              (mrb_class_get(mrb, "SyntaxError"))
-#define E_LOCALJUMP_ERROR           (mrb_class_get(mrb, "LocalJumpError"))
-#define I_LOCALJUMP_ERROR           (mrb_class_get(this, "LocalJumpError"))
-#define E_REGEXP_ERROR              (mrb_class_get(mrb, "RegexpError"))
-
-#define E_NOTIMP_ERROR              (mrb_class_get(mrb, "NotImplementedError"))
-#define E_FLOATDOMAIN_ERROR         (mrb_class_get(mrb, "FloatDomainError"))
-
-#define E_KEY_ERROR                 (mrb_class_get(mrb, "KeyError"))
 
 mrb_value mrb_yield(mrb_state *mrb, mrb_value v, mrb_value blk);
 mrb_value mrb_yield_argv(mrb_state *mrb, mrb_value b, int argc, mrb_value *argv);
@@ -346,17 +344,6 @@ public:
     int mrb_pool_can_realloc(void *p, size_t len);
     void *mrb_pool_realloc(void *p, size_t oldlen, size_t newlen);
 };
-//struct mrb_pool* mrb_pool_open(mrb_state*);
-//void mrb_pool_close(struct mrb_pool*);
-//void* mrb_pool_alloc(struct mrb_pool*, size_t);
-//void* mrb_pool_realloc(struct mrb_pool*, void*, size_t oldlen, size_t newlen);
-//int mrb_pool_can_realloc(struct mrb_pool*, void*, size_t);
-//void* mrb_alloca(mrb_state *mrb, size_t);
 // protect given object from GC, used to access mruby values in the external context without fear
 void mrb_lock(mrb_state *mrb, mrb_value obj);
 void mrb_unlock(mrb_state *mrb, mrb_value obj);
-#if defined(__cplusplus)
-}  /* extern "C" { */
-#endif
-
-#endif  /* MRUBY_H */

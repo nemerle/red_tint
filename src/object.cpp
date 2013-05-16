@@ -319,7 +319,7 @@ mrb_value mrb_check_to_integer(mrb_state *mrb, mrb_value val, const char *method
 }
 
 mrb_value
-mrb_convert_type(mrb_state *mrb, mrb_value val, mrb_int type, const char *tname, const char *method)
+mrb_convert_type(mrb_state *mrb, const mrb_value &val, mrb_int type, const char *tname, const char *method)
 {
     if (mrb_type(val) == type)
         return val;
