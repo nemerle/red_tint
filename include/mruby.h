@@ -139,17 +139,7 @@ struct ArgStore {
 struct mrb_state {
     void *jmp;
     MemManager m_gc;
-
-    mrb_value *m_stack;
-    mrb_value *m_stbase, *stend;
-
-    mrb_callinfo *m_ci;
-    mrb_callinfo *cibase, *ciend;
-
-    mrb_code **rescue;
-    int m_rsize;
-    RProc **m_ensure;
-    int m_esize;
+    mrb_context m_ctx2;
 
     RObject *m_exc;
     struct iv_tbl *globals;
@@ -219,10 +209,10 @@ protected:
     RProc *prepare_method_missing(RClass *c, mrb_sym mid, const int &a, int &n, mrb_value *regs);
     template<bool optional=false>
     mrb_value *arg_read_prepare(int args) {
-        mrb_value *sp = m_stack + 1;
-        int argc = m_ci->argc;
+        mrb_value *sp = m_ctx2.m_stack + 1;
+        int argc = m_ctx2.m_ci->argc;
         if (argc < 0) {
-            RArray *a = mrb_ary_ptr(m_stack[1]);
+            RArray *a = mrb_ary_ptr(m_ctx2.m_stack[1]);
             argc = a->m_len;
             sp = a->m_ptr;
         }

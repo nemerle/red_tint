@@ -538,21 +538,21 @@ void MemManager::root_scan_phase()
     mark(m_vm->m_exc); /* mark exception */
 
     /* mark stack */
-    e = m_vm->m_stack - m_vm->m_stbase;
-    if (m_vm->m_ci)
-        e += m_vm->m_ci->nregs;
-    if (m_vm->m_stbase + e > m_vm->stend)
-        e = m_vm->stend - m_vm->m_stbase;
+    e = m_vm->m_ctx2.m_stack - m_vm->m_ctx2.m_stbase;
+    if (m_vm->m_ctx2.m_ci)
+        e += m_vm->m_ctx2.m_ci->nregs;
+    if (m_vm->m_ctx2.m_stbase + e > m_vm->m_ctx2.stend)
+        e = m_vm->m_ctx2.stend - m_vm->m_ctx2.m_stbase;
     for (i=0; i<e; i++) {
-        mrb_gc_mark_value(m_vm, m_vm->m_stbase[i]);
+        mrb_gc_mark_value(m_vm, m_vm->m_ctx2.m_stbase[i]);
     }
     /* mark ensure stack */
-    e = (m_vm->m_ci) ? m_vm->m_ci->eidx : 0;
+    e = (m_vm->m_ctx2.m_ci) ? m_vm->m_ctx2.m_ci->eidx : 0;
     for (i=0; i<e; i++) {
-        mark(m_vm->m_ensure[i]);
+        mark(m_vm->m_ctx2.m_ensure[i]);
     }
     /* mark closure */
-    for (ci = m_vm->cibase; ci <= m_vm->m_ci; ci++) {
+    for (ci = m_vm->m_ctx2.cibase; ci <= m_vm->m_ctx2.m_ci; ci++) {
         if (!ci)
             continue;
         mark(ci->env);

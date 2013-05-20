@@ -37,7 +37,7 @@ struct REnv : public RBasic {
     mrb_sym mid;
     int cioff;
     static REnv *alloc(mrb_state *mrb) {
-        return (REnv *)mrb->gc().mrb_obj_alloc(MRB_TT_ENV, (RClass*)mrb->m_ci->proc->env);
+        return (REnv *)mrb->gc().mrb_obj_alloc(MRB_TT_ENV, (RClass*)mrb->m_ctx2.m_ci->proc->env);
     }
 };
 
