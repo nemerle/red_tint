@@ -59,8 +59,6 @@
 #define E_FLOATDOMAIN_ERROR         (mrb_class_get(mrb, "FloatDomainError"))
 
 #define E_KEY_ERROR                 (mrb_class_get(mrb, "KeyError"))
-typedef uint32_t mrb_code;
-typedef uint32_t mrb_aspec;
 struct RClass;
 struct RProc;
 struct REnv;
@@ -78,6 +76,21 @@ NORET(void mrb_exc_raise(mrb_state *mrb, mrb_value exc));
 NORET(void mrb_raise(mrb_state *mrb, RClass *c, const char *msg));
 NORET(void mrb_raisef(mrb_state *mrb, RClass *c, const char *fmt, ...));
 NORET(void mrb_name_error(mrb_state *mrb, mrb_sym id, const char *fmt, ...));
+int mrb_get_args(mrb_state *mrb, const char *format, ...);
+
+mrb_value mrb_funcall(mrb_state*, mrb_value, const char*, int,...);
+mrb_value mrb_funcall_argv(mrb_state*, mrb_value, mrb_sym, int, mrb_value*);
+mrb_value mrb_funcall_with_block(mrb_state*, mrb_value, mrb_sym, int, const mrb_value *, mrb_value);
+mrb_sym mrb_intern_cstr(mrb_state*,const char*);
+mrb_sym mrb_intern2(mrb_state*,const char*,size_t);
+mrb_sym mrb_intern_str(mrb_state*,mrb_value);
+mrb_value mrb_check_intern_cstr(mrb_state*,const char*);
+mrb_value mrb_check_intern_str(mrb_state*,mrb_value);
+mrb_value mrb_check_intern(mrb_state*,const char*,size_t);
+const char *mrb_sym2name(mrb_state*,mrb_sym);
+const char *mrb_sym2name_len(mrb_state*,mrb_sym,size_t&);
+mrb_value mrb_sym2str(mrb_state*,mrb_sym);
+mrb_value mrb_str_format(mrb_state *, int, const mrb_value *, mrb_value);
 
 struct mrb_callinfo {
     mrb_sym mid;

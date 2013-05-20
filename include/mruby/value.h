@@ -9,6 +9,10 @@
 #ifndef MRB_NAN_BOXING
 
 struct RClass;
+struct mrb_context;
+struct mrb_state;
+typedef uint32_t mrb_code;
+typedef uint32_t mrb_aspec;
 
 enum mrb_vtype {
     MRB_TT_FALSE = 0,   /*   0 */
