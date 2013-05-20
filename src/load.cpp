@@ -114,11 +114,11 @@ static int read_rite_irep_record(mrb_state *mrb, const uint8_t *bin,size_t , uin
             src += pool_data_len;
             switch (tt) { //pool data
             case MRB_TT_FIXNUM:
-                irep->m_pool[i] = mrb_str_to_inum(mrb, s, 10, FALSE);
+                irep->m_pool[i] = mrb_str_to_inum(mrb, s, 10, false);
                 break;
 
             case MRB_TT_FLOAT:
-                irep->m_pool[i] = mrb_float_value(mrb_str_to_dbl(mrb, s, FALSE));
+                irep->m_pool[i] = mrb_float_value(mrb_str_to_dbl(mrb, s, false));
                 break;
 
             case MRB_TT_STRING:

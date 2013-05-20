@@ -38,7 +38,7 @@
  + those E_* macros requires mrb_state* variable named mrb.
  + exception objects obtained from those macros are local to mrb
  */
-#define A_RUNTIME_ERROR(x)          (mrb_class_get((x), "RuntimeError"))
+#define A_RUNTIME_ERROR(x)          ((x)->class_get("RuntimeError"))
 #define E_RUNTIME_ERROR             (mrb_class_get(mrb, "RuntimeError"))
 #define A_TYPE_ERROR(x)             ((x)->class_get("TypeError"))
 #define E_TYPE_ERROR                (mrb_class_get(mrb, "TypeError"))
@@ -139,7 +139,8 @@ struct ArgStore {
 struct mrb_state {
     void *jmp;
     MemManager m_gc;
-    mrb_context m_ctx2;
+    mrb_context *m_ctx;
+    mrb_context *root_c;
 
     RObject *m_exc;
     struct iv_tbl *globals;
@@ -209,10 +210,10 @@ protected:
     RProc *prepare_method_missing(RClass *c, mrb_sym mid, const int &a, int &n, mrb_value *regs);
     template<bool optional=false>
     mrb_value *arg_read_prepare(int args) {
-        mrb_value *sp = m_ctx2.m_stack + 1;
-        int argc = m_ctx2.m_ci->argc;
+        mrb_value *sp = m_ctx->m_stack + 1;
+        int argc = m_ctx->m_ci->argc;
         if (argc < 0) {
-            RArray *a = mrb_ary_ptr(m_ctx2.m_stack[1]);
+            RArray *a = mrb_ary_ptr(m_ctx->m_stack[1]);
             argc = a->m_len;
             sp = a->m_ptr;
         }

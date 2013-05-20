@@ -37,6 +37,7 @@ enum mrb_vtype {
     MRB_TT_FILE,        /*  19 */
     MRB_TT_ENV,         /*  20 */
     MRB_TT_DATA,        /*  21 */
+    MRB_TT_FIBER,       /*  22 */
     MRB_TT_MAXDEFINE    /*  22 */
 };
 
@@ -100,6 +101,7 @@ enum mrb_vtype {
     MRB_TT_FILE,        /*  20 */
     MRB_TT_ENV,         /*  21 */
     MRB_TT_DATA,        /*  22 */
+    MRB_TT_FIBER,       /*  22 */
     MRB_TT_MAXDEFINE    /*  23 */
 };
 

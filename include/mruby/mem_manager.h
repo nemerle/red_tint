@@ -66,6 +66,7 @@ public:
     void    step_ratio(int value) { gc_step_ratio = value; }
     bool    generational_gc_mode() const { return is_generational_gc_mode;}
 protected:
+    void    mark_context(struct mrb_context *ctx);
     void    root_scan_phase();
     size_t  incremental_sweep_phase(size_t limit);
     void    prepare_incremental_sweep();

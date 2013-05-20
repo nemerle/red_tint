@@ -21,6 +21,7 @@
 #include "mruby/string.h"
 #include "mruby/variable.h"
 
+extern void mrb_free_context(mrb_state *mrb, struct mrb_context *ctx);
 /*
   = Tri-color Incremental Garbage Collection
 
@@ -351,6 +352,35 @@ RBasic* MemManager::mrb_obj_alloc(enum mrb_vtype ttype, RClass *cls)
     return p;
 }
 
+void MemManager::mark_context(mrb_context *ctx)
+{
+    size_t i;
+    size_t e;
+    mrb_callinfo *ci;
+
+    /* mark stack */
+    e = ctx->m_stack - ctx->m_stbase;
+    if (ctx->m_ci)
+        e += ctx->m_ci->nregs;
+    if (ctx->m_stbase + e > ctx->stend) e = ctx->stend - ctx->m_stbase;
+    for (i=0; i<e; i++) {
+        mrb_gc_mark_value(m_vm, ctx->m_stbase[i]);
+    }
+    /* mark ensure stack */
+    e = (ctx->m_ci) ? ctx->m_ci->eidx : 0;
+    for (i=0; i<e; i++) {
+        mark(ctx->m_ensure[i]);
+    }
+    /* mark closure */
+    for (ci = ctx->cibase; ci <= ctx->m_ci; ci++) {
+        if (!ci) continue;
+        mark(ci->env);
+        mark(ci->proc);
+        mark(ci->target_class);
+    }
+    if (ctx->prev)
+        mark_context(ctx->prev);
+}
 void MemManager::mark_children(RBasic *obj)
 {
     gc_assert(obj->is_gray());
@@ -401,7 +431,14 @@ void MemManager::mark_children(RBasic *obj)
             }
         }
             break;
+        case MRB_TT_FIBER:
+        {
+            mrb_context *c = ((RFiber*)obj)->cxt;
 
+            mark_context(c);
+            ((RFiber*)obj)->cxt = nullptr;
+        }
+            break;
         case MRB_TT_ARRAY:
         {
             RArray *a = (RArray*)obj;
@@ -480,7 +517,13 @@ void MemManager::obj_free(RBasic *obj)
             }
         }
             break;
+        case MRB_TT_FIBER:
+        {
+            mrb_context *c = ((RFiber*)obj)->cxt;
 
+            mrb_free_context(m_vm,c);
+        }
+            break;
         case MRB_TT_ARRAY:
             if (obj->flags & MRB_ARY_SHARED)
                 mrb_ary_decref(m_vm, ((RArray*)obj)->m_aux.shared);
@@ -537,28 +580,8 @@ void MemManager::root_scan_phase()
     mark(m_vm->top_self); /* mark top_self */
     mark(m_vm->m_exc); /* mark exception */
 
+    mark_context(m_vm->m_ctx);
     /* mark stack */
-    e = m_vm->m_ctx2.m_stack - m_vm->m_ctx2.m_stbase;
-    if (m_vm->m_ctx2.m_ci)
-        e += m_vm->m_ctx2.m_ci->nregs;
-    if (m_vm->m_ctx2.m_stbase + e > m_vm->m_ctx2.stend)
-        e = m_vm->m_ctx2.stend - m_vm->m_ctx2.m_stbase;
-    for (i=0; i<e; i++) {
-        mrb_gc_mark_value(m_vm, m_vm->m_ctx2.m_stbase[i]);
-    }
-    /* mark ensure stack */
-    e = (m_vm->m_ctx2.m_ci) ? m_vm->m_ctx2.m_ci->eidx : 0;
-    for (i=0; i<e; i++) {
-        mark(m_vm->m_ctx2.m_ensure[i]);
-    }
-    /* mark closure */
-    for (ci = m_vm->m_ctx2.cibase; ci <= m_vm->m_ctx2.m_ci; ci++) {
-        if (!ci)
-            continue;
-        mark(ci->env);
-        mark(ci->proc);
-        mark(ci->target_class);
-    }
     if (nullptr==m_vm->m_irep)
         return;
 
@@ -605,6 +628,31 @@ size_t MemManager::gc_gray_mark(RBasic *obj)
 
         case MRB_TT_ENV:
             children += (int)obj->flags;
+            break;
+        case MRB_TT_FIBER:
+        {
+            mrb_context *c = ((RFiber*)obj)->cxt;
+            size_t i;
+
+            /* mark stack */
+            i = c->m_stack - c->m_stbase;
+            if (c->m_ci)
+                i += c->m_ci->nregs;
+            if (c->m_stbase + i > c->stend)
+                i = c->stend - c->m_stbase;
+            children += i;
+
+            /* mark ensure stack */
+            children += (c->m_ci) ? c->m_ci->eidx : 0;
+
+            /* mark closure */
+            if (c->cibase) {
+                mrb_callinfo *ci;
+                for (i=0, ci = c->cibase; ci <= c->m_ci; i++, ci++)
+                    ; // TODO: ?
+            }
+            children += i;
+        }
             break;
 
         case MRB_TT_ARRAY:

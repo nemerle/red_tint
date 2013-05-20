@@ -177,12 +177,12 @@ static mrb_value exc_equal(mrb_state *mrb, mrb_value exc)
 
 static void exc_debug_info(mrb_state *mrb, RObject *exc)
 {
-    mrb_callinfo *ci = mrb->m_ctx2.m_ci;
+    mrb_callinfo *ci = mrb->m_ctx->m_ci;
     mrb_code *pc = ci->pc;
 
-    exc->iv_set(mrb_intern2(mrb, "ciidx", 5), mrb_fixnum_value(ci - mrb->m_ctx2.cibase));
+    exc->iv_set(mrb_intern2(mrb, "ciidx", 5), mrb_fixnum_value(ci - mrb->m_ctx->cibase));
     ci--;
-    while (ci >= mrb->m_ctx2.cibase) {
+    while (ci >= mrb->m_ctx->cibase) {
         if (ci->proc && !MRB_PROC_CFUNC_P(ci->proc)) {
             mrb_irep *irep = ci->proc->body.irep;
 

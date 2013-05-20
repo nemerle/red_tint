@@ -876,8 +876,8 @@ mrb_parser_new(mrb_state *mrb)
     p->f = NULL;
 #endif
 
-    p->m_cmd_start = TRUE;
-    p->in_def = p->in_single = FALSE;
+    p->m_cmd_start = true;
+    p->in_def = p->in_single = false;
 
     p->m_capture_errors = 0;
     p->m_lineno = 1;

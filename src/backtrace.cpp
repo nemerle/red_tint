@@ -20,11 +20,11 @@ void mrb_print_backtrace(mrb_state *mrb)
 
     printf("trace:\n");
     ciidx = mrb_fixnum(mrb->m_exc->iv_get(mrb->intern_cstr("ciidx")));
-    if (ciidx >= mrb->m_ctx2.ciend - mrb->m_ctx2.cibase)
+    if (ciidx >= mrb->m_ctx->ciend - mrb->m_ctx->cibase)
         ciidx = 10; /* ciidx is broken... */
 
     for (i = ciidx; i >= 0; i--) {
-        ci = &mrb->m_ctx2.cibase[i];
+        ci = &mrb->m_ctx->cibase[i];
         filename = "(unknown)";
         line = -1;
 
@@ -39,7 +39,7 @@ void mrb_print_backtrace(mrb_state *mrb)
                 mrb_code *pc;
 
                 if (i+1 <= ciidx) {
-                    pc = mrb->m_ctx2.cibase[i+1].pc;
+                    pc = mrb->m_ctx->cibase[i+1].pc;
                 }
                 else {
                     pc = (mrb_code*)mrb_voidp(mrb->m_exc->iv_get(mrb->intern_cstr("lastpc")));

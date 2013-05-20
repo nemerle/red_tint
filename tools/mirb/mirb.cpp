@@ -35,14 +35,14 @@ p(mrb_state *mrb, mrb_value obj)
  * or if he wants an evaluation of his code now */
 bool is_code_block_open(mrb_parser_state *parser)
 {
-    int code_block_open = FALSE;
+    int code_block_open = false;
 
 
     /* check for heredoc */
-    if (parser->heredoc_starts_nextline) return TRUE;
+    if (parser->heredoc_starts_nextline) return true;
     if (parser->heredoc_end_now) {
-        parser->heredoc_end_now = FALSE;
-        return FALSE;
+        parser->heredoc_end_now = false;
+        return false;
     }
 
     /* check if parser error are available */
@@ -56,19 +56,19 @@ bool is_code_block_open(mrb_parser_state *parser)
         /* the user */
 
         if (strncmp(message, unexpected_end, strlen(unexpected_end)) == 0) {
-            code_block_open = TRUE;
+            code_block_open = true;
         }
         else if (strcmp(message, "syntax error, unexpected keyword_end") == 0) {
-            code_block_open = FALSE;
+            code_block_open = false;
         }
         else if (strcmp(message, "syntax error, unexpected tREGEXP_BEG") == 0) {
-            code_block_open = FALSE;
+            code_block_open = false;
         }
         return code_block_open;
     }
 
     /* check for unterminated string */
-    if (parser->m_lex_strterm) return TRUE;
+    if (parser->m_lex_strterm) return true;
 
     switch (parser->m_lstate) {
 
@@ -77,32 +77,32 @@ bool is_code_block_open(mrb_parser_state *parser)
         case EXPR_BEG:
             /* an expression was just started, */
             /* we can't end it like this */
-            code_block_open = TRUE;
+            code_block_open = true;
             break;
         case EXPR_DOT:
             /* a message dot was the last token, */
             /* there has to come more */
-            code_block_open = TRUE;
+            code_block_open = true;
             break;
         case EXPR_CLASS:
             /* a class keyword is not enough! */
             /* we need also a name of the class */
-            code_block_open = TRUE;
+            code_block_open = true;
             break;
         case EXPR_FNAME:
             /* a method name is necessary */
-            code_block_open = TRUE;
+            code_block_open = true;
             break;
         case EXPR_VALUE:
             /* if, elsif, etc. without condition */
-            code_block_open = TRUE;
+            code_block_open = true;
             break;
 
             /* now all the states which are closed */
 
         case EXPR_ARG:
             /* an argument is the last token */
-            code_block_open = FALSE;
+            code_block_open = false;
             break;
 
             /* all states which are unsure */
@@ -240,7 +240,7 @@ main(int argc, char **argv)
     mrb_value result;
     struct mrbc_args args;
     int n;
-    int code_block_open = FALSE;
+    int code_block_open = false;
     int ai;
 
     /* new interpreter instance */
@@ -265,7 +265,7 @@ main(int argc, char **argv)
         cxt->dump_result = 1;
 
     ai = mrb->gc().arena_save();
-    while (TRUE) {
+    while (true) {
 #ifndef ENABLE_READLINE
         print_cmdline(code_block_open);
 

@@ -1204,7 +1204,7 @@ mrb_int codegen_scope::readint_mrb_int(const char *p, int base, int neg, int *ov
 
         if (neg) {
             if ((MRB_INT_MIN + n)/base > result) {
-                *overflow = TRUE;
+                *overflow = true;
                 return 0;
             }
             result *= base;
@@ -1212,7 +1212,7 @@ mrb_int codegen_scope::readint_mrb_int(const char *p, int base, int neg, int *ov
         }
         else {
             if ((MRB_INT_MAX - n)/base < result) {
-                *overflow = TRUE;
+                *overflow = true;
                 return 0;
             }
             result *= base;
@@ -1220,7 +1220,7 @@ mrb_int codegen_scope::readint_mrb_int(const char *p, int base, int neg, int *ov
         }
         p++;
     }
-    *overflow = FALSE;
+    *overflow = false;
     return result;
 }
 void codegen_scope::visit(ZsuperNode *n) {
@@ -2296,11 +2296,11 @@ void codegen_scope::visit(SelfNode *sn) {
 }
 void codegen_scope::visit(WordsNode *n) {
     bool val = m_val_stack.back();
-    gen_literal_array(n->child(), FALSE, val);
+    gen_literal_array(n->child(), false, val);
 }
 void codegen_scope::visit(SymbolsNode *n) {
     bool val = m_val_stack.back();
-    gen_literal_array(n->child(), TRUE, val);
+    gen_literal_array(n->child(), true, val);
 }
 void codegen_scope::visit(PostExeNode *n) {
     codegen( n->child(), false);
@@ -2457,9 +2457,9 @@ void codegen_scope::finish()
     irep->m_pool = (mrb_value *)s_realloc(irep->m_pool, sizeof(mrb_value)*irep->plen);
     irep->syms = (mrb_sym *)s_realloc(irep->syms, sizeof(mrb_sym)*irep->slen);
     if (m_filename) {
-        irep->filename = m_filename;
+//        irep->filename = m_filename;
         fname_len = strlen(m_filename);
-        fname = (char *)m_mrb->gc()._malloc(fname_len); // todo: check fname
+        fname = (char *)m_mrb->gc()._malloc(fname_len+1); // todo: check fname
         memcpy(fname,m_filename,fname_len);
         fname[fname_len] = 0;
         irep->filename = fname;

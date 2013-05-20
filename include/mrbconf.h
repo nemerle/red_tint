@@ -4,8 +4,7 @@
 ** See Copyright Notice in mruby.h
 */
 
-#ifndef MRUBYCONF_H
-#define MRUBYCONF_H
+#pragma once
 #ifndef __cplusplus
 # error "Only c++ for now"
 #endif
@@ -104,9 +103,7 @@
 typedef short mrb_sym;
 
 /* define ENABLE_XXXX from DISABLE_XXX */
-#ifndef DISABLE_STDIO
 #define ENABLE_STDIO 1
-#endif
 #ifndef ENABLE_DEBUG
 #define DISABLE_DEBUG
 #endif
@@ -114,16 +111,5 @@ typedef short mrb_sym;
 #include <inttypes.h>
 typedef bool mrb_bool;
 
-#ifdef ENABLE_STDIO
 # include <stdio.h>
-#endif
 
-#ifndef FALSE
-# define FALSE 0
-#endif
-
-#ifndef TRUE
-# define TRUE 1
-#endif
-
-#endif  /* MRUBYCONF_H */

@@ -251,16 +251,16 @@ mrb_f_send(mrb_state *mrb, mrb_value self)
 static mrb_value
 mrb_f_block_given_p_m(mrb_state *mrb, mrb_value self)
 {
-    mrb_callinfo *ci = mrb->m_ctx2.m_ci;
+    mrb_callinfo *ci = mrb->m_ctx->m_ci;
     mrb_value *bp;
     mrb_bool given_p = false;
 
-    bp = mrb->m_ctx2.m_stbase + ci->stackidx + 1;
+    bp = mrb->m_ctx->m_stbase + ci->stackidx + 1;
     ci--;
-    if (ci > mrb->m_ctx2.cibase) {
+    if (ci > mrb->m_ctx->cibase) {
         /* block_given? called within block; check upper scope */
         if (ci->proc->env && ci->proc->env->stack) {
-            given_p = !(ci->proc->env->stack == mrb->m_ctx2.m_stbase || mrb_nil_p(ci->proc->env->stack[1]));
+            given_p = !(ci->proc->env->stack == mrb->m_ctx->m_stbase || mrb_nil_p(ci->proc->env->stack[1]));
         }
         else {
             if (ci->argc > 0) {
@@ -841,7 +841,7 @@ mrb_value mrb_f_raise(mrb_state *mrb, mrb_value self)
         /* fall through */
     default:
         exc = mrb_make_exception(mrb, argc, a);
-        mrb_obj_ptr(exc)->iv_set(mrb_intern2(mrb, "lastpc", 6), mrb_voidp_value(mrb->m_ctx2.m_ci->pc));
+        mrb_obj_ptr(exc)->iv_set(mrb_intern2(mrb, "lastpc", 6), mrb_voidp_value(mrb->m_ctx->m_ci->pc));
         mrb_exc_raise(mrb, exc);
         break;
     }
