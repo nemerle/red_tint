@@ -47,7 +47,7 @@ mrb_pool* MemManager::mrb_pool_open()
     mrb_pool *pool = (mrb_pool *)_malloc(sizeof(mrb_pool));
 
     if (pool) {
-        pool->mrb = m_mrb;
+        pool->mrb = m_vm;
         pool->pages = 0;
     }
 
@@ -116,7 +116,7 @@ int mrb_pool::mrb_pool_can_realloc(void *p, size_t len)
 {
 
     if (!this)
-        return FALSE;
+        return false;
     len += ALIGN_PADDING(len);
     mrb_pool_page *page = this->pages;
     while (page) {
@@ -124,12 +124,12 @@ int mrb_pool::mrb_pool_can_realloc(void *p, size_t len)
             size_t beg;
 
             beg = (char*)p - page->page;
-            if (beg + len > page->len) return FALSE;
-            return TRUE;
+            if (beg + len > page->len) return false;
+            return true;
         }
         page = page->next;
     }
-    return FALSE;
+    return false;
 }
 
 void* mrb_pool::mrb_pool_realloc(void *p, size_t oldlen, size_t newlen)

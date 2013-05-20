@@ -125,9 +125,7 @@ static mrb_value mrb_random_mt_rand(mrb_state *mrb, mt_state *t, mrb_value max)
 
 static mrb_value get_opt(mrb_state* mrb)
 {
-    mrb_value arg;
-
-    arg = mrb_fixnum_value(0);
+    mrb_value arg = mrb_fixnum_value(0);
     mrb_get_args(mrb, "|o", &arg);
 
     if (!mrb_nil_p(arg)) {
@@ -212,15 +210,15 @@ static mrb_value mrb_random_srand(mrb_state *mrb, mrb_value self)
 
 void mrb_mruby_random_gem_init(mrb_state *mrb)
 {
-    mrb->kernel_module->define_method(mrb,"rand", mrb_random_g_rand, MRB_ARGS_OPT(1)).
-        define_method(mrb,"srand", mrb_random_g_srand, MRB_ARGS_OPT(1));
+    mrb->kernel_module->define_method("rand", mrb_random_g_rand, MRB_ARGS_OPT(1)).
+        define_method("srand", mrb_random_g_srand, MRB_ARGS_OPT(1));
 
     mrb->define_class("Random", mrb->object_class)
-        .define_class_method(mrb,"rand", mrb_random_g_rand, MRB_ARGS_OPT(1))
-        .define_class_method(mrb,"srand", mrb_random_g_srand, MRB_ARGS_OPT(1))
-        .define_method(mrb,"initialize", mrb_random_init, MRB_ARGS_OPT(1))
-        .define_method(mrb,"rand", mrb_random_rand, MRB_ARGS_OPT(1))
-        .define_method(mrb,"srand", mrb_random_srand, MRB_ARGS_OPT(1))
+        .define_class_method("rand", mrb_random_g_rand, MRB_ARGS_OPT(1))
+        .define_class_method("srand", mrb_random_g_srand, MRB_ARGS_OPT(1))
+        .define_method("initialize", mrb_random_init, MRB_ARGS_OPT(1))
+        .define_method("rand", mrb_random_rand, MRB_ARGS_OPT(1))
+        .define_method("srand", mrb_random_srand, MRB_ARGS_OPT(1))
     ;
 }
 

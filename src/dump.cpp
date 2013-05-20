@@ -72,19 +72,19 @@ static size_t get_pool_block_size(mrb_state *mrb, mrb_irep *irep)
     for (pool_no = 0; pool_no < irep->plen; pool_no++) {
         int ai = mrb->gc().arena_save();
 
-        switch (mrb_type(irep->pool[pool_no])) {
+        switch (mrb_type(irep->m_pool[pool_no])) {
             case MRB_TT_FIXNUM:
-                str = mrb_fixnum_to_str(mrb, irep->pool[pool_no], 10);
+                str = mrb_fixnum_to_str(mrb, irep->m_pool[pool_no], 10);
                 size += RSTRING_LEN(str);
                 break;
 
             case MRB_TT_FLOAT:
-                len = mrb_float_to_str(buf, mrb_float(irep->pool[pool_no]));
+                len = mrb_float_to_str(buf, mrb_float(irep->m_pool[pool_no]));
                 size += len;
                 break;
 
             case MRB_TT_STRING:
-                str = mrb_str_to_str(mrb, irep->pool[pool_no]);
+                str = mrb_str_to_str(mrb, irep->m_pool[pool_no]);
                 size += RSTRING_LEN(str);
                 break;
 
@@ -112,22 +112,22 @@ static int write_pool_block(mrb_state *mrb, mrb_irep *irep, uint8_t *buf)
     for (pool_no = 0; pool_no < irep->plen; pool_no++) {
         int ai = mrb->gc().arena_save();
 
-        cur += uint8_to_bin(mrb_type(irep->pool[pool_no]), cur); /* data type */
+        cur += uint8_to_bin(mrb_type(irep->m_pool[pool_no]), cur); /* data type */
 
-        switch (mrb_type(irep->pool[pool_no])) {
+        switch (mrb_type(irep->m_pool[pool_no])) {
             case MRB_TT_FIXNUM:
-                str = mrb_fixnum_to_str(mrb, irep->pool[pool_no], 10);
+                str = mrb_fixnum_to_str(mrb, irep->m_pool[pool_no], 10);
                 char_ptr = RSTRING_PTR(str);
                 len = RSTRING_LEN(str);
                 break;
 
             case MRB_TT_FLOAT:
-                len = mrb_float_to_str(char_buf, mrb_float(irep->pool[pool_no]));
+                len = mrb_float_to_str(char_buf, mrb_float(irep->m_pool[pool_no]));
                 char_ptr = &char_buf[0];
                 break;
 
             case MRB_TT_STRING:
-                str = irep->pool[pool_no];
+                str = irep->m_pool[pool_no];
                 char_ptr = RSTRING_PTR(str);
                 len = RSTRING_LEN(str);
                 break;

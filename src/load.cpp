@@ -39,7 +39,7 @@ static void irep_free(size_t sirep, mrb_state *mrb)
             if (p)
                 mrb->m_gc._free(p);
 
-            p = mrb->m_irep[i]->pool;
+            p = mrb->m_irep[i]->m_pool;
             if (p)
                 mrb->m_gc._free(p);
 
@@ -99,8 +99,8 @@ static int read_rite_irep_record(mrb_state *mrb, const uint8_t *bin,size_t , uin
     plen = bin_to_uint32(src); /* number of pool */
     src += sizeof(uint32_t);
     if (plen > 0) {
-        irep->pool = (mrb_value *)mrb->gc()._malloc(sizeof(mrb_value) * plen);
-        if (irep->pool == NULL) {
+        irep->m_pool = (mrb_value *)mrb->gc()._malloc(sizeof(mrb_value) * plen);
+        if (irep->m_pool == NULL) {
             ret = MRB_DUMP_GENERAL_FAILURE;
             goto error_exit;
         }
@@ -114,19 +114,19 @@ static int read_rite_irep_record(mrb_state *mrb, const uint8_t *bin,size_t , uin
             src += pool_data_len;
             switch (tt) { //pool data
             case MRB_TT_FIXNUM:
-                irep->pool[i] = mrb_str_to_inum(mrb, s, 10, FALSE);
+                irep->m_pool[i] = mrb_str_to_inum(mrb, s, 10, FALSE);
                 break;
 
             case MRB_TT_FLOAT:
-                irep->pool[i] = mrb_float_value(mrb_str_to_dbl(mrb, s, FALSE));
+                irep->m_pool[i] = mrb_float_value(mrb_str_to_dbl(mrb, s, FALSE));
                 break;
 
             case MRB_TT_STRING:
-                irep->pool[i] = s;
+                irep->m_pool[i] = s;
                 break;
 
             default:
-                irep->pool[i] = mrb_nil_value();
+                irep->m_pool[i] = mrb_nil_value();
                 break;
             }
             irep->plen++;

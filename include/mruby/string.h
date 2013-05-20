@@ -19,6 +19,10 @@ struct RString : public RBasic {
         struct mrb_shared_string *shared;
     } aux;
     char *ptr;
+public:
+    void str_cat(const char *ptr, int len);
+    void buf_append(mrb_value str2);
+    void str_append(mrb_value str2);
 };
 #if defined(__cplusplus)
 extern "C" {

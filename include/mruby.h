@@ -40,11 +40,15 @@
  */
 #define A_RUNTIME_ERROR(x)          (mrb_class_get((x), "RuntimeError"))
 #define E_RUNTIME_ERROR             (mrb_class_get(mrb, "RuntimeError"))
+#define A_TYPE_ERROR(x)             ((x)->class_get("TypeError"))
 #define E_TYPE_ERROR                (mrb_class_get(mrb, "TypeError"))
 #define I_TYPE_ERROR                (this->class_get("TypeError"))
+#define A_ARGUMENT_ERROR(x)         ((x)->class_get("ArgumentError"))
 #define E_ARGUMENT_ERROR            (mrb_class_get(mrb, "ArgumentError"))
 #define I_ARGUMENT_ERROR            (this->class_get("ArgumentError"))
+#define A_INDEX_ERROR(x)            ((x)->class_get("IndexError"))
 #define E_INDEX_ERROR               (mrb_class_get(mrb, "IndexError"))
+#define I_RANGE_ERROR               (this->class_get("RangeError"))
 #define E_RANGE_ERROR               (mrb_class_get(mrb, "RangeError"))
 #define E_NAME_ERROR                (mrb_class_get(mrb, "NameError"))
 #define E_NOMETHOD_ERROR            (mrb_class_get(mrb, "NoMethodError"))
@@ -105,9 +109,32 @@ struct mrb_callinfo {
     int eidx;
     REnv *env;
 };
+struct mrb_context {
+  mrb_context *prev;
+
+  mrb_value *m_stack;
+  mrb_value *m_stbase, *stend;
+
+  mrb_callinfo *m_ci;
+  mrb_callinfo *cibase, *ciend;
+
+  mrb_code **rescue;
+  int m_rsize;
+  RProc **m_ensure;
+  int m_esize;
+};
 struct SysInterface {
     virtual void print_f(const char *fmt, ...);
     virtual void error_f(const char *fmt,...);
+};
+struct ArgStore {
+
+    ArgStore &operator>>(mrb_value &v) {
+        return *this;
+    }
+    ArgStore &operator>>(mrb_sym &v) {
+        return *this;
+    }
 };
 struct mrb_state {
     void *jmp;
@@ -169,15 +196,49 @@ struct mrb_state {
         return intern2(name, strlen(name));
     }
     mrb_sym intern2(const char *name, size_t len);
+    ArgStore arg_store() {return ArgStore(); }
 public:
     static mrb_state *create(mrb_allocf f, void *ud);
     RClass &define_class(const char *name, RClass *super);
     mrb_value const_get(mrb_value mod, mrb_sym sym);
     mrb_value mrb_run(RProc *proc, mrb_value self);
     void codedump_all(int start);
+    template<class T>
+    T get_arg() {
+        T res;
+        mrb_value *arg_src = arg_read_prepare(1);
+        get_arg(*arg_src,res);
+        return res;
+    }
+    NORET(void mrb_raise(RClass *m_ctx, const char *msg));
 protected:
+    void get_arg(const mrb_value &arg, mrb_int &tgt);
+    void get_arg(const mrb_value &arg, mrb_sym &tgt);
+    void get_arg(const mrb_value &arg, mrb_value &tgt) { tgt = arg; }
     RClass * class_from_sym(RClass *klass, mrb_sym id);
     RProc *prepare_method_missing(RClass *c, mrb_sym mid, const int &a, int &n, mrb_value *regs);
+    template<bool optional=false>
+    mrb_value *arg_read_prepare(int args) {
+        mrb_value *sp = m_stack + 1;
+        int argc = m_ci->argc;
+        if (argc < 0) {
+            RArray *a = mrb_ary_ptr(m_stack[1]);
+            argc = a->m_len;
+            sp = a->m_ptr;
+        }
+        if(!optional) {
+            if (argc != args) {
+                mrb_raise(I_ARGUMENT_ERROR, "wrong number of arguments");
+            }
+        }
+        else {
+            if(argc>args) // too many arguments !
+                mrb_raise(I_ARGUMENT_ERROR, "wrong number of arguments");
+            else if(argc!=args)
+                return nullptr; // not enough args, that's ok when processing optional args
+        }
+        return sp;
+    }
 private:
     void codedump(int n);
 };
@@ -187,8 +248,8 @@ typedef mrb_value (*mrb_func_t)(mrb_state *mrb, mrb_value);
 
 mrb_value mrb_singleton_class(mrb_state*, mrb_value);
 void mrb_include_module(mrb_state*, RClass*, RClass*);
-void mrb_define_class_method(mrb_state *, RClass *, const char *, mrb_func_t, mrb_aspec);
-void mrb_define_singleton_method(mrb_state*, struct RObject*, const char*, mrb_func_t, mrb_aspec);
+void mrb_define_class_method(RClass *, const char *, mrb_func_t, mrb_aspec);
+//void mrb_define_singleton_method(struct RObject*, const char*, mrb_func_t, mrb_aspec);
 void mrb_define_module_function(mrb_state*, RClass*, const char*, mrb_func_t, mrb_aspec);
 void mrb_define_const(mrb_state*, struct RClass*, const char *name, mrb_value);
 void mrb_undef_method(mrb_state*, struct RClass*, const char*);
@@ -201,7 +262,6 @@ RClass * mrb_class_get(mrb_state *mrb, const char *name);
 
 mrb_value mrb_obj_dup(mrb_state *mrb, mrb_value obj);
 mrb_value mrb_check_to_integer(mrb_state *mrb, mrb_value val, const char *method);
-mrb_bool mrb_obj_respond_to(const RClass *c, mrb_sym mid);
 RClass * mrb_define_class_under(mrb_state *mrb, RClass *outer, const char *name, struct RClass *super);
 RClass * mrb_define_module_under(mrb_state *mrb, RClass *outer, const char *name);
 
@@ -226,21 +286,6 @@ RClass * mrb_define_module_under(mrb_state *mrb, RClass *outer, const char *name
 /* accept no arguments */
 #define MRB_ARGS_NONE() ((mrb_aspec)0)
 
-int mrb_get_args(mrb_state *mrb, const char *format, ...);
-
-mrb_value mrb_funcall(mrb_state*, mrb_value, const char*, int,...);
-mrb_value mrb_funcall_argv(mrb_state*, mrb_value, mrb_sym, int, mrb_value*);
-mrb_value mrb_funcall_with_block(mrb_state*, mrb_value, mrb_sym, int, const mrb_value *, mrb_value);
-mrb_sym mrb_intern_cstr(mrb_state*,const char*);
-mrb_sym mrb_intern2(mrb_state*,const char*,size_t);
-mrb_sym mrb_intern_str(mrb_state*,mrb_value);
-mrb_value mrb_check_intern_cstr(mrb_state*,const char*);
-mrb_value mrb_check_intern_str(mrb_state*,mrb_value);
-mrb_value mrb_check_intern(mrb_state*,const char*,size_t);
-const char *mrb_sym2name(mrb_state*,mrb_sym);
-const char *mrb_sym2name_len(mrb_state*,mrb_sym,size_t&);
-mrb_value mrb_sym2str(mrb_state*,mrb_sym);
-mrb_value mrb_str_format(mrb_state *, int, const mrb_value *, mrb_value);
 
 /* For backward compatibility. */
 static inline
@@ -320,7 +365,7 @@ void mrb_print_backtrace(mrb_state *mrb);
 
 mrb_value mrb_yield(mrb_state *mrb, mrb_value v, mrb_value blk);
 mrb_value mrb_yield_argv(mrb_state *mrb, mrb_value b, int argc, mrb_value *argv);
-mrb_value mrb_class_new_instance(mrb_state *mrb, int, mrb_value*, struct RClass *);
+//mrb_value mrb_class_new_instance(mrb_state *mrb, int, mrb_value*, struct RClass *);
 mrb_value mrb_class_new_instance_m(mrb_state *mrb, mrb_value klass);
 
 void mrb_gc_protect(mrb_state *mrb, mrb_value obj);

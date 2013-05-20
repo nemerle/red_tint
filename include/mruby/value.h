@@ -48,6 +48,12 @@ struct mrb_value {
         mrb_sym sym;
     } value;
     enum mrb_vtype tt; // TODO: use c++11 typed unions.
+    mrb_value to_str(mrb_state *mrb) const
+    {
+        return check_type(mrb, MRB_TT_STRING, "String", "to_str");
+    }
+    mrb_value check_type(mrb_state *mrb, mrb_vtype t, const char *c, const char *m) const;
+// TODO: consider using a constructor to ease the return value conversions from void *, to mrb_values
 };
 
 #define mrb_type(o)   (o).tt
@@ -156,8 +162,8 @@ mrb_float_value(mrb_float f)
 #define mrb_string_p(o) (mrb_type(o) == MRB_TT_STRING)
 #define mrb_hash_p(o) (mrb_type(o) == MRB_TT_HASH)
 #define mrb_voidp_p(o) (mrb_type(o) == MRB_TT_VOIDP)
-#define mrb_bool(o)   (mrb_type(o) != MRB_TT_FALSE)
-#define mrb_test(o)   mrb_bool(o)
+#define mrb_as_bool(o)   (mrb_type(o) != MRB_TT_FALSE)
+#define mrb_test(o)   mrb_as_bool(o)
 
 /* white: 011, black: 100, gray: 000 */
 #define MRB_GC_GRAY 0
@@ -178,6 +184,7 @@ struct RBasic {
     uint32_t flags:21;
     RClass *c;
     RBasic *gcnext;
+    mrb_state *m_vm;
     void paint_gray()  { color = MRB_GC_GRAY; }
     void paint_black() { color = MRB_GC_BLACK; }
     void paint_white() { color = MRB_GC_WHITES; }
@@ -186,19 +193,34 @@ struct RBasic {
     bool is_black() const { return (color & MRB_GC_BLACK);}
 };
 
-#define mrb_basic_ptr(v) ((struct RBasic*)((v).value.p))
-/* obsolete macro mrb_basic; will be removed soon */
-#define mrb_basic(v)     mrb_basic_ptr(v)
+#define mrb_basic_ptr(v) ((RBasic*)((v).value.p))
+typedef mrb_value (*mrb_func_t)(mrb_state *mrb, mrb_value);
 
 struct RObject : public RBasic {
     struct iv_tbl *iv;
+public:
+    void iv_set(mrb_sym sym, mrb_value v);
+    mrb_value iv_get(mrb_sym sym);
+    void define_singleton_method(const char *name, mrb_func_t func, mrb_aspec aspec);
 };
 
-#define mrb_obj_ptr(v)   ((struct RObject*)((v).value.p))
+#define mrb_obj_ptr(v)   ((RObject*)((v).value.p))
 /* obsolete macro mrb_object; will be removed soon */
-#define mrb_object(o) mrb_obj_ptr(o)
 #define mrb_immediate_p(x) (mrb_type(x) <= MRB_TT_VOIDP)
 #define mrb_special_const_p(x) mrb_immediate_p(x)
+struct RFiber : public RObject {
+  mrb_context *cxt;
+};
+
+namespace mruby {
+static inline mrb_value toRuby(RBasic *p)
+{
+    mrb_value v;
+    MRB_SET_VALUE(v, p->tt, value.p, p);
+    return v;
+}
+
+} // end of mruby namespace
 
 static inline mrb_value mrb_fixnum_value(mrb_int i)
 {

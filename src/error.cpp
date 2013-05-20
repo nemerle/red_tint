@@ -180,15 +180,15 @@ static void exc_debug_info(mrb_state *mrb, RObject *exc)
     mrb_callinfo *ci = mrb->m_ci;
     mrb_code *pc = ci->pc;
 
-    mrb_obj_iv_set(mrb, exc, mrb_intern2(mrb, "ciidx", 5), mrb_fixnum_value(ci - mrb->cibase));
+    exc->iv_set(mrb_intern2(mrb, "ciidx", 5), mrb_fixnum_value(ci - mrb->cibase));
     ci--;
     while (ci >= mrb->cibase) {
         if (ci->proc && !MRB_PROC_CFUNC_P(ci->proc)) {
             mrb_irep *irep = ci->proc->body.irep;
 
             if (irep->filename && irep->lines && irep->iseq <= pc && pc < irep->iseq + irep->ilen) {
-                mrb_obj_iv_set(mrb, exc, mrb_intern2(mrb, "file", 4), mrb_str_new_cstr(mrb, irep->filename));
-                mrb_obj_iv_set(mrb, exc, mrb_intern2(mrb, "line", 4), mrb_fixnum_value(irep->lines[pc - irep->iseq - 1]));
+                exc->iv_set(mrb_intern2(mrb, "file", 4), mrb_str_new_cstr(mrb, irep->filename));
+                exc->iv_set(mrb_intern2(mrb, "line", 4), mrb_fixnum_value(irep->lines[pc - irep->iseq - 1]));
                 return;
             }
         }
@@ -215,12 +215,18 @@ void mrb_raise(mrb_state *mrb, RClass *c, const char *msg)
     mrb_exc_raise(mrb, mrb_exc_new3(mrb, c, mesg));
 }
 
+void mrb_state::mrb_raise( RClass *c, const char *msg)
+{
+    mrb_value mesg;
+    mesg = mrb_str_new_cstr(this, msg);
+    mrb_exc_raise(this, mrb_exc_new3(this, c, mesg));
+}
 mrb_value mrb_vformat(mrb_state *mrb, const char *format, va_list ap)
 {
     const char *p = format;
     const char *b = p;
     ptrdiff_t size;
-    mrb_value ary = RArray::new_capa(mrb, 4);
+    RArray *p_ary = RArray::create(mrb,4);
 
     while (*p) {
         const char c = *p++;
@@ -228,16 +234,16 @@ mrb_value mrb_vformat(mrb_state *mrb, const char *format, va_list ap)
         if (c == '%') {
             if (*p == 'S') {
                 size = p - b - 1;
-                RArray::push(mrb, ary, mrb_str_new(mrb, b, size));
-                RArray::push(mrb, ary, va_arg(ap, mrb_value));
+                p_ary->push(mrb_str_new(mrb, b, size));
+                p_ary->push(va_arg(ap, mrb_value));
                 b = p + 1;
             }
         }
         else if (c == '\\') {
             if (*p) {
                 size = p - b - 1;
-                RArray::push(mrb, ary, mrb_str_new(mrb, b, size));
-                RArray::push(mrb, ary, mrb_str_new(mrb, p, 1));
+                p_ary->push(mrb_str_new(mrb, b, size));
+                p_ary->push(mrb_str_new(mrb, p, 1));
                 b = ++p;
             }
             else {
@@ -250,8 +256,8 @@ mrb_value mrb_vformat(mrb_state *mrb, const char *format, va_list ap)
     }
     else {
         size = p - b;
-        RArray::push(mrb, ary, mrb_str_new(mrb, b, size));
-        return RArray::join(mrb, ary, mrb_str_new(mrb,NULL,0));
+        p_ary->push(mrb_str_new(mrb, b, size));
+        return p_ary->join(mrb_str_new(mrb,NULL,0));
     }
 }
 
@@ -288,7 +294,7 @@ void mrb_name_error(mrb_state *mrb, mrb_sym id, const char *fmt, ...)
     argv[0] = mrb_vformat(mrb, fmt, args);
     va_end(args);
     argv[1] = mrb_symbol_value(id);
-    exc = mrb_class_new_instance(mrb, 2, argv, E_NAME_ERROR);
+    exc = E_NAME_ERROR->new_instance(2, argv);
     mrb_exc_raise(mrb, exc);
 }
 
@@ -386,7 +392,7 @@ exception_call:
 
 mrb_value mrb_make_exception(mrb_state *mrb, int argc, mrb_value *argv)
 {
-    return make_exception(mrb, argc, argv, TRUE);
+    return make_exception(mrb, argc, argv, true);
 }
 
 void mrb_sys_fail(mrb_state *mrb, const char *mesg)
@@ -411,13 +417,13 @@ void mrb_init_exception(mrb_state *mrb)
     RClass *e;
 
     e = mrb->eException_class = mrb_define_class(mrb, "Exception",           mrb->object_class);        /* 15.2.22 */
-    e->define_class_method(mrb, "exception", mrb_instance_new, MRB_ARGS_ANY())
-            .define_method(mrb, "exception", exc_exception, MRB_ARGS_ANY())
-            .define_method(mrb, "initialize", exc_initialize, MRB_ARGS_ANY())
-            .define_method(mrb, "==", exc_equal, MRB_ARGS_REQ(1))
-            .define_method(mrb, "to_s", exc_to_s, MRB_ARGS_NONE())
-            .define_method(mrb, "message", exc_message, MRB_ARGS_NONE())
-            .define_method(mrb, "inspect", exc_inspect, MRB_ARGS_NONE());
+    e->define_class_method("exception", mrb_instance_new, MRB_ARGS_ANY())
+            .define_method("exception", exc_exception, MRB_ARGS_ANY())
+            .define_method("initialize", exc_initialize, MRB_ARGS_ANY())
+            .define_method("==", exc_equal, MRB_ARGS_REQ(1))
+            .define_method("to_s", exc_to_s, MRB_ARGS_NONE())
+            .define_method("message", exc_message, MRB_ARGS_NONE())
+            .define_method("inspect", exc_inspect, MRB_ARGS_NONE());
 
     mrb->eStandardError_class = &mrb->define_class("StandardError",       mrb->eException_class);       /* 15.2.23 */
     mrb->define_class("RuntimeError", mrb->eStandardError_class);                                       /* 15.2.28 */

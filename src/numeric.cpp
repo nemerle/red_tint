@@ -88,11 +88,11 @@ static mrb_value
 num_pow(mrb_state *mrb, mrb_value x)
 {
     mrb_value y;
-    int both_int = FALSE;
+    int both_int = false;
     mrb_float d;
 
     mrb_get_args(mrb, "o", &y);
-    if (mrb_fixnum_p(x) && mrb_fixnum_p(y)) both_int = TRUE;
+    if (mrb_fixnum_p(x) && mrb_fixnum_p(y)) both_int = true;
     d = pow(mrb_to_flo(mrb, x), mrb_to_flo(mrb, y));
     if (both_int && FIXABLE(d))
         return mrb_fixnum_value((mrb_int)d);
@@ -1304,8 +1304,7 @@ fix_to_s(mrb_state *mrb, mrb_value self)
  *  less than, equal to, or greater than <i>numeric</i>. This is the
  *  basis for the tests in <code>Comparable</code>.
  */
-static mrb_value
-num_cmp(mrb_state *mrb, mrb_value self)
+static mrb_value num_cmp(mrb_state *mrb, mrb_value self)
 {
     mrb_value other;
     mrb_float x, y;
@@ -1358,63 +1357,63 @@ mrb_init_numeric(mrb_state *mrb)
 
     /* Numeric Class */
     numeric = &mrb->define_class("Numeric",  mrb->object_class)
-            .include_module(mrb, "Comparable")
-            .define_method(mrb, "+@",       num_uplus,      MRB_ARGS_REQ(1))  /* 15.2.7.4.1  */
-            .define_method(mrb, "-@",       num_uminus,     MRB_ARGS_REQ(1))  /* 15.2.7.4.2  */
-            .define_method(mrb, "**",       num_pow,        MRB_ARGS_REQ(1))
-            .define_method(mrb, "/",        num_div,        MRB_ARGS_REQ(1))  /* 15.2.8.3.4  */
-            .define_method(mrb, "quo",      num_div,        MRB_ARGS_REQ(1))  /* 15.2.7.4.5 (x) */
-            .define_method(mrb, "abs",      num_abs,        MRB_ARGS_NONE())  /* 15.2.7.4.3  */
-            .define_method(mrb, "<=>",      num_cmp,        MRB_ARGS_REQ(1))  /* 15.2.9.3.6  */
+            .include_module("Comparable")
+            .define_method("+@",       num_uplus,      MRB_ARGS_REQ(1))  /* 15.2.7.4.1  */
+            .define_method("-@",       num_uminus,     MRB_ARGS_REQ(1))  /* 15.2.7.4.2  */
+            .define_method("**",       num_pow,        MRB_ARGS_REQ(1))
+            .define_method("/",        num_div,        MRB_ARGS_REQ(1))  /* 15.2.8.3.4  */
+            .define_method("quo",      num_div,        MRB_ARGS_REQ(1))  /* 15.2.7.4.5 (x) */
+            .define_method("abs",      num_abs,        MRB_ARGS_NONE())  /* 15.2.7.4.3  */
+            .define_method("<=>",      num_cmp,        MRB_ARGS_REQ(1))  /* 15.2.9.3.6  */
             ;
     /* Integer Class */
     integer = &mrb->define_class("Integer",  numeric)
-            .define_method(mrb, "to_i", int_to_i, MRB_ARGS_NONE())              /* 15.2.8.3.24 */
-            .define_method(mrb, "to_int", int_to_i, MRB_ARGS_NONE())
-            .undef_class_method(mrb, "new")
+            .define_method("to_i", int_to_i, MRB_ARGS_NONE())              /* 15.2.8.3.24 */
+            .define_method("to_int", int_to_i, MRB_ARGS_NONE())
+            .undef_class_method("new")
             ;
     mrb->fixnum_class = &mrb->define_class("Fixnum", integer)
-            .define_method(mrb, "+",        fix_plus,          MRB_ARGS_REQ(1)) /* 15.2.8.3.1  */
-            .define_method(mrb, "-",        fix_minus,         MRB_ARGS_REQ(1)) /* 15.2.8.3.2  */
-            .define_method(mrb, "-@",       fix_uminus,        MRB_ARGS_REQ(1)) /* 15.2.7.4.2  */
-            .define_method(mrb, "*",        fix_mul,           MRB_ARGS_REQ(1)) /* 15.2.8.3.3  */
-            .define_method(mrb, "%",        fix_mod,           MRB_ARGS_REQ(1)) /* 15.2.8.3.5  */
-            .define_method(mrb, "==",       fix_equal,         MRB_ARGS_REQ(1)) /* 15.2.8.3.7  */
-            .define_method(mrb, "~",        fix_rev,           MRB_ARGS_NONE()) /* 15.2.8.3.8  */
-            .define_method(mrb, "&",        fix_and,           MRB_ARGS_REQ(1)) /* 15.2.8.3.9  */
-            .define_method(mrb, "|",        fix_or,            MRB_ARGS_REQ(1)) /* 15.2.8.3.10 */
-            .define_method(mrb, "^",        fix_xor,           MRB_ARGS_REQ(1)) /* 15.2.8.3.11 */
-            .define_method(mrb, "<<",       fix_lshift,        MRB_ARGS_REQ(1)) /* 15.2.8.3.12 */
-            .define_method(mrb, ">>",       fix_rshift,        MRB_ARGS_REQ(1)) /* 15.2.8.3.13 */
-            .define_method(mrb, "eql?",     num_eql,           MRB_ARGS_REQ(1)) /* 15.2.8.3.16 */
-            .define_method(mrb, "hash",     flo_hash,          MRB_ARGS_NONE()) /* 15.2.8.3.18 */
-            .define_method(mrb, "next",     int_succ,          MRB_ARGS_NONE()) /* 15.2.8.3.19 */
-            .define_method(mrb, "succ",     fix_succ,          MRB_ARGS_NONE()) /* 15.2.8.3.21 */
-            .define_method(mrb, "to_f",     fix_to_f,          MRB_ARGS_NONE()) /* 15.2.8.3.23 */
-            .define_method(mrb, "to_s",     fix_to_s,          MRB_ARGS_NONE()) /* 15.2.8.3.25 */
-            .define_method(mrb, "inspect",  fix_to_s,          MRB_ARGS_NONE())
-            .define_method(mrb, "divmod",   fix_divmod,        MRB_ARGS_REQ(1)) /* 15.2.8.3.30 (x) */
-            .undef_class_method(mrb,  "new")
+            .define_method("+",        fix_plus,          MRB_ARGS_REQ(1)) /* 15.2.8.3.1  */
+            .define_method("-",        fix_minus,         MRB_ARGS_REQ(1)) /* 15.2.8.3.2  */
+            .define_method("-@",       fix_uminus,        MRB_ARGS_REQ(1)) /* 15.2.7.4.2  */
+            .define_method("*",        fix_mul,           MRB_ARGS_REQ(1)) /* 15.2.8.3.3  */
+            .define_method("%",        fix_mod,           MRB_ARGS_REQ(1)) /* 15.2.8.3.5  */
+            .define_method("==",       fix_equal,         MRB_ARGS_REQ(1)) /* 15.2.8.3.7  */
+            .define_method("~",        fix_rev,           MRB_ARGS_NONE()) /* 15.2.8.3.8  */
+            .define_method("&",        fix_and,           MRB_ARGS_REQ(1)) /* 15.2.8.3.9  */
+            .define_method("|",        fix_or,            MRB_ARGS_REQ(1)) /* 15.2.8.3.10 */
+            .define_method("^",        fix_xor,           MRB_ARGS_REQ(1)) /* 15.2.8.3.11 */
+            .define_method("<<",       fix_lshift,        MRB_ARGS_REQ(1)) /* 15.2.8.3.12 */
+            .define_method(">>",       fix_rshift,        MRB_ARGS_REQ(1)) /* 15.2.8.3.13 */
+            .define_method("eql?",     num_eql,           MRB_ARGS_REQ(1)) /* 15.2.8.3.16 */
+            .define_method("hash",     flo_hash,          MRB_ARGS_NONE()) /* 15.2.8.3.18 */
+            .define_method("next",     int_succ,          MRB_ARGS_NONE()) /* 15.2.8.3.19 */
+            .define_method("succ",     fix_succ,          MRB_ARGS_NONE()) /* 15.2.8.3.21 */
+            .define_method("to_f",     fix_to_f,          MRB_ARGS_NONE()) /* 15.2.8.3.23 */
+            .define_method("to_s",     fix_to_s,          MRB_ARGS_NONE()) /* 15.2.8.3.25 */
+            .define_method("inspect",  fix_to_s,          MRB_ARGS_NONE())
+            .define_method("divmod",   fix_divmod,        MRB_ARGS_REQ(1)) /* 15.2.8.3.30 (x) */
+            .undef_class_method("new")
             ;
 
     /* Float Class */
     mrb->float_class = &mrb->define_class("Float", numeric)
-            .undef_class_method(mrb,  "new")
-            .define_method(mrb, "+",         flo_plus,         MRB_ARGS_REQ(1)) /* 15.2.9.3.1  */
-            .define_method(mrb, "-",         flo_minus,        MRB_ARGS_REQ(1)) /* 15.2.9.3.2  */
-            .define_method(mrb, "*",         flo_mul,          MRB_ARGS_REQ(1)) /* 15.2.9.3.3  */
-            .define_method(mrb, "%",         flo_mod,          MRB_ARGS_REQ(1)) /* 15.2.9.3.5  */
-            .define_method(mrb, "==",        flo_eq,           MRB_ARGS_REQ(1)) /* 15.2.9.3.7  */
-            .define_method(mrb, "ceil",      flo_ceil,         MRB_ARGS_NONE()) /* 15.2.9.3.8  */
-            .define_method(mrb, "finite?",   flo_finite_p,     MRB_ARGS_NONE()) /* 15.2.9.3.9  */
-            .define_method(mrb, "floor",     flo_floor,        MRB_ARGS_NONE()) /* 15.2.9.3.10 */
-            .define_method(mrb, "infinite?", flo_infinite_p,   MRB_ARGS_NONE()) /* 15.2.9.3.11 */
-            .define_method(mrb, "round",     flo_round,        MRB_ARGS_NONE()) /* 15.2.9.3.12 */
-            .define_method(mrb, "to_f",      flo_to_f,         MRB_ARGS_NONE()) /* 15.2.9.3.13 */
-            .define_method(mrb, "to_i",      flo_truncate,     MRB_ARGS_NONE()) /* 15.2.9.3.14 */
-            .define_method(mrb, "to_int",    flo_truncate,     MRB_ARGS_NONE())
-            .define_method(mrb, "truncate",  flo_truncate,     MRB_ARGS_NONE()) /* 15.2.9.3.15 */
-            .define_method(mrb, "to_s",      flo_to_s,         MRB_ARGS_NONE()) /* 15.2.9.3.16(x) */
-            .define_method(mrb, "inspect",   flo_to_s,         MRB_ARGS_NONE())
+            .undef_class_method("new")
+            .define_method("+",         flo_plus,         MRB_ARGS_REQ(1)) /* 15.2.9.3.1  */
+            .define_method("-",         flo_minus,        MRB_ARGS_REQ(1)) /* 15.2.9.3.2  */
+            .define_method("*",         flo_mul,          MRB_ARGS_REQ(1)) /* 15.2.9.3.3  */
+            .define_method("%",         flo_mod,          MRB_ARGS_REQ(1)) /* 15.2.9.3.5  */
+            .define_method("==",        flo_eq,           MRB_ARGS_REQ(1)) /* 15.2.9.3.7  */
+            .define_method("ceil",      flo_ceil,         MRB_ARGS_NONE()) /* 15.2.9.3.8  */
+            .define_method("finite?",   flo_finite_p,     MRB_ARGS_NONE()) /* 15.2.9.3.9  */
+            .define_method("floor",     flo_floor,        MRB_ARGS_NONE()) /* 15.2.9.3.10 */
+            .define_method("infinite?", flo_infinite_p,   MRB_ARGS_NONE()) /* 15.2.9.3.11 */
+            .define_method("round",     flo_round,        MRB_ARGS_NONE()) /* 15.2.9.3.12 */
+            .define_method("to_f",      flo_to_f,         MRB_ARGS_NONE()) /* 15.2.9.3.13 */
+            .define_method("to_i",      flo_truncate,     MRB_ARGS_NONE()) /* 15.2.9.3.14 */
+            .define_method("to_int",    flo_truncate,     MRB_ARGS_NONE())
+            .define_method("truncate",  flo_truncate,     MRB_ARGS_NONE()) /* 15.2.9.3.15 */
+            .define_method("to_s",      flo_to_s,         MRB_ARGS_NONE()) /* 15.2.9.3.16(x) */
+            .define_method("inspect",   flo_to_s,         MRB_ARGS_NONE())
             ;
 }

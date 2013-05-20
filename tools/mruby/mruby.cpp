@@ -172,7 +172,6 @@ main(int argc, char **argv)
     int n = -1;
     int i;
     struct mrbc_args args;
-    mrb_value ARGV;
 
     if (mrb == NULL) {
         fputs("Invalid mrb_state, exiting mruby\n", stderr);
@@ -186,11 +185,11 @@ main(int argc, char **argv)
         return n;
     }
 
-    ARGV = RArray::new_capa(mrb, args.argc);
+    RArray *pARGV = RArray::create(mrb,args.argc);
     for (i = 0; i < args.argc; i++) {
-        RArray::push(mrb, ARGV, mrb_str_new(mrb, args.argv[i], strlen(args.argv[i])));
+        pARGV->push(mrb_str_new(mrb, args.argv[i], strlen(args.argv[i])));
     }
-    mrb_define_global_const(mrb, "ARGV", ARGV);
+    mrb_define_global_const(mrb, "ARGV", mrb_obj_value(pARGV));
 
     if (args.mrbfile) {
         n = mrb_read_irep_file(mrb, args.rfp);

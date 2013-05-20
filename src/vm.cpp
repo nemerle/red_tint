@@ -491,7 +491,7 @@ RProc * mrb_state::prepare_method_missing(RClass *c,mrb_sym mid_,const int &a,in
     mrb_sym missing_id = mrb_intern2(this, "method_missing", 14);
     RProc *m =  RClass::method_search_vm(this, &c, missing_id);
     if (n == CALL_MAXARGS) {
-        RArray::unshift(this, regs[a+1], sym);
+        RARRAY(regs[a+1])->unshift(sym);
     }
     else {
         value_move(regs+a+2, regs+a+1, ++n);
@@ -504,7 +504,7 @@ mrb_value mrb_state::mrb_run(RProc *proc, mrb_value self)
     /* assert(mrb_proc_cfunc_p(proc)) */
     mrb_irep *irep = proc->body.irep;
     mrb_code *pc = irep->iseq;
-    mrb_value *pool = irep->pool;
+    mrb_value *pool = irep->m_pool;
     mrb_sym *syms = irep->syms;
     mrb_value *regs = NULL;
     mrb_code i;
@@ -665,7 +665,7 @@ mrb_value mrb_state::mrb_run(RProc *proc, mrb_value self)
             /* A B C  R(A) := R(C)::Sym(B) */
             int a = GETARG_A(i);
 
-            regs[a] = mrb_const_get(this, regs[a], syms[GETARG_Bx(i)]);
+            regs[a] = this->const_get(regs[a], syms[GETARG_Bx(i)]);
             NEXT;
         }
 
@@ -855,7 +855,7 @@ L_SEND:
                 /* setup environment for calling method */
                 proc = m_ci->proc = m;
                 irep = m->body.irep;
-                pool = irep->pool;
+                pool = irep->m_pool;
                 syms = irep->syms;
                 _ci->nregs = irep->nregs;
                 call_stack_sizing(this,_ci,irep);
@@ -915,7 +915,7 @@ L_SEND:
                 regs[0] = m->env->stack[0];
                 pc = m->body.irep->iseq;
             }
-            pool = irep->pool;
+            pool = irep->m_pool;
             syms = irep->syms;
             JUMP;
         }
@@ -967,7 +967,7 @@ L_SEND:
                 /* setup environment for calling method */
                 ci->proc = m;
                 irep = m->body.irep;
-                pool = irep->pool;
+                pool = irep->m_pool;
                 syms = irep->syms;
                 ci->nregs = irep->nregs;
                 call_stack_sizing(this,ci,irep);
@@ -1152,7 +1152,7 @@ L_RAISE:
                 }
 L_RESCUE:
                 irep = _ci->proc->body.irep;
-                pool = irep->pool;
+                pool = irep->m_pool;
                 syms = irep->syms;
                 regs = m_stack = m_stbase + _ci[1].stackidx;
                 pc = this->rescue[--_ci->ridx];
@@ -1212,7 +1212,7 @@ L_RESCUE:
                 DEBUG(printf("from :%s\n", mrb_sym2name(this, ci->mid)));
                 proc = m_ci->proc;
                 irep = proc->body.irep;
-                pool = irep->pool;
+                pool = irep->m_pool;
                 syms = irep->syms;
 
                 regs[acc] = v;
@@ -1249,7 +1249,7 @@ L_RESCUE:
             else {
                 /* setup environment for calling method */
                 irep = m->body.irep;
-                pool = irep->pool;
+                pool = irep->m_pool;
                 syms = irep->syms;
                 call_stack_sizing(this,_ci,irep);
                 regs = m_stack;
@@ -1598,14 +1598,14 @@ L_RESCUE:
 
         CASE(OP_ARYCAT) {
             /* A B            mrb_ary_concat(R(A),R(B)) */
-            RArray::concat(this, regs[GETARG_A(i)], RArray::splat(this, regs[GETARG_B(i)]));
+            mrb_ary_ptr(regs[GETARG_A(i)])->concat(RArray::splat(this, regs[GETARG_B(i)]));
             gc().arena_restore(ai);
             NEXT;
         }
 
         CASE(OP_ARYPUSH) {
             /* A B            R(A).push(R(B)) */
-            RArray::push(this, regs[GETARG_A(i)], regs[GETARG_B(i)]);
+            mrb_ary_ptr(regs[GETARG_A(i)])->push(regs[GETARG_B(i)]);
             NEXT;
         }
 
@@ -1624,14 +1624,14 @@ L_RESCUE:
                 }
             }
             else {
-                regs[GETARG_A(i)] = RArray::ref(this, v, c);
+                regs[GETARG_A(i)] = RARRAY(v)->ref(c);
             }
             NEXT;
         }
 
         CASE(OP_ASET) {
             /* A B C          R(B)[C] := R(A) */
-            RArray::set(this, regs[GETARG_B(i)], GETARG_C(i), regs[GETARG_A(i)]);
+            RARRAY(regs[GETARG_B(i)])->set(GETARG_C(i), regs[GETARG_A(i)]);
             NEXT;
         }
 
@@ -1791,7 +1791,7 @@ L_RESCUE:
             }
             else {
                 irep = p->body.irep;
-                pool = irep->pool;
+                pool = irep->m_pool;
                 syms = irep->syms;
                 stack_extend(this, irep->nregs, 1);
                 ci->nregs = irep->nregs;
@@ -1805,7 +1805,7 @@ L_RESCUE:
             /* A B            R(A).newmethod(Sym(B),R(A+1)) */
             int a = GETARG_A(i);
             RClass *c = mrb_class_ptr(regs[a]);
-            c->define_method_vm(this,syms[GETARG_B(i)], regs[a+1]);
+            c->define_method_vm(syms[GETARG_B(i)], regs[a+1]);
             gc().arena_restore(ai);
             NEXT;
         }

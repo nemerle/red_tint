@@ -177,12 +177,12 @@ mrb_init_proc(mrb_state *mrb)
     mrb->proc_class = mrb_define_class(mrb, "Proc", mrb->object_class);
     MRB_SET_INSTANCE_TT(mrb->proc_class, MRB_TT_PROC);
     m = mrb_proc_new(mrb, call_irep);
-    mrb->proc_class->define_method(mrb, "initialize", mrb_proc_initialize, MRB_ARGS_NONE())
-            .define_method(mrb, "initialize_copy", mrb_proc_init_copy, MRB_ARGS_REQ(1))
-            .define_method(mrb, "arity", mrb_proc_arity, MRB_ARGS_NONE())
-            .define_method_raw(mrb, mrb_intern(mrb, "call"), m)
-            .define_method_raw(mrb, mrb_intern(mrb, "[]"), m);
+    mrb->proc_class->define_method("initialize", mrb_proc_initialize, MRB_ARGS_NONE())
+            .define_method("initialize_copy", mrb_proc_init_copy, MRB_ARGS_REQ(1))
+            .define_method("arity", mrb_proc_arity, MRB_ARGS_NONE())
+            .define_method_raw(mrb_intern(mrb, "call"), m)
+            .define_method_raw(mrb_intern(mrb, "[]"), m);
 
-    mrb->kernel_module->define_class_method(mrb, "lambda", proc_lambda, MRB_ARGS_NONE())        /* 15.3.1.2.6  */
-            .define_method(mrb, "lambda", proc_lambda, MRB_ARGS_NONE());   /* 15.3.1.3.27 */
+    mrb->kernel_module->define_class_method("lambda", proc_lambda, MRB_ARGS_NONE())        /* 15.3.1.2.6  */
+            .define_method("lambda", proc_lambda, MRB_ARGS_NONE());   /* 15.3.1.3.27 */
 }

@@ -20,7 +20,6 @@ struct RRange : public RBasic{
 };
 
 #define mrb_range_ptr(v)    ((struct RRange*)((v).value.p))
-#define mrb_range_value(p)  mrb_obj_value((void*)(p))
 
 #if defined(__cplusplus)
 extern "C" {

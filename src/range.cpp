@@ -40,7 +40,7 @@ mrb_value mrb_range_new(mrb_state *mrb, mrb_value beg, mrb_value end, int excl)
     r->edges->beg = beg;
     r->edges->end = end;
     r->excl = excl;
-    return mrb_range_value(r);
+    return mrb_obj_value(r);
 }
 
 /*
@@ -180,10 +180,10 @@ r_le(mrb_state *mrb, mrb_value a, mrb_value b)
 
     if (mrb_type(r) == MRB_TT_FIXNUM) {
         mrb_int c = mrb_fixnum(r);
-        if (c == 0 || c == -1) return TRUE;
+        if (c == 0 || c == -1) return true;
     }
 
-    return FALSE;
+    return false;
 }
 
 static int
@@ -193,10 +193,10 @@ r_gt(mrb_state *mrb, mrb_value a, mrb_value b)
     /* output :a < b => -1, a = b =>  0, a > b => +1 */
 
     if (mrb_type(r) == MRB_TT_FIXNUM) {
-        if (mrb_fixnum(r) == 1) return TRUE;
+        if (mrb_fixnum(r) == 1) return true;
     }
 
-    return FALSE;
+    return false;
 }
 
 static int
@@ -207,10 +207,10 @@ r_ge(mrb_state *mrb, mrb_value a, mrb_value b)
 
     if (mrb_type(r) == MRB_TT_FIXNUM) {
         mrb_int c = mrb_fixnum(r);
-        if (c == 0 || c == 1) return TRUE;
+        if (c == 0 || c == 1) return true;
     }
 
-    return FALSE;
+    return false;
 }
 
 /*
@@ -291,10 +291,10 @@ mrb_range_beg_len(mrb_state *mrb, mrb_value range, mrb_int *begp, mrb_int *lenp,
 
     *begp = beg;
     *lenp = len;
-    return TRUE;
+    return true;
 
 out_of_range:
-    return FALSE;
+    return false;
 }
 
 /* 15.2.14.4.12(x) */
@@ -434,21 +434,21 @@ mrb_init_range(mrb_state *mrb)
 {
     mrb->define_class("Range", mrb->object_class)
             .instance_tt(MRB_TT_RANGE)
-            .include_module(mrb, "Enumerable")
-            .define_method(mrb, "begin",           mrb_range_beg,         MRB_ARGS_NONE())      /* 15.2.14.4.3  */
-            .define_method(mrb, "end",             mrb_range_end,         MRB_ARGS_NONE())      /* 15.2.14.4.5  */
-            .define_method(mrb, "==",              mrb_range_eq,          MRB_ARGS_REQ(1))      /* 15.2.14.4.1  */
-            .define_method(mrb, "===",             mrb_range_include,     MRB_ARGS_REQ(1))      /* 15.2.14.4.2  */
-            .define_method(mrb, "each",            mrb_range_each,        MRB_ARGS_NONE())      /* 15.2.14.4.4  */
-            .define_method(mrb, "exclude_end?",    mrb_range_excl,        MRB_ARGS_NONE())      /* 15.2.14.4.6  */
-            .define_method(mrb, "first",           mrb_range_beg,         MRB_ARGS_NONE())      /* 15.2.14.4.7  */
-            .define_method(mrb, "include?",        mrb_range_include,     MRB_ARGS_REQ(1))      /* 15.2.14.4.8  */
-            .define_method(mrb, "initialize",      mrb_range_initialize,  MRB_ARGS_ANY())       /* 15.2.14.4.9  */
-            .define_method(mrb, "last",            mrb_range_end,         MRB_ARGS_NONE())      /* 15.2.14.4.10 */
-            .define_method(mrb, "member?",         mrb_range_include,     MRB_ARGS_REQ(1))      /* 15.2.14.4.11 */
-            .define_method(mrb, "to_s",            range_to_s,            MRB_ARGS_NONE())      /* 15.2.14.4.12(x) */
-            .define_method(mrb, "inspect",         range_inspect,         MRB_ARGS_NONE())      /* 15.2.14.4.13(x) */
-            .define_method(mrb, "eql?",            range_eql,             MRB_ARGS_REQ(1))      /* 15.2.14.4.14(x) */
-            .define_method(mrb, "initialize_copy", range_initialize_copy, MRB_ARGS_REQ(1))      /* 15.2.14.4.15(x) */
+            .include_module("Enumerable")
+            .define_method("begin",           mrb_range_beg,         MRB_ARGS_NONE())      /* 15.2.14.4.3  */
+            .define_method("end",             mrb_range_end,         MRB_ARGS_NONE())      /* 15.2.14.4.5  */
+            .define_method("==",              mrb_range_eq,          MRB_ARGS_REQ(1))      /* 15.2.14.4.1  */
+            .define_method("===",             mrb_range_include,     MRB_ARGS_REQ(1))      /* 15.2.14.4.2  */
+            .define_method("each",            mrb_range_each,        MRB_ARGS_NONE())      /* 15.2.14.4.4  */
+            .define_method("exclude_end?",    mrb_range_excl,        MRB_ARGS_NONE())      /* 15.2.14.4.6  */
+            .define_method("first",           mrb_range_beg,         MRB_ARGS_NONE())      /* 15.2.14.4.7  */
+            .define_method("include?",        mrb_range_include,     MRB_ARGS_REQ(1))      /* 15.2.14.4.8  */
+            .define_method("initialize",      mrb_range_initialize,  MRB_ARGS_ANY())       /* 15.2.14.4.9  */
+            .define_method("last",            mrb_range_end,         MRB_ARGS_NONE())      /* 15.2.14.4.10 */
+            .define_method("member?",         mrb_range_include,     MRB_ARGS_REQ(1))      /* 15.2.14.4.11 */
+            .define_method("to_s",            range_to_s,            MRB_ARGS_NONE())      /* 15.2.14.4.12(x) */
+            .define_method("inspect",         range_inspect,         MRB_ARGS_NONE())      /* 15.2.14.4.13(x) */
+            .define_method("eql?",            range_eql,             MRB_ARGS_REQ(1))      /* 15.2.14.4.14(x) */
+            .define_method("initialize_copy", range_initialize_copy, MRB_ARGS_REQ(1))      /* 15.2.14.4.15(x) */
             .fin();
 }

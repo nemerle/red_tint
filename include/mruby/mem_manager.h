@@ -9,6 +9,7 @@ struct REnv;
 struct mrb_state;
 struct mrb_pool;
 struct heap_page;
+struct mrb_context;
 
 typedef void* (*mrb_allocf) (mrb_state *mrb, void*, size_t, void *ud);
 #ifndef MRB_ARENA_SIZE
@@ -29,11 +30,15 @@ public:
 
             template<typename T>
     T *     obj_alloc(RClass *cls) {
-                return (T *)mrb_obj_alloc(T::ttype,cls);
+                T *res=(T *)mrb_obj_alloc(T::ttype,cls);
+                res->m_vm = m_vm;
+                return res;
             }
             template<typename T>
     T *     obj_alloc(mrb_vtype type,RClass *cls) {
-                return (T *)mrb_obj_alloc(type,cls);
+                T *res=(T *)mrb_obj_alloc(type,cls);
+                res->m_vm = m_vm;
+                return res;
             }
     RBasic *mrb_obj_alloc(mrb_vtype ttype, RClass *cls);
     void *  _calloc(size_t nelem, size_t len);
@@ -87,7 +92,7 @@ protected:
 
     mrb_allocf m_allocf;
     void *ud; /* auxiliary data */
-    mrb_state * m_mrb;
+    mrb_state * m_vm;
     heap_page * m_heaps;
     heap_page * sweeps;
     heap_page * m_free_heaps;

@@ -30,7 +30,7 @@ mrb_state* mrb_state::create(mrb_allocf f, void *ud)
         return nullptr;
 
     *mrb = mrb_state_zero;
-    mrb->gc().m_mrb = mrb;
+    mrb->gc().m_vm = mrb;
     mrb->gc().ud = ud;
     mrb->gc().m_allocf = f;
     mrb->gc().current_white_part = MRB_GC_WHITE_A;
@@ -98,7 +98,7 @@ void mrb_irep_free(mrb_state *mrb, struct mrb_irep *irep)
     MemManager &mm(mrb->gc());
     if (!(irep->flags & MRB_ISEQ_NO_FREE))
         mm._free(irep->iseq);
-    mm._free(irep->pool);
+    mm._free(irep->m_pool);
     mm._free(irep->syms);
     mm._free((void *)irep->filename);
     mm._free(irep->lines);
@@ -168,8 +168,8 @@ mrb_top_self(mrb_state *mrb)
 {
     if (!mrb->top_self) {
         mrb->top_self = mrb->gc().obj_alloc<RObject>(MRB_TT_OBJECT, mrb->object_class);
-        mrb_define_singleton_method(mrb, mrb->top_self, "inspect", inspect_main, MRB_ARGS_NONE());
-        mrb_define_singleton_method(mrb, mrb->top_self, "to_s", inspect_main, MRB_ARGS_NONE());
+        mrb->top_self->define_singleton_method("inspect", inspect_main, MRB_ARGS_NONE());
+        mrb->top_self->define_singleton_method("to_s", inspect_main, MRB_ARGS_NONE());
     }
     return mrb_obj_value(mrb->top_self);
 }

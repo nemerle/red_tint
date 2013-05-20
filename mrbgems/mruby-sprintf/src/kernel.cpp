@@ -19,8 +19,8 @@ mrb_mruby_sprintf_gem_init(mrb_state* mrb)
     }
     krn = mrb->kernel_module;
 
-    krn->define_method(mrb, "sprintf", mrb_f_sprintf, MRB_ARGS_ANY())
-            .define_method(mrb, "format",  mrb_f_sprintf, MRB_ARGS_ANY());
+    krn->define_method("sprintf", mrb_f_sprintf, MRB_ARGS_ANY())
+            .define_method("format",  mrb_f_sprintf, MRB_ARGS_ANY());
 }
 
 void

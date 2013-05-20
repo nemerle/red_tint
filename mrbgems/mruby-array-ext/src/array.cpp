@@ -114,22 +114,21 @@ mrb_ary_rassoc(mrb_state *mrb, mrb_value ary)
  *     a.at(-1)    #=> "e"
  */
 
-static mrb_value
-mrb_ary_at(mrb_state *mrb, mrb_value ary)
+static mrb_value mrb_ary_at(mrb_state *mrb, mrb_value ary)
 {
   mrb_int pos;
   mrb_get_args(mrb, "i", &pos);
 
-  return RArray::entry(ary, pos);
+    return RARRAY(ary)->entry(pos);
 }
 
 void
 mrb_mruby_array_ext_gem_init(mrb_state* mrb)
 {
-    mrb->array_class->define_class_method(mrb, "try_convert", mrb_ary_s_try_convert, MRB_ARGS_REQ(1))
-            .define_method(mrb, "assoc",  mrb_ary_assoc,  MRB_ARGS_REQ(1))
-            .define_method(mrb, "at",     mrb_ary_at,     MRB_ARGS_REQ(1))
-            .define_method(mrb, "rassoc", mrb_ary_rassoc, MRB_ARGS_REQ(1));
+    mrb->array_class->define_class_method("try_convert", mrb_ary_s_try_convert, MRB_ARGS_REQ(1))
+            .define_method("assoc",  mrb_ary_assoc,  MRB_ARGS_REQ(1))
+            .define_method("at",     mrb_ary_at,     MRB_ARGS_REQ(1))
+            .define_method("rassoc", mrb_ary_rassoc, MRB_ARGS_REQ(1));
 }
 
 void

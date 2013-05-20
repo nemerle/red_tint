@@ -190,6 +190,7 @@ struct kh_T {
     bool exist(iterator x) {return (!__ac_iseither((this)->e_flags, (this)->d_flags, (x)));}
     const khkey_t &key(int x) const { return keys[x];}
     khval_t &value( khiter_t x ) { return  vals[x]; }
+    const khval_t &value( khiter_t x ) const { return  vals[x]; }
     khint_t begin() const { return khint_t(0);}
     khint_t end() const { return n_buckets;}
     khint_t size() const { return m_size; }

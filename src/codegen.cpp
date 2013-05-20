@@ -518,8 +518,8 @@ void codegen_scope::genop_peep(mrb_code i, int val)
         if (c0 == OP_STRING) {
             int i = GETARG_Bx(i0);
 
-            if (mrb_type(m_irep->pool[i]) == MRB_TT_STRING &&
-                    RSTRING_LEN(m_irep->pool[i]) == 0) {
+            if (mrb_type(m_irep->m_pool[i]) == MRB_TT_STRING &&
+                    RSTRING_LEN(m_irep->m_pool[i]) == 0) {
                 m_pc--;
                 return;
             }
@@ -572,7 +572,7 @@ int codegen_scope::new_lit(mrb_value val)
     switch (mrb_type(val)) {
     case MRB_TT_STRING:
         for (i=0; i<m_irep->plen; i++) {
-            mrb_value pv = m_irep->pool[i];
+            mrb_value pv = m_irep->m_pool[i];
             mrb_int len;
 
             if (mrb_type(pv) != MRB_TT_STRING) continue;
@@ -584,7 +584,7 @@ int codegen_scope::new_lit(mrb_value val)
     case MRB_TT_FLOAT:
     default:
         for (i=0; i<m_irep->plen; i++) {
-            if (mrb_obj_equal(m_mrb, m_irep->pool[i], val))
+            if (mrb_obj_equal(m_mrb, m_irep->m_pool[i], val))
                 return i;
         }
         break;
@@ -592,9 +592,9 @@ int codegen_scope::new_lit(mrb_value val)
 
     if (m_irep->plen == m_pcapa) {
         m_pcapa *= 2;
-        m_irep->pool = (mrb_value *)s_realloc(m_irep->pool, sizeof(mrb_value)*m_pcapa);
+        m_irep->m_pool = (mrb_value *)s_realloc(m_irep->m_pool, sizeof(mrb_value)*m_pcapa);
     }
-    m_irep->pool[m_irep->plen] = val;
+    m_irep->m_pool[m_irep->plen] = val;
     i = m_irep->plen++;
 
     return i;
@@ -2407,7 +2407,7 @@ codegen_scope* codegen_scope::create(mrb_state *mrb, codegen_scope *prev, const 
     p->m_iseq = (mrb_code*)mrb->gc()._malloc(sizeof(mrb_code)*p->m_icapa);
 
     p->m_pcapa = 32;
-    p->m_irep->pool = (mrb_value*)mrb->gc()._malloc(sizeof(mrb_value)*p->m_pcapa);
+    p->m_irep->m_pool = (mrb_value*)mrb->gc()._malloc(sizeof(mrb_value)*p->m_pcapa);
     p->m_irep->plen = 0;
 
     p->m_scapa = 256;
@@ -2454,7 +2454,7 @@ void codegen_scope::finish()
             irep->lines = 0;
         }
     }
-    irep->pool = (mrb_value *)s_realloc(irep->pool, sizeof(mrb_value)*irep->plen);
+    irep->m_pool = (mrb_value *)s_realloc(irep->m_pool, sizeof(mrb_value)*irep->plen);
     irep->syms = (mrb_sym *)s_realloc(irep->syms, sizeof(mrb_sym)*irep->slen);
     if (m_filename) {
         irep->filename = m_filename;

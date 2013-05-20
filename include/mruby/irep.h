@@ -14,7 +14,7 @@ struct mrb_irep {
     uint8_t flags;
 
     mrb_code *iseq;
-    mrb_value *pool;
+    mrb_value *m_pool;
     mrb_sym *syms;
 
     /* debug info */

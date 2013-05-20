@@ -100,13 +100,13 @@ int mrb_parser_state::skips(const char *s)
             while (len--) {
                 nextc();
             }
-            return TRUE;
+            return true;
         }
         else{
             s--;
         }
     }
-    return FALSE;
+    return false;
 }
 int mrb_parser_state::newtok()
 {
@@ -291,7 +291,7 @@ int mrb_parser_state::peek_n(int c, int n)
 
     do {
         c0 = nextc();
-        if (c0 < 0) return FALSE;
+        if (c0 < 0) return false;
         list = push(list, (mrb_ast_node*)(intptr_t)c0);
     } while(n--);
     if (this->pb) {
@@ -300,8 +300,8 @@ int mrb_parser_state::peek_n(int c, int n)
     else {
         this->pb = list;
     }
-    if (c0 == c) return TRUE;
-    return FALSE;
+    if (c0 == c) return true;
+    return false;
 }
 bool mrb_parser_state::peeks(const char *s)
 {
@@ -328,8 +328,8 @@ int mrb_parser_state::heredoc_identifier()
 {
     int c;
     int type = str_heredoc;
-    int indent = FALSE;
-    int quote = FALSE;
+    int indent = false;
+    int quote = false;
     HeredocNode *newnode;
     mrb_parser_heredoc_info *info;
 
@@ -339,13 +339,13 @@ int mrb_parser_state::heredoc_identifier()
         return 0;
     }
     if (c == '-') {
-        indent = TRUE;
+        indent = true;
         c = this->nextc();
     }
     if (c == '\'' || c == '"') {
         int term = c;
         if (c == '\'')
-            quote = TRUE;
+            quote = true;
         newtok();
         while ((c = nextc()) != -1 && c != term) {
             if (c == '\n') {
@@ -381,7 +381,7 @@ int mrb_parser_state::heredoc_identifier()
         type |= STR_FUNC_EXPAND;
     info->type = (mrb_string_type)type;
     info->allow_indent = indent;
-    info->line_head = TRUE;
+    info->line_head = true;
     info->doc = nullptr;
     this->heredocs =this->push(this->heredocs, newnode);
     if (this->parsing_heredoc == nullptr) {
@@ -390,7 +390,7 @@ int mrb_parser_state::heredoc_identifier()
             n = n->right();
         this->parsing_heredoc = n;
     }
-    this->heredoc_starts_nextline = TRUE;
+    this->heredoc_starts_nextline = true;
     m_lstate = EXPR_END;
 
     yylval.nd = newnode;
@@ -427,7 +427,7 @@ int mrb_parser_state::parse_string()
             m_lineno++;
             m_column = 0;
             line_head = hinf->line_head;
-            hinf->line_head = TRUE;
+            hinf->line_head = true;
             if (line_head) {
                 /* check whether end of heredoc */
                 const char *s = m_lexer.tok();
@@ -482,7 +482,7 @@ int mrb_parser_state::parse_string()
 
                     m_lexer.tokadd(read_escape());
                     if (hinf)
-                        hinf->line_head = FALSE;
+                        hinf->line_head = false;
                 }
             } else {
                 if (c != beg && c != end) {
@@ -513,7 +513,7 @@ int mrb_parser_state::parse_string()
                 m_cmd_start = true;
                 yylval.sn = new_str(m_lexer.tok(), m_lexer.toklen());
                 if (hinf)
-                    hinf->line_head = FALSE;
+                    hinf->line_head = false;
                 return tSTRING_PART;
             }
             m_lexer.tokadd('#');

@@ -76,17 +76,17 @@ mrb_struct_members(mrb_state *mrb, mrb_value s)
 static mrb_value
 mrb_struct_s_members_m(mrb_state *mrb, mrb_value klass)
 {
-    mrb_value members, ary;
     mrb_value *p, *pend;
 
-    members = mrb_struct_s_members(mrb, klass);
-    ary = RArray::new_capa(mrb, RARRAY_LEN(members));
-    p = RARRAY_PTR(members); pend = p + RARRAY_LEN(members);
+    mrb_value members = mrb_struct_s_members(mrb, klass);
+    RArray * arr = RArray::create(mrb,RARRAY_LEN(members));
+    p = RARRAY_PTR(members);
+    pend = p + RARRAY_LEN(members);
     while (p < pend) {
-        RArray::push(mrb, ary, *p);
+        arr->push(*p);
         p++;
     }
-    return ary;
+    return mrb_obj_value(arr);
 }
 
 /* 15.2.18.4.6  */
@@ -237,7 +237,7 @@ make_struct(mrb_state *mrb, mrb_value name, mrb_value members, struct RClass * k
     mrb_value nstr, *ptr_members;
     mrb_sym id;
     mrb_int i, len;
-    struct RClass *c;
+    RClass *c;
 
     if (mrb_nil_p(name)) {
         c = mrb_class_new(mrb, klass);
@@ -249,7 +249,7 @@ make_struct(mrb_state *mrb, mrb_value name, mrb_value members, struct RClass * k
         if (!mrb_is_const_id(id)) {
             mrb_name_error(mrb, id, "identifier %S needs to be constant", name);
         }
-        if (mrb_const_defined_at(mrb, klass, id)) {
+        if (mrb_const_defined_at(klass, id)) {
             mrb_warn(mrb,"redefining constant Struct::%s", mrb_string_value_ptr(mrb, name));
             //?rb_mod_remove_const(klass, mrb_sym2name(mrb, id));
         }
@@ -257,11 +257,11 @@ make_struct(mrb_state *mrb, mrb_value name, mrb_value members, struct RClass * k
     }
     MRB_SET_INSTANCE_TT(c, MRB_TT_ARRAY);
     nstr = mrb_obj_value(c);
-    mrb_iv_set(mrb, nstr, mrb_intern2(mrb, "__members__", 11), members);
-
-    mrb_define_class_method(mrb, c, "new", mrb_instance_new, MRB_ARGS_ANY());
-    mrb_define_class_method(mrb, c, "[]", mrb_instance_new, MRB_ARGS_ANY());
-    mrb_define_class_method(mrb, c, "members", mrb_struct_s_members_m, MRB_ARGS_NONE());
+    c->iv_set(mrb_intern2(mrb, "__members__", 11), members);
+    c->define_class_method("new", mrb_instance_new, MRB_ARGS_ANY())
+        .define_class_method("[]", mrb_instance_new, MRB_ARGS_ANY())
+        .define_class_method("members", mrb_struct_s_members_m, MRB_ARGS_NONE())
+            ;
     //RSTRUCT(nstr)->basic.c->super = c->c;
     ptr_members = RARRAY_PTR(members);
     len = RARRAY_LEN(members);
@@ -269,12 +269,12 @@ make_struct(mrb_state *mrb, mrb_value name, mrb_value members, struct RClass * k
         mrb_sym id = mrb_symbol(ptr_members[i]);
         if (mrb_is_local_id(id) || mrb_is_const_id(id)) {
             if (i < N_REF_FUNC) {
-                c->define_method_id(mrb, id, ref_func[i], MRB_ARGS_NONE());
+                c->define_method_id(id, ref_func[i], MRB_ARGS_NONE());
             }
             else {
-                c->define_method_id(mrb, id, mrb_struct_ref, MRB_ARGS_NONE());
+                c->define_method_id(id, mrb_struct_ref, MRB_ARGS_NONE());
             }
-            c->define_method_id(mrb, mrb_id_attrset(mrb, id), mrb_struct_set_m, MRB_ARGS_REQ(1));
+            c->define_method_id(mrb_id_attrset(mrb, id), mrb_struct_set_m, MRB_ARGS_REQ(1));
         }
     }
     return nstr;
@@ -284,21 +284,23 @@ mrb_value
 mrb_struct_define(mrb_state *mrb, const char *name, ...)
 {
     va_list ar;
-    mrb_value nm, ary;
+    mrb_value nm;
     char *mem;
 
-    if (!name) nm = mrb_nil_value();
-    else nm = mrb_str_new_cstr(mrb, name);
-    ary = mrb_ary_new(mrb);
+    if (!name)
+        nm = mrb_nil_value();
+    else
+        nm = mrb_str_new_cstr(mrb, name);
+    RArray *arr = RArray::create(mrb);
 
     va_start(ar, name);
     while ((mem = va_arg(ar, char*)) != 0) {
         mrb_sym slot = mrb_intern(mrb, mem);
-        RArray::push(mrb, ary, mrb_symbol_value(slot));
+        arr->push(mrb_symbol_value(slot));
     }
     va_end(ar);
 
-    return make_struct(mrb, nm, ary, struct_class(mrb));
+    return make_struct(mrb, nm, mrb_obj_value(arr), struct_class(mrb));
 }
 
 /* 15.2.18.3.1  */
@@ -359,7 +361,7 @@ mrb_struct_s_def(mrb_state *mrb, mrb_value klass)
         if (mrb_array_p(rest)) {
             if (!mrb_nil_p(name) && mrb_symbol_p(name)) {
                 /* 1stArgument:symbol -> name=nil rest=argv[0]-[n] */
-                RArray::unshift(mrb, rest, name);
+                RARRAY(rest)->unshift(name);
                 name = mrb_nil_value();
             }
         }
@@ -387,8 +389,7 @@ mrb_struct_s_def(mrb_state *mrb, mrb_value klass)
     return st;
 }
 
-static int
-num_members(mrb_state *mrb, struct RClass *klass)
+static int num_members(mrb_state *mrb, RClass *klass)
 {
     mrb_value members;
 
@@ -413,11 +414,12 @@ mrb_struct_initialize_withArg(mrb_state *mrb, int argc, mrb_value *argv, mrb_val
         mrb_raise(mrb, E_ARGUMENT_ERROR, "struct size differs");
     }
 
+    RArray *p_self(RSTRUCT_ARY(self));
     for (i = 0; i < argc; i++) {
-        RArray::set(mrb, self, i, argv[i]);
+        p_self->set(i, argv[i]);
     }
     for (i = argc; i < n; i++) {
-        RArray::set(mrb, self, i, mrb_nil_value());
+        p_self->set(i, mrb_nil_value());
     }
     return self;
 }
@@ -522,7 +524,7 @@ mrb_struct_init_copy(mrb_state *mrb, mrb_value copy)
     }
     len = RSTRUCT_LEN(copy);
     for (i = 0; i < len; i++) {
-        RArray::set(mrb, copy, i, RSTRUCT_PTR(s)[i]);
+        RSTRUCT_ARY(copy)->set(i, RSTRUCT_PTR(s)[i]);
     }
     return copy;
 }
@@ -796,16 +798,16 @@ void
 mrb_mruby_struct_gem_init(mrb_state* mrb)
 {
     mrb->define_class("Struct",  mrb->object_class)
-            .define_class_method(mrb, "new",       mrb_struct_s_def,       MRB_ARGS_ANY())  /* 15.2.18.3.1  */
-            .define_method(mrb, "==",              mrb_struct_equal,       MRB_ARGS_REQ(1)) /* 15.2.18.4.1  */
-            .define_method(mrb, "[]",              mrb_struct_aref,        MRB_ARGS_REQ(1)) /* 15.2.18.4.2  */
-            .define_method(mrb, "[]=",             mrb_struct_aset,        MRB_ARGS_REQ(2)) /* 15.2.18.4.3  */
-            .define_method(mrb, "members",         mrb_struct_members_m,   MRB_ARGS_NONE()) /* 15.2.18.4.6  */
-            .define_method(mrb, "initialize",      mrb_struct_initialize_m,MRB_ARGS_ANY())  /* 15.2.18.4.8  */
-            .define_method(mrb, "initialize_copy", mrb_struct_init_copy,   MRB_ARGS_REQ(1)) /* 15.2.18.4.9  */
-            .define_method(mrb, "inspect",         mrb_struct_inspect,     MRB_ARGS_NONE()) /* 15.2.18.4.10(x)  */
-            .define_alias(mrb, "to_s", "inspect")                                       /* 15.2.18.4.11(x)  */
-            .define_method(mrb, "eql?",            mrb_struct_eql,         MRB_ARGS_REQ(1)) /* 15.2.18.4.12(x)  */
+            .define_class_method("new",       mrb_struct_s_def,       MRB_ARGS_ANY())  /* 15.2.18.3.1  */
+            .define_method("==",              mrb_struct_equal,       MRB_ARGS_REQ(1)) /* 15.2.18.4.1  */
+            .define_method("[]",              mrb_struct_aref,        MRB_ARGS_REQ(1)) /* 15.2.18.4.2  */
+            .define_method("[]=",             mrb_struct_aset,        MRB_ARGS_REQ(2)) /* 15.2.18.4.3  */
+            .define_method("members",         mrb_struct_members_m,   MRB_ARGS_NONE()) /* 15.2.18.4.6  */
+            .define_method("initialize",      mrb_struct_initialize_m,MRB_ARGS_ANY())  /* 15.2.18.4.8  */
+            .define_method("initialize_copy", mrb_struct_init_copy,   MRB_ARGS_REQ(1)) /* 15.2.18.4.9  */
+            .define_method("inspect",         mrb_struct_inspect,     MRB_ARGS_NONE()) /* 15.2.18.4.10(x)  */
+            .define_alias("to_s", "inspect")                                       /* 15.2.18.4.11(x)  */
+            .define_method("eql?",            mrb_struct_eql,         MRB_ARGS_REQ(1)) /* 15.2.18.4.12(x)  */
             ;
 }
 

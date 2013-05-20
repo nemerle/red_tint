@@ -256,7 +256,7 @@ void mrb_state::codedump(int n)
                 break;
             case OP_STRING:
             {
-                mrb_value s = irep->pool[GETARG_Bx(c)];
+                mrb_value s = irep->m_pool[GETARG_Bx(c)];
 
                 s = mrb_str_dump(this, s);
                 sys.print_f("OP_STRING\tR%d\t%s\n", GETARG_A(c), RSTRING_PTR(s));

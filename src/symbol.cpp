@@ -12,6 +12,7 @@
 #include "mruby/string.h"
 #include "mruby/class.h"
 
+namespace {
 /* ------------------------------------------------------ */
 struct symbol_name {
     size_t len;
@@ -38,6 +39,7 @@ struct SymHashEqual {
     }
 };
 
+} // end of anonymous namespace
 struct SymTable {
     typedef kh_T<symbol_name, mrb_sym,SymHashFunc,SymHashEqual> kh_n2s;
     typedef kh_n2s::iterator iterator;
@@ -77,13 +79,12 @@ mrb_sym mrb_state::intern2(const char *name, size_t len)
 {
     SymTable &name2sym_tab(*this->name2sym);
     symbol_name sname;
-    khiter_t k;
     mrb_sym sym;
     char *p;
 
     sname.len = len;
     sname.name = name;
-    k = name2sym_tab.find(sname);
+    khiter_t k = name2sym_tab.find(sname);
     if (k != name2sym_tab.end())
         return name2sym_tab[k];
 
@@ -271,8 +272,7 @@ sym_to_sym(mrb_state *mrb, mrb_value sym)
 #endif
 #define is_identchar(c) (SIGN_EXTEND_CHAR(c)!=-1&&(ISALNUM(c) || (c) == '_'))
 
-static int
-is_special_global_name(const char* m)
+static int is_special_global_name(const char* m)
 {
     switch (*m) {
     case '~': case '*': case '$': case '?': case '!': case '@':
@@ -287,26 +287,25 @@ is_special_global_name(const char* m)
         if (is_identchar(*m)) m += 1;
         break;
     default:
-        if (!ISDIGIT(*m)) return FALSE;
+        if (!ISDIGIT(*m)) return false;
         do ++m; while (ISDIGIT(*m));
         break;
     }
     return !*m;
 }
 
-static int
-symname_p(const char *name)
+static int symname_p(const char *name)
 {
     const char *m = name;
-    int localid = FALSE;
+    int localid = false;
 
-    if (!m) return FALSE;
+    if (!m) return false;
     switch (*m) {
     case '\0':
-        return FALSE;
+        return false;
 
     case '$':
-        if (is_special_global_name(++m)) return TRUE;
+        if (is_special_global_name(++m)) return true;
         goto id;
 
     case '@':
@@ -332,7 +331,7 @@ symname_p(const char *name)
         switch (*++m) {
         case '~': ++m; break;
         case '=': if (*++m == '=') ++m; break;
-        default: return FALSE;
+        default: return false;
         }
         break;
 
@@ -357,14 +356,14 @@ symname_p(const char *name)
         break;
 
     case '[':
-        if (*++m != ']') return FALSE;
+        if (*++m != ']') return false;
         if (*++m == '=') ++m;
         break;
 
     default:
         localid = !ISUPPER(*m);
 id:
-        if (*m != '_' && !ISALPHA(*m)) return FALSE;
+        if (*m != '_' && !ISALPHA(*m)) return false;
         while (is_identchar(*m)) m += 1;
         if (localid) {
             switch (*m) {
@@ -374,11 +373,10 @@ id:
         }
         break;
     }
-    return *m ? FALSE : TRUE;
+    return *m ? false : true;
 }
 
-static mrb_value
-sym_inspect(mrb_state *mrb, mrb_value sym)
+static mrb_value sym_inspect(mrb_state *mrb, mrb_value sym)
 {
     mrb_value str;
     const char *name;
@@ -411,9 +409,7 @@ mrb_value mrb_sym2str(mrb_state *mrb, mrb_sym sym)
     return mrb_str_dump(mrb, str);
 }
 
-const char*
-mrb_sym2name(mrb_state *mrb, mrb_sym sym)
-{
+const char* mrb_sym2name(mrb_state *mrb, mrb_sym sym) {
     size_t len;
     const char *name = mrb_sym2name_len(mrb, sym, len);
 
@@ -427,48 +423,41 @@ mrb_sym2name(mrb_state *mrb, mrb_sym sym)
     }
 }
 
-#define lesser(a,b) (((a)>(b))?(b):(a))
-
-static mrb_value sym_cmp(mrb_state *mrb, mrb_value s1)
-{
+static mrb_value sym_cmp(mrb_state *mrb, mrb_value s1) {
     mrb_value s2;
-    mrb_sym sym1, sym2;
 
     mrb_get_args(mrb, "o", &s2);
     if (mrb_type(s2) != MRB_TT_SYMBOL)
         return mrb_nil_value();
-    sym1 = mrb_symbol(s1);
-    sym2 = mrb_symbol(s2);
-    if (sym1 == sym2) return mrb_fixnum_value(0);
-    else {
-        const char *p1, *p2;
-        int retval;
+    mrb_sym sym1 = mrb_symbol(s1);
+    mrb_sym sym2 = mrb_symbol(s2);
+    if (sym1 == sym2)
+        return mrb_fixnum_value(0);
         size_t len, len1, len2;
 
-        p1 = mrb_sym2name_len(mrb, sym1, len1);
-        p2 = mrb_sym2name_len(mrb, sym2, len2);
-        len = lesser(len1, len2);
-        retval = memcmp(p1, p2, len);
+    const char *p1 = mrb_sym2name_len(mrb, sym1, len1);
+    const char *p2 = mrb_sym2name_len(mrb, sym2, len2);
+    len = std::min(len1, len2);
+    int retval = memcmp(p1, p2, len);
         if (retval == 0) {
             if (len1 == len2) return mrb_fixnum_value(0);
             if (len1 > len2)  return mrb_fixnum_value(1);
             return mrb_fixnum_value(-1);
         }
-        if (retval > 0) return mrb_fixnum_value(1);
+    if (retval > 0)
+        return mrb_fixnum_value(1);
         return mrb_fixnum_value(-1);
-    }
 }
 
 void mrb_init_symbol(mrb_state *mrb)
 {
-    RClass *sym;
-
-    sym = mrb->symbol_class = mrb_define_class(mrb, "Symbol", mrb->object_class);
-    sym->define_method(mrb, "===",             sym_equal,               MRB_ARGS_REQ(1))            /* 15.2.11.3.1  */
-            .define_method(mrb, "id2name",         mrb_sym_to_s,            MRB_ARGS_NONE())        /* 15.2.11.3.2  */
-            .define_method(mrb, "to_s",            mrb_sym_to_s,            MRB_ARGS_NONE())        /* 15.2.11.3.3  */
-            .define_method(mrb, "to_sym",          sym_to_sym,              MRB_ARGS_NONE())        /* 15.2.11.3.4  */
-            .define_method(mrb, "inspect",         sym_inspect,             MRB_ARGS_NONE())        /* 15.2.11.3.5(x)  */
-            .define_method(mrb, "<=>",             sym_cmp,                 MRB_ARGS_REQ(1));
-    mrb->init_sym = mrb_intern(mrb, "initialize");
+    mrb->symbol_class = &mrb->define_class("Symbol", mrb->object_class)
+        .define_method("===",             sym_equal,               MRB_ARGS_REQ(1))            /* 15.2.11.3.1  */
+        .define_method("id2name",         mrb_sym_to_s,            MRB_ARGS_NONE())        /* 15.2.11.3.2  */
+        .define_method("to_s",            mrb_sym_to_s,            MRB_ARGS_NONE())        /* 15.2.11.3.3  */
+        .define_method("to_sym",          sym_to_sym,              MRB_ARGS_NONE())        /* 15.2.11.3.4  */
+        .define_method("inspect",         sym_inspect,             MRB_ARGS_NONE())        /* 15.2.11.3.5(x)  */
+        .define_method("<=>",             sym_cmp,                 MRB_ARGS_REQ(1))
+            ;
+    mrb->init_sym = mrb->intern_cstr("initialize");
 }

@@ -34,108 +34,51 @@ public:
     RClass & instance_tt(int tt) { flags = ((flags & ~0xff) | (char)tt); return *this;}
     //static RProc *method_search_vm(mrb_state *, RClass**, mrb_sym);
     static RProc* method_search_vm(mrb_state *mrb, RClass ** cp, mrb_sym mid);
-    static RClass * mrb_class(mrb_state *mrb, mrb_value &v) {
-        switch (mrb_type(v)) {
-            case MRB_TT_FALSE:
-                if (v.value.i)
-                    return mrb->false_class;
-                return mrb->nil_class;
-            case MRB_TT_TRUE:
-                return mrb->true_class;
-            case MRB_TT_SYMBOL:
-                return mrb->symbol_class;
-            case MRB_TT_FIXNUM:
-                return mrb->fixnum_class;
-            case MRB_TT_FLOAT:
-                return mrb->float_class;
-            default:
-                return mrb_obj_ptr(v)->c;
+    static RClass * mrb_class(mrb_state *mrb, mrb_value &v);
+    static const RClass * mrb_class(mrb_state *mrb, const mrb_value &v) {
+        return const_cast<const RClass *>(mrb_class(mrb,const_cast<mrb_value &>(v)));
         }
-    }
-    static const RClass * mrb_class(mrb_state *mrb, const mrb_value &v) { return const_cast<const RClass *>(mrb_class(mrb,const_cast<mrb_value &>(v))); }
-    RClass &define_class_method(mrb_state *mrb, const char *name, mrb_func_t func, mrb_aspec aspec) {
-        mrb_define_singleton_method(mrb, this, name, func, aspec);
+    RClass &define_class_method(const char *name, mrb_func_t func, mrb_aspec aspec) {
+        define_singleton_method(name, func, aspec);
         return *this;
     }
-    RClass &define_method(mrb_state *mrb, const char *name, mrb_func_t func, mrb_aspec aspec) {
-        define_method_id(mrb, mrb_intern(mrb, name), func, aspec);
+    RClass &define_method(const char *name, mrb_func_t func, mrb_aspec aspec) {
+        define_method_id(m_vm->intern_cstr(name),func, aspec);
         return *this;
     }
-    void define_method_vm(mrb_state *mrb, mrb_sym name, mrb_value body)
-    {
-        kh_mt *h = this->mt;
-        khiter_t k;
-        RProc *p;
-
-        if (!h)
-            this->mt = kh_mt::init(mrb);
-        k = this->mt->put(name);
-        p = mrb_proc_ptr(body);
-        this->mt->value(k) = p;
-        if (p) {
-            mrb->gc().mrb_field_write_barrier(this, p);
+    void define_method_vm(mrb_sym name, mrb_value body);
+    void define_method_id(mrb_sym mid, mrb_func_t func, mrb_aspec aspec);
+    RClass &define_method_raw(mrb_sym mid, RProc *p);
+    RClass &include_module(const char *name) {
+        return include_module(m_vm->class_get(name));
         }
-    }
-    void define_method_id(mrb_state *mrb, mrb_sym mid, mrb_func_t func, mrb_aspec aspec);
-    RClass &define_method_raw(mrb_state *mrb, mrb_sym mid, RProc *p)
+    RClass &include_module(RClass *m);
+    RClass &define_alias(const char *name1, const char *name2)
     {
-        kh_mt *h = this->mt;
-        khiter_t k;
-
-        if (!h)
-            this->mt = kh_mt::init(mrb);
-        k = this->mt->put(mid);
-        this->mt->value(k) = p;
-        if (p) {
-            mrb->gc().mrb_field_write_barrier(this, p);
-        }
+        alias_method(mrb_intern(m_vm, name1), mrb_intern(m_vm, name2));
         return *this;
     }
-    RClass &include_module(mrb_state *mrb, const char *name) {
-        return include_module(mrb, mrb->class_get("Enumerable"));
-    }
-    RClass &include_module(mrb_state *mrb, RClass *m);
-    RClass &define_alias(mrb_state *mrb, const char *name1, const char *name2)
+    void alias_method(mrb_sym a, mrb_sym b)
     {
-        alias_method(mrb, mrb_intern(mrb, name1), mrb_intern(mrb, name2));
-        return *this;
+        RProc *m = method_search(b);
+        define_method_vm(a, mrb_obj_value(m));
     }
-    void alias_method(mrb_state *mrb, mrb_sym a, mrb_sym b)
-    {
-        RProc *m = method_search(mrb, b);
-
-        define_method_vm(mrb, a, mrb_obj_value(m));
-    }
-    RProc* method_search(mrb_state *mrb, mrb_sym mid)
-    {
-        RProc *m;
-        RClass* found_in = this;
-        m = method_search_vm(mrb, &found_in, mid);
-        if (!m) {
-            mrb_value inspect = mrb_funcall(mrb, mrb_obj_value(found_in), "inspect", 0);
-            if (RSTRING_LEN(inspect) > 64) {
-                inspect = mrb_any_to_s(mrb, mrb_obj_value(found_in));
-            }
-            mrb_name_error(mrb, mid, "undefined method '%S' for class %S",
-                       mrb_sym2str(mrb, mid), inspect);
-        }
-        return m;
-    }
+    RProc* method_search(mrb_sym mid);
     void fin() const {} // used as a marker in all define_method/define_x sets.
 
 #undef FORWARD_TO_INSTANCE
-    RClass& undef_method(mrb_state *mrb, const char *name);
-    RClass& undef_method(mrb_state *mrb, mrb_sym a);
-    RClass& undef_class_method(mrb_state *mrb, const char *name);
-    mrb_value const_get(mrb_state * mrb, mrb_sym sym);
+    RClass& undef_method(const char *name);
+    RClass& undef_method(mrb_sym a);
+    RClass& undef_class_method(const char *name);
+    mrb_value const_get(mrb_sym sym);
     void mark_mt(MemManager &mm);
-    size_t mark_mt_size(mrb_state *mrb) const;
+    size_t mark_mt_size() const;
+    mrb_bool respond_to(mrb_sym mid) const;
+    mrb_value new_instance(int argc, mrb_value *argv);
+    void name_class(mrb_sym name);
 };
 
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
 RClass* mrb_define_class_id(mrb_state*, mrb_sym, RClass*);
 RClass* mrb_define_module_id(mrb_state*, mrb_sym);
 RClass *mrb_vm_define_class(mrb_state*, mrb_value, mrb_value, mrb_sym);
@@ -151,7 +94,4 @@ void mrb_obj_call_init(mrb_state *mrb, mrb_value obj, int argc, mrb_value *argv)
 
 void mrb_gc_free_mt(mrb_state*, struct RClass*);
 
-#if defined(__cplusplus)
-}  /* extern "C" { */
-#endif
 

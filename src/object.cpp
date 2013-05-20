@@ -13,7 +13,7 @@
 int
 mrb_obj_eq(mrb_state *mrb, mrb_value v1, mrb_value v2)
 {
-    if (mrb_type(v1) != mrb_type(v2)) return FALSE;
+    if (mrb_type(v1) != mrb_type(v2)) return false;
     switch (mrb_type(v1)) {
         case MRB_TT_TRUE:
             return 1;
@@ -44,10 +44,10 @@ mrb_equal(mrb_state *mrb, mrb_value obj1, mrb_value obj2)
 {
     mrb_value result;
 
-    if (mrb_obj_eq(mrb, obj1, obj2)) return TRUE;
+    if (mrb_obj_eq(mrb, obj1, obj2)) return true;
     result = mrb_funcall(mrb, obj1, "==", 1, obj2);
-    if (mrb_test(result)) return TRUE;
-    return FALSE;
+    if (mrb_test(result)) return true;
+    return false;
 }
 
 /*
@@ -268,31 +268,31 @@ void
 mrb_init_object(mrb_state *mrb)
 {
     mrb->nil_class = &mrb->define_class("NilClass",   mrb->object_class)
-            .undef_class_method(mrb, "new")
-            .define_method(mrb, "&",    false_and,      MRB_ARGS_REQ(1))  /* 15.2.4.3.1  */
-            .define_method(mrb, "^",    false_xor,      MRB_ARGS_REQ(1))  /* 15.2.4.3.2  */
-            .define_method(mrb, "|",    false_or,       MRB_ARGS_REQ(1))  /* 15.2.4.3.3  */
-            .define_method(mrb, "nil?", mrb_true,       MRB_ARGS_NONE())  /* 15.2.4.3.4  */
-            .define_method(mrb, "to_s", nil_to_s,       MRB_ARGS_NONE())  /* 15.2.4.3.5  */
-            .define_method(mrb, "inspect", nil_inspect, MRB_ARGS_NONE())
+            .undef_class_method("new")
+            .define_method("&",    false_and,      MRB_ARGS_REQ(1))  /* 15.2.4.3.1  */
+            .define_method("^",    false_xor,      MRB_ARGS_REQ(1))  /* 15.2.4.3.2  */
+            .define_method("|",    false_or,       MRB_ARGS_REQ(1))  /* 15.2.4.3.3  */
+            .define_method("nil?", mrb_true,       MRB_ARGS_NONE())  /* 15.2.4.3.4  */
+            .define_method("to_s", nil_to_s,       MRB_ARGS_NONE())  /* 15.2.4.3.5  */
+            .define_method("inspect", nil_inspect, MRB_ARGS_NONE())
             ;
 
     mrb->true_class = &mrb->define_class("TrueClass",  mrb->object_class)
-            .undef_class_method(mrb,"new")
-            .define_method(mrb, "&",    true_and,       MRB_ARGS_REQ(1))  /* 15.2.5.3.1  */
-            .define_method(mrb, "^",    true_xor,       MRB_ARGS_REQ(1))  /* 15.2.5.3.2  */
-            .define_method(mrb, "to_s", true_to_s,      MRB_ARGS_NONE())  /* 15.2.5.3.3  */
-            .define_method(mrb, "|",    true_or,        MRB_ARGS_REQ(1))  /* 15.2.5.3.4  */
-            .define_method(mrb, "inspect", true_to_s,   MRB_ARGS_NONE())
+            .undef_class_method("new")
+            .define_method("&",    true_and,       MRB_ARGS_REQ(1))  /* 15.2.5.3.1  */
+            .define_method("^",    true_xor,       MRB_ARGS_REQ(1))  /* 15.2.5.3.2  */
+            .define_method("to_s", true_to_s,      MRB_ARGS_NONE())  /* 15.2.5.3.3  */
+            .define_method("|",    true_or,        MRB_ARGS_REQ(1))  /* 15.2.5.3.4  */
+            .define_method("inspect", true_to_s,   MRB_ARGS_NONE())
             ;
 
     mrb->false_class = &mrb->define_class("FalseClass", mrb->object_class)
-            .undef_class_method(mrb, "new")
-            .define_method(mrb, "&",    false_and,      MRB_ARGS_REQ(1))  /* 15.2.6.3.1  */
-            .define_method(mrb, "^",    false_xor,      MRB_ARGS_REQ(1))  /* 15.2.6.3.2  */
-            .define_method(mrb, "to_s", false_to_s,     MRB_ARGS_NONE())  /* 15.2.6.3.3  */
-            .define_method(mrb, "|",    false_or,       MRB_ARGS_REQ(1))  /* 15.2.6.3.4  */
-            .define_method(mrb, "inspect", false_to_s,  MRB_ARGS_NONE())
+            .undef_class_method("new")
+            .define_method("&",    false_and,      MRB_ARGS_REQ(1))  /* 15.2.6.3.1  */
+            .define_method("^",    false_xor,      MRB_ARGS_REQ(1))  /* 15.2.6.3.2  */
+            .define_method("to_s", false_to_s,     MRB_ARGS_NONE())  /* 15.2.6.3.3  */
+            .define_method("|",    false_or,       MRB_ARGS_REQ(1))  /* 15.2.6.3.4  */
+            .define_method("inspect", false_to_s,  MRB_ARGS_NONE())
             ;
 }
 
@@ -312,7 +312,7 @@ mrb_value mrb_check_to_integer(mrb_state *mrb, mrb_value val, const char *method
 {
     if (mrb_type(val) == MRB_TT_FIXNUM)
         return val;
-    mrb_value v = convert_type(mrb, val, "Integer", method, FALSE);
+    mrb_value v = convert_type(mrb, val, "Integer", method, false);
     if (mrb_nil_p(v) || mrb_type(v) != MRB_TT_FIXNUM)
         return mrb_nil_value();
     return v;
@@ -479,10 +479,10 @@ mrb_obj_is_kind_of(mrb_state *mrb, mrb_value obj, RClass *c)
 
     while (cl) {
         if (cl == c || cl->mt == c->mt)
-            return TRUE;
+            return true;
         cl = cl->super;
     }
-    return FALSE;
+    return false;
 }
 
 static mrb_value
@@ -491,7 +491,7 @@ mrb_to_integer(mrb_state *mrb, mrb_value val, const char *method)
 
     if (mrb_fixnum_p(val))
         return val;
-    mrb_value v = convert_type(mrb, val, "Integer", method, TRUE);
+    mrb_value v = convert_type(mrb, val, "Integer", method, true);
     if (!mrb_obj_is_kind_of(mrb, v, mrb->fixnum_class)) {
         mrb_raisef(mrb, E_TYPE_ERROR, "can't convert %S to Integer (%S#%S gives %S)",
                    val, val, mrb_str_new_cstr(mrb, method), v);
@@ -528,7 +528,7 @@ mrb_convert_to_integer(mrb_state *mrb, mrb_value val, int base)
 
         case MRB_TT_STRING:
 string_conv:
-            return mrb_str_to_inum(mrb, val, base, TRUE);
+            return mrb_str_to_inum(mrb, val, base, true);
 
         default:
             break;
@@ -539,7 +539,7 @@ string_conv:
 arg_error:
         mrb_raise(mrb, E_ARGUMENT_ERROR, "base specified for non string value");
     }
-    tmp = convert_type(mrb, val, "Integer", "to_int", FALSE);
+    tmp = convert_type(mrb, val, "Integer", "to_int", false);
     if (mrb_nil_p(tmp)) {
         return mrb_to_integer(mrb, val, "to_i");
     }
@@ -566,7 +566,7 @@ mrb_Float(mrb_state *mrb, mrb_value val)
             return val;
 
         case MRB_TT_STRING:
-            return mrb_float_value(mrb_str_to_dbl(mrb, val, TRUE));
+            return mrb_float_value(mrb_str_to_dbl(mrb, val, true));
 
         default:
             return mrb_convert_type(mrb, val, MRB_TT_FLOAT, "Float", "to_f");
@@ -582,6 +582,55 @@ mrb_inspect(mrb_state *mrb, mrb_value obj)
 int
 mrb_eql(mrb_state *mrb, mrb_value obj1, mrb_value obj2)
 {
-    if (mrb_obj_eq(mrb, obj1, obj2)) return TRUE;
+    if (mrb_obj_eq(mrb, obj1, obj2)) return true;
     return mrb_test(mrb_funcall(mrb, obj1, "eql?", 1, obj2));
+}
+mrb_value mrb_value::check_type(mrb_state *mrb, mrb_vtype t, const char *c, const char *m) const {
+    mrb_value tmp;
+
+    tmp = mrb_check_convert_type(mrb, *this, t, c, m);
+    if (mrb_nil_p(tmp)) {
+        mrb_raisef(mrb, E_TYPE_ERROR, "expected %S", mrb_str_new_cstr(mrb, c));
+    }
+    return tmp;
+}
+
+void mrb_state::get_arg(const mrb_value &arg,mrb_int &tgt) {
+    switch (mrb_type(arg)) {
+        case MRB_TT_FIXNUM:
+            tgt = mrb_fixnum(arg);
+            break;
+        case MRB_TT_FLOAT:
+        {
+            mrb_float f = mrb_float(arg);
+
+            if (!FIXABLE(f)) {
+                mrb_raise(I_RANGE_ERROR, "float too big for int");
+            }
+            tgt = (mrb_int)f;
+        }
+            break;
+        case MRB_TT_FALSE:
+            tgt = 0;
+            break;
+        default:
+        {
+            mrb_value tmp;
+            tmp = mrb_convert_type(this, arg, MRB_TT_FIXNUM, "Integer", "to_int");
+            tgt = mrb_fixnum(tmp);
+        }
+            break;
+    }
+}
+void mrb_state::get_arg(const mrb_value &arg, mrb_sym &tgt) {
+
+    if (mrb_type(arg) == MRB_TT_SYMBOL) {
+        tgt = mrb_symbol(arg);
+    }
+    else if (mrb_string_p(arg)) {
+        tgt = mrb_intern_str(this, arg.to_str(this));
+    }
+    else {
+        mrb_raisef(this, I_TYPE_ERROR, "%S is not a symbol", mrb_funcall(this, arg, "inspect", 0));
+    }
 }
