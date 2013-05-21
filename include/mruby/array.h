@@ -28,14 +28,17 @@ struct RArray : public RBasic {
         mrb_int capa;
         mrb_shared_array *shared;
     } m_aux;
+        //TODO: semantics of this field change depending on the shared flag
+        // When not shared this is a pointer to base data
+        // when shared it's an 'iterator'-like element over shared->ptr
     mrb_value *m_ptr;
 public:
 static  RArray *    create(mrb_state *mrb, size_t capa=0) {return ary_new_capa(mrb,capa);}
-    static mrb_value new_capa(mrb_state *mrb, mrb_int capa);
-    static mrb_value s_create(mrb_state *mrb, mrb_value self);
-    static mrb_value new_from_values(mrb_state *mrb, mrb_int size, const mrb_value *vals);
+static  mrb_value   new_capa(mrb_state *mrb, mrb_int capa);
+static  mrb_value   s_create(mrb_state *mrb, mrb_value self);
+static  mrb_value   new_from_values(mrb_state *mrb, mrb_int size, const mrb_value *vals);
 static  mrb_value   new_from_values(mrb_state *mrb, const std::vector<mrb_value> &values);
-    static mrb_value splat(mrb_state *mrb, mrb_value v);
+static  mrb_value   splat(mrb_state *mrb, const mrb_value &v);
 
         void        replace(const mrb_value &other);
         void        replace_m();
@@ -49,7 +52,7 @@ static  mrb_value   new_from_values(mrb_state *mrb, const std::vector<mrb_value>
         mrb_value   aset();
         mrb_value   shift();
         mrb_value   plus() const;
-        void        push(mrb_value elem);
+        void        push(const mrb_value &elem);
         void        push_m();
         mrb_value   pop();
         mrb_value   first();
@@ -68,7 +71,7 @@ static  mrb_value   new_from_values(mrb_state *mrb, const std::vector<mrb_value>
         mrb_value   entry(mrb_int offset);
         mrb_value   mrb_ary_equal();
         mrb_value   mrb_ary_eql();
-        mrb_value   empty_p();
+        mrb_value   empty_p() const;
         mrb_value   inspect();
         void        splice(mrb_int head, mrb_int len, const mrb_value &rpl);
 protected:
@@ -94,6 +97,6 @@ static  RArray *    ary_new_capa(mrb_state *mrb, size_t capa);
 
 void mrb_ary_decref(mrb_state*, mrb_shared_array*);
 mrb_value mrb_ary_new(mrb_state *mrb);
-mrb_value mrb_check_array_type(mrb_state *mrb, mrb_value self);
+mrb_value mrb_check_array_type(mrb_state *mrb, const mrb_value &self);
 mrb_value mrb_assoc_new(mrb_state *mrb, const mrb_value &car, const mrb_value &cdr);
 

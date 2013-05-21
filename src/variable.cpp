@@ -268,17 +268,16 @@ protected:
 public:
     iv_tbl() {
     }
-    void iv_put(mrb_state *mrb, mrb_sym sym, mrb_value val)
+    void iv_put(mrb_sym sym, const mrb_value &val)
     {
         khiter_t k = h->put(sym);
         h->value(k) = val;
     }
-    mrb_bool iv_get(mrb_sym sym, mrb_value *vp)
+    mrb_bool iv_get(mrb_sym sym, mrb_value &vp)
     {
         khiter_t k = h->get(sym);
         if (k != h->end() ) {
-            if (vp)
-                *vp = h->value(k);
+            vp = h->value(k);
             return true;
         }
         return false;
@@ -291,7 +290,7 @@ public:
         }
         return false;
     }
-    mrb_bool iv_del(mrb_state *mrb, mrb_sym sym, mrb_value *vp)
+    mrb_bool iv_del(mrb_sym sym, mrb_value *vp)
     {
         if(!h)
             return false;
@@ -424,12 +423,12 @@ mrb_value RObject::iv_get(mrb_sym sym)
 {
     mrb_value v;
 
-    if (this->iv && this->iv->iv_get(sym, &v))
+    if (this->iv && this->iv->iv_get(sym, v))
         return v;
     return mrb_nil_value();
 }
 
-mrb_value mrb_iv_get(mrb_state *mrb, mrb_value obj, mrb_sym sym)
+mrb_value mrb_iv_get(const mrb_value &obj, mrb_sym sym)
 {
     if (obj_iv_p(obj)) {
         return mrb_obj_ptr(obj)->iv_get(sym);
@@ -437,13 +436,13 @@ mrb_value mrb_iv_get(mrb_state *mrb, mrb_value obj, mrb_sym sym)
     return mrb_nil_value();
 }
 
-void RObject::iv_set(mrb_sym sym, mrb_value v)
+void RObject::iv_set(mrb_sym sym, const mrb_value &v)
 {
     if (!iv) {
         iv = iv_tbl::iv_new(m_vm);
     }
     m_vm->gc().mrb_write_barrier(this);
-    iv->iv_put(m_vm, sym, v);
+    iv->iv_put(sym, v);
 }
 
 void mrb_obj_iv_ifnone(mrb_state *mrb, RObject *obj, mrb_sym sym, mrb_value v)
@@ -453,20 +452,20 @@ void mrb_obj_iv_ifnone(mrb_state *mrb, RObject *obj, mrb_sym sym, mrb_value v)
     if (!t) {
         t = obj->iv = iv_tbl::iv_new(mrb);
     }
-    else if (t->iv_get(sym, &v)) {
+    else if (t->iv_get(sym, v)) {
         return;
     }
     mrb->gc().mrb_write_barrier(obj);
-    t->iv_put(mrb, sym, v);
+    t->iv_put(sym, v);
 }
 
-void mrb_iv_set(mrb_state *mrb, mrb_value obj, mrb_sym sym, mrb_value v)
+void mrb_iv_set(mrb_state *mrb, mrb_value obj, mrb_sym sym, const mrb_value &v)
 {
     if (obj_iv_p(obj)) {
         mrb_obj_ptr(obj)->iv_set(sym, v);
     }
     else {
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "cannot set instance variable");
+        mrb->mrb_raise(E_ARGUMENT_ERROR, "cannot set instance variable");
     }
 }
 
@@ -530,7 +529,7 @@ mrb_value mrb_obj_iv_inspect(mrb_state *mrb, struct RObject *obj)
         const char *cn = mrb_obj_classname(mrb, mrb_obj_value(obj));
         mrb_value str = mrb_str_buf_new(mrb, 30);
 
-        mrb_str_buf_cat(mrb, str, "-<", 2);
+        mrb_str_buf_cat(str, "-<", 2);
         mrb_str_cat2(mrb, str, cn);
         mrb_str_cat(mrb, str, ":", 1);
         mrb_str_concat(mrb, str, mrb_ptr_to_str(mrb, obj));
@@ -542,28 +541,27 @@ mrb_value mrb_obj_iv_inspect(mrb_state *mrb, struct RObject *obj)
     return mrb_any_to_s(mrb, mrb_obj_value(obj));
 }
 
-mrb_value mrb_iv_remove(mrb_state *mrb, mrb_value obj, mrb_sym sym)
+mrb_value mrb_iv_remove(mrb_value obj, mrb_sym sym)
 {
     if (obj_iv_p(obj)) {
         iv_tbl *t = mrb_obj_ptr(obj)->iv;
         mrb_value val;
 
-        if (t && t->iv_del(mrb, sym, &val)) {
+        if (t && t->iv_del(sym, &val)) {
             return val;
         }
     }
     return mrb_undef_value();
 }
 
-mrb_value
-mrb_vm_iv_get(mrb_state *mrb, mrb_sym sym)
+mrb_value mrb_vm_iv_get(mrb_state *mrb, mrb_sym sym)
 {
     /* get self */
-    return mrb_iv_get(mrb, mrb->m_ctx->m_stack[0], sym);
+    return mrb_iv_get(mrb->m_ctx->m_stack[0], sym);
 }
 
 void
-mrb_vm_iv_set(mrb_state *mrb, mrb_sym sym, mrb_value v)
+mrb_vm_iv_set(mrb_state *mrb, mrb_sym sym, const mrb_value &v)
 {
     /* get self */
     mrb_iv_set(mrb, mrb->m_ctx->m_stack[0], sym, v);
@@ -661,7 +659,7 @@ mrb_value mrb_mod_cv_get(mrb_state *mrb, RClass * c, mrb_sym sym)
             iv_tbl *t = c->iv;
             mrb_value v;
 
-            if (t->iv_get(sym, &v))
+            if (t->iv_get(sym, v))
                 return v;
         }
         c = c->super;
@@ -686,7 +684,7 @@ void mrb_mod_cv_set(mrb_state *mrb, struct RClass * c, mrb_sym sym, mrb_value v)
 
             if (t->iv_get(sym)) {
                 mrb->gc().mrb_write_barrier(c);
-                t->iv_put(mrb, sym, v);
+                t->iv_put(sym, v);
                 return;
             }
         }
@@ -698,7 +696,7 @@ void mrb_mod_cv_set(mrb_state *mrb, struct RClass * c, mrb_sym sym, mrb_value v)
     }
 
     mrb->gc().mrb_write_barrier(cls);
-    cls->iv->iv_put(mrb, sym, v);
+    cls->iv->iv_put(sym, v);
 }
 
 void mrb_cv_set(mrb_state *mrb, mrb_value mod, mrb_sym sym, mrb_value v)
@@ -747,7 +745,7 @@ mrb_vm_cv_set(mrb_state *mrb, mrb_sym sym, mrb_value v)
 
             if (t->iv_get(sym)) {
                 mrb->gc().mrb_write_barrier(c);
-                t->iv_put(mrb, sym, v);
+                t->iv_put(sym, v);
                 return;
             }
         }
@@ -758,7 +756,7 @@ mrb_vm_cv_set(mrb_state *mrb, mrb_sym sym, mrb_value v)
         c->iv = iv_tbl::iv_new(mrb);
     }
     mrb->gc().mrb_write_barrier(c);
-    c->iv->iv_put(mrb, sym, v);
+    c->iv->iv_put(sym, v);
 }
 
 mrb_bool mrb_const_defined(mrb_state *mrb, const mrb_value &mod, mrb_sym sym)
@@ -779,7 +777,7 @@ mod_const_check(mrb_state *mrb, const mrb_value &mod)
         case MRB_TT_SCLASS:
             break;
         default:
-            mrb_raise(mrb, E_TYPE_ERROR, "constant look-up for non class/module");
+            mrb->mrb_raise(E_TYPE_ERROR, "constant look-up for non class/module");
             break;
     }
 }
@@ -796,7 +794,7 @@ L_RETRY:
     while (c) {
         if (c->iv) {
             t = c->iv;
-            if (t->iv_get(sym, &v))
+            if (t->iv_get(sym, v))
                 return v;
         }
         c = c->super;
@@ -841,7 +839,7 @@ mrb_value mrb_vm_const_get(mrb_state *mrb, mrb_sym sym)
         RClass *c2 = c;
         mrb_value v;
 
-        if (c->iv && c->iv->iv_get(sym, &v)) {
+        if (c->iv && c->iv->iv_get(sym, v)) {
             return v;
         }
         c2 = c;
@@ -849,7 +847,7 @@ mrb_value mrb_vm_const_get(mrb_state *mrb, mrb_sym sym)
             c2 = mrb_class_outer_module(mrb, c2);
             if (!c2)
                 break;
-            if (c2->iv && c2->iv->iv_get(sym, &v)) {
+            if (c2->iv && c2->iv->iv_get(sym, v)) {
                 return v;
             }
         }
@@ -876,17 +874,17 @@ void mrb_vm_const_set(mrb_state *mrb, mrb_sym sym, mrb_value v)
 void mrb_const_remove(mrb_state *mrb, mrb_value mod, mrb_sym sym)
 {
     mod_const_check(mrb, mod);
-    mrb_iv_remove(mrb, mod, sym);
+    mrb_iv_remove(mod, sym);
 }
 
-void mrb_define_const(mrb_state *mrb, RClass *mod, const char *name, mrb_value v)
+void RClass::define_const(const char *name, mrb_value v)
 {
-    mod->iv_set(mrb->intern_cstr(name), v);
+    iv_set(m_vm->intern_cstr(name), v);
 }
 
 void mrb_define_global_const(mrb_state *mrb, const char *name, mrb_value val)
 {
-    mrb_define_const(mrb, mrb->object_class, name, val);
+    mrb->object_class->define_const(name, val);
 }
 static int const_i(mrb_sym sym, mrb_value v, void *p)
 {
@@ -927,7 +925,7 @@ mrb_value mrb_gv_get(mrb_state *mrb, mrb_sym sym)
     if (!mrb->globals) {
         return mrb_nil_value();
     }
-    if (mrb->globals->iv_get(sym, &v))
+    if (mrb->globals->iv_get(sym, v))
         return v;
     return mrb_nil_value();
 }
@@ -937,7 +935,7 @@ void mrb_gv_set(mrb_state *mrb, mrb_sym sym, mrb_value v)
     if (!mrb->globals)
         mrb->globals = iv_tbl::iv_new(mrb);
 
-    mrb->globals->iv_put(mrb, sym, v);
+    mrb->globals->iv_put(sym, v);
 }
 
 static int gv_i_arr(mrb_sym sym, mrb_value v, void *p)
@@ -1003,9 +1001,9 @@ int mrb_const_defined_at(RClass *klass, mrb_sym id)
     return mrb_const_defined_0(klass, id, true, false);
 }
 
-mrb_value mrb_attr_get(mrb_state *mrb, mrb_value obj, mrb_sym id)
+mrb_value mrb_attr_get(mrb_value obj, mrb_sym id)
 {
-    return mrb_iv_get(mrb, obj, id);
+    return mrb_iv_get(obj, id);
 }
 
 static int csym_i(mrb_sym sym, mrb_value v, void *p)

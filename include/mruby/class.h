@@ -76,6 +76,7 @@ public:
     mrb_bool respond_to(mrb_sym mid) const;
     mrb_value new_instance(int argc, mrb_value *argv);
     void name_class(mrb_sym name);
+    void define_const(const char *name, mrb_value v);
 };
 
 

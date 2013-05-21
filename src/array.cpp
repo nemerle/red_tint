@@ -27,7 +27,7 @@ RArray* RArray::ary_new_capa(mrb_state *mrb, size_t capa)
 
     // check for size_t wrap-around blen < capa -> wrap around occured.
     if ( (capa > ARY_MAX_SIZE) || (blen < capa) ) {
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "array size too big");
+        mrb_raise(E_ARGUMENT_ERROR, "array size too big");
     }
 
     RArray *a = mrb->gc().obj_alloc<RArray>(mrb->array_class);
@@ -125,10 +125,11 @@ void RArray::ary_make_shared()
 
 void RArray::ary_expand_capa(mrb_state *mrb, size_t _len)
 {
+    assert((flags&MRB_ARY_SHARED)==0); // will not work if in shared mode
     mrb_int capa = m_aux.capa;
 
     if (_len > ARY_MAX_SIZE) {
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "array size too big");
+        mrb_raise(E_ARGUMENT_ERROR, "array size too big");
     }
 
     while(capa < _len) {
@@ -147,7 +148,7 @@ void RArray::ary_expand_capa(mrb_state *mrb, size_t _len)
         mrb_value *expanded_ptr = (mrb_value *)mrb->gc()._realloc(m_ptr, sizeof(mrb_value)*capa);
 
         if(!expanded_ptr) {
-            mrb_raise(mrb, E_RUNTIME_ERROR, "out of memory");
+            mrb_raise(E_RUNTIME_ERROR, "out of memory");
         }
 
         m_aux.capa = capa;
@@ -157,6 +158,7 @@ void RArray::ary_expand_capa(mrb_state *mrb, size_t _len)
 
 void RArray::ary_shrink_capa()
 {
+    assert((flags&MRB_ARY_SHARED)==0); // will not work if in shared mode
     mrb_int capa = m_aux.capa;
 
     if (capa < ARY_DEFAULT_LEN * 2)
@@ -221,6 +223,7 @@ mrb_value RArray::plus() const
     mrb_get_args(m_vm, "a", &ptr, &blen);
     mrb_value ary = RArray::new_capa(m_vm, m_len + blen);
     RArray *a2 = mrb_ary_ptr(ary);
+    assert(a2->m_ptr && m_ptr && ptr);
     array_copy(a2->m_ptr, m_ptr, m_len);
     array_copy(a2->m_ptr + m_len, ptr, blen);
     a2->m_len = m_len + blen;
@@ -341,6 +344,7 @@ mrb_value RArray::reverse()
     mrb_value ary(RArray::new_capa(m_vm, m_len));
     if (m_len <= 0)
         return ary;
+    assert(m_ptr);
     RArray *b = mrb_ary_ptr(ary);
     mrb_value * p1  = m_ptr;
     mrb_value * e   = p1 + m_len;
@@ -372,7 +376,7 @@ mrb_value RArray::new_from_values(mrb_state *mrb, const std::vector<mrb_value> &
     return ary;
 }
 
-void RArray::push(mrb_value elem) /* mrb_ary_push */
+void RArray::push(const mrb_value &elem) /* mrb_ary_push */
 {
     ary_modify();
     if (m_len == m_aux.capa)
@@ -397,6 +401,7 @@ mrb_value RArray::pop()
 {
     if (m_len == 0)
         return mrb_nil_value();
+    assert(m_ptr!=0);
     return m_ptr[--m_len];
 }
 
@@ -404,20 +409,19 @@ mrb_value RArray::pop()
 
 mrb_value RArray::shift()
 {
-    mrb_value val;
 
     if (m_len == 0)
         return mrb_nil_value();
+    assert(m_ptr);
     if (this->flags & MRB_ARY_SHARED) {
-        val = m_ptr[0];
+        mrb_value val = m_ptr[0];
         m_ptr++;
         m_len--;
         return val;
     }
     if (m_len > ARY_SHIFT_SHARED_MIN) {
         this->ary_make_shared();
-        //goto L_SHIFT;
-        val = m_ptr[0];
+        mrb_value val = m_ptr[0];
         m_ptr++;
         m_len--;
         return val;
@@ -425,7 +429,7 @@ mrb_value RArray::shift()
     mrb_value *ptr = m_ptr;
     mrb_int size = m_len;
 
-    val = *ptr;
+    mrb_value val = *ptr;
     while((int)(--size)) {
         *ptr = *(ptr+1);
         ++ptr;
@@ -497,7 +501,7 @@ void RArray::set(mrb_int n, const mrb_value &val) /* rb_ary_store */
     if (n < 0) {
         n += m_len;
         if (n < 0) {
-            mrb_raisef(m_vm, A_INDEX_ERROR(m_vm), "index %S out of array", mrb_fixnum_value(n - m_len));
+            m_vm->mrb_raisef(A_INDEX_ERROR(m_vm), "index %S out of array", mrb_fixnum_value(n - m_len));
         }
     }
     if (m_len <= (int)n) {
@@ -704,10 +708,11 @@ mrb_value RArray::last()
     }
     if (_size > m_len)
         _size = m_len;
-    if ((this->flags & MRB_ARY_SHARED) || _size > ARY_DEFAULT_LEN) {
+    if ((this->flags & MRB_ARY_SHARED) || (_size > ARY_DEFAULT_LEN)) {
         return ary_subseq(m_len - _size, _size);
     }
-    return RArray::new_from_values(m_vm, _size, m_ptr + m_len - _size);
+    assert((_size>=0) && _size <= ARY_DEFAULT_LEN);
+    return RArray::new_from_values(m_vm, _size, m_ptr + (m_len - _size));
 }
 
 mrb_value RArray::index_m()
@@ -732,12 +737,16 @@ mrb_value RArray::rindex_m()
     return mrb_nil_value();
 }
 
-mrb_value RArray::splat(mrb_state *mrb, mrb_value v)
+mrb_value RArray::splat(mrb_state *mrb, const mrb_value &v)
 {
     if (mrb_array_p(v)) {
         return v;
     }
-    return RArray::new_from_values(mrb, 1, &v);
+    mrb_value ary = RArray::new_capa(mrb, 1);
+    RArray *a = mrb_ary_ptr(ary);
+    a->m_ptr[a->m_len++] = v;
+    return ary;
+//    return RArray::new_from_values(mrb, 1, &v);
 }
 
 mrb_value RArray::size()
@@ -754,12 +763,12 @@ void RArray::clear()
     m_ptr = 0;
 }
 
-mrb_value RArray::empty_p()
+mrb_value RArray::empty_p() const
 {
     return mrb_bool_value(m_len == 0);
 }
 
-mrb_value mrb_check_array_type(mrb_state *mrb, mrb_value ary)
+mrb_value mrb_check_array_type(mrb_state *mrb, const mrb_value &ary)
 {
     return mrb_check_convert_type(mrb, ary, MRB_TT_ARRAY, "Array", "to_ary");
 }
@@ -791,26 +800,29 @@ mrb_value RArray::inspect_ary(RArray *list_arr)
     mrb_value t = {{(void *)this},MRB_TT_ARRAY};
 
     list_arr->push(t);
+    RString *strr = RString::create(m_vm,64);
+    arystr = mrb_obj_value(strr);
 
-    arystr = mrb_str_buf_new(m_vm, 64);
-    mrb_str_buf_cat(m_vm, arystr, head, sizeof(head));
+    //mrb_str_buf_cat(m_vm, arystr, head, sizeof(head));
+    strr->str_cat(head,sizeof(head));
 
     for(i=0; i<m_len; i++) {
         int ai = m_vm->gc().arena_save();
 
         if (i > 0) {
-            mrb_str_buf_cat(m_vm, arystr, sep, sizeof(sep));
+            strr->str_cat(sep, sizeof(sep));
+            //mrb_str_buf_cat(m_vm, arystr, sep, sizeof(sep));
         }
         if (mrb_array_p(m_ptr[i])) {
             s = RARRAY(m_ptr[i])->inspect_ary(list_arr);
         } else {
             s = mrb_inspect(m_vm, m_ptr[i]);
         }
-        mrb_str_buf_cat(m_vm, arystr, RSTRING_PTR(s), RSTRING_LEN(s));
+        strr->str_cat(RSTRING_PTR(s), RSTRING_LEN(s));
         m_vm->gc().arena_restore(ai);
     }
 
-    mrb_str_buf_cat(m_vm, arystr, tail, sizeof(tail));
+    mrb_str_buf_cat(arystr, tail, sizeof(tail));
     list_arr->pop();
 
     return arystr;
@@ -849,7 +861,7 @@ mrb_value RArray::join_ary(const mrb_value &sep, RArray *list_arr)
 
     for(mrb_int i=0; i<m_len; i++) {
         if (i > 0 && !mrb_nil_p(sep)) {
-            mrb_str_buf_cat(m_vm, result, RSTRING_PTR(sep), RSTRING_LEN(sep));
+            mrb_str_buf_cat(result, RSTRING_PTR(sep), RSTRING_LEN(sep));
         }
 
         mrb_value val = m_ptr[i];
@@ -859,24 +871,24 @@ mrb_value RArray::join_ary(const mrb_value &sep, RArray *list_arr)
                 /* fall through */
 
             case MRB_TT_STRING:
-                mrb_str_buf_cat(m_vm, result, RSTRING_PTR(val), RSTRING_LEN(val));
+                mrb_str_buf_cat(result, RSTRING_PTR(val), RSTRING_LEN(val));
                 break;
 
             default:
                 tmp = mrb_check_string_type(m_vm, val);
                 if (!mrb_nil_p(tmp)) {
                     val = tmp;
-                    mrb_str_buf_cat(m_vm, result, RSTRING_PTR(tmp), RSTRING_LEN(tmp));
+                    mrb_str_buf_cat(result, RSTRING_PTR(tmp), RSTRING_LEN(tmp));
                     break;
                 }
                 tmp = mrb_check_convert_type(m_vm, val, MRB_TT_ARRAY, "Array", "to_ary");
                 if (!mrb_nil_p(tmp)) {
                     val = RARRAY(tmp)->join_ary(sep, list_arr);
-                    mrb_str_buf_cat(m_vm, result, RSTRING_PTR(val), RSTRING_LEN(val));
+                    mrb_str_buf_cat(result, RSTRING_PTR(val), RSTRING_LEN(val));
                     break;
                 }
                 val = mrb_obj_as_string(m_vm, val);
-                mrb_str_buf_cat(m_vm, result, RSTRING_PTR(val), RSTRING_LEN(val));
+                mrb_str_buf_cat(result, RSTRING_PTR(val), RSTRING_LEN(val));
                 break;
         }
     }

@@ -584,7 +584,7 @@ int codegen_scope::new_lit(mrb_value val)
     case MRB_TT_FLOAT:
     default:
         for (i=0; i<m_irep->plen; i++) {
-            if (mrb_obj_equal(m_mrb, m_irep->m_pool[i], val))
+            if (mrb_obj_equal(m_irep->m_pool[i], val))
                 return i;
         }
         break;
@@ -1262,7 +1262,7 @@ void codegen_scope::visit(NthRefNode *n) {
     mrb_value fix = mrb_fixnum_value(n->m_ref);
     mrb_value str = mrb_str_buf_new(mrb, 4);
 
-    mrb_str_buf_cat(mrb, str, "$", 1);
+    mrb_str_buf_cat(str, "$", 1);
     mrb_str_buf_append(mrb, str, mrb_fixnum_to_str(mrb, fix, 10));
     int sym = new_sym( mrb_intern_str(mrb, str));
     genop( MKOP_ABx(OP_GETGLOBAL, m_sp, sym));

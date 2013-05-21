@@ -164,7 +164,7 @@ void* MemManager::_realloc(void *p, size_t len)
         }
         else {
             out_of_memory = true;
-            mrb_raise(m_vm, A_RUNTIME_ERROR(m_vm), "Out of memory");
+            m_vm->mrb_raise(A_RUNTIME_ERROR(m_vm), "Out of memory");
         }
     }
     else {
@@ -311,7 +311,7 @@ void MemManager::gc_protect(RBasic *p)
     if (this->arena_idx >= MRB_ARENA_SIZE) {
         /* arena overflow error */
         this->arena_idx = MRB_ARENA_SIZE - 4; /* force room in arena */
-        mrb_raise(m_vm, A_RUNTIME_ERROR(m_vm), "arena overflow error");
+        m_vm->mrb_raise(A_RUNTIME_ERROR(m_vm), "arena overflow error");
     }
     m_arena[this->arena_idx++] = p;
 }

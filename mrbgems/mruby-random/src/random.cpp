@@ -30,11 +30,11 @@ static mt_state *mrb_mt_get_context(mrb_state *mrb,  mrb_value self)
     mt_state *t;
     mrb_value context;
 
-    context = mrb_iv_get(mrb, self, mrb_intern(mrb, MT_STATE_KEY));
+    context = mrb_iv_get(self, mrb_intern(mrb, MT_STATE_KEY));
 
     t = (mt_state *)mrb_data_get_ptr(mrb, context, &mt_state_type);
     if (!t)
-        mrb_raise(mrb, E_RUNTIME_ERROR, "mt_state get from mrb_iv_get failed");
+        mrb->mrb_raise(E_RUNTIME_ERROR, "mt_state get from mrb_iv_get failed");
 
     return t;
 }
@@ -130,7 +130,7 @@ static mrb_value get_opt(mrb_state* mrb)
 
     if (!mrb_nil_p(arg)) {
         if (!mrb_fixnum_p(arg)) {
-            mrb_raise(mrb, E_ARGUMENT_ERROR, "invalid argument type");
+            mrb->mrb_raise(E_ARGUMENT_ERROR, "invalid argument type");
         }
         arg = mrb_check_convert_type(mrb, arg, MRB_TT_FIXNUM, "Fixnum", "to_int");
         if (mrb_fixnum(arg) < 0) {
@@ -188,7 +188,7 @@ static mrb_value mrb_random_rand(mrb_state *mrb, mrb_value self)
     mt_state *t = mrb_mt_get_context(mrb, self);
 
     max = get_opt(mrb);
-    seed = mrb_iv_get(mrb, self, mrb_intern(mrb, INSTANCE_RAND_SEED_KEY));
+    seed = mrb_iv_get(self, mrb_intern(mrb, INSTANCE_RAND_SEED_KEY));
     if (mrb_nil_p(seed)) {
         mrb_random_mt_srand(mrb, t, mrb_nil_value());
     }
@@ -203,7 +203,7 @@ static mrb_value mrb_random_srand(mrb_state *mrb, mrb_value self)
 
     seed = get_opt(mrb);
     seed = mrb_random_mt_srand(mrb, t, seed);
-    old_seed = mrb_iv_get(mrb, self, mrb_intern(mrb, INSTANCE_RAND_SEED_KEY));
+    old_seed = mrb_iv_get(self, mrb_intern(mrb, INSTANCE_RAND_SEED_KEY));
     mrb_iv_set(mrb, self, mrb_intern(mrb, INSTANCE_RAND_SEED_KEY), seed);
     return old_seed;
 }

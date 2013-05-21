@@ -201,7 +201,7 @@ typedef mrb_value (*mrb_func_t)(mrb_state *mrb, mrb_value);
 struct RObject : public RBasic {
     struct iv_tbl *iv;
 public:
-    void iv_set(mrb_sym sym, mrb_value v);
+    void iv_set(mrb_sym sym, const mrb_value &v);
     mrb_value iv_get(mrb_sym sym);
     void define_singleton_method(const char *name, mrb_func_t func, mrb_aspec aspec);
 };

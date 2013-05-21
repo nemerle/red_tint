@@ -346,7 +346,7 @@ static void
 irep_error(mrb_state *mrb, int n)
 {
     static const char msg[] = "irep load error";
-    mrb->m_exc = mrb_obj_ptr(mrb_exc_new(mrb, E_SCRIPT_ERROR, msg, sizeof(msg) - 1));
+    mrb->m_exc = mrb_obj_ptr(mrb_exc_new(E_SCRIPT_ERROR, msg, sizeof(msg) - 1));
 }
 
 mrb_value

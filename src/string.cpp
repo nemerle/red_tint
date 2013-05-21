@@ -116,7 +116,7 @@ str_mod_check(mrb_state *mrb, mrb_value str, char *p, mrb_int len)
     RString *s = mrb_str_ptr(str);
 
     if (s->ptr != p || s->len != len) {
-        mrb_raise(mrb, E_RUNTIME_ERROR, "string modified");
+        mrb->mrb_raise(E_RUNTIME_ERROR, "string modified");
     }
 }
 
@@ -129,10 +129,9 @@ mrb_str_offset(mrb_state *mrb, mrb_value str, int pos)
     return pos;
 }
 
-static RString*
-str_new(mrb_state *mrb, const char *p, mrb_int len)
+RString* RString::create(mrb_state *mrb, const char *p, mrb_int len)
 {
-    RString *s = mrb_obj_alloc_string(mrb);
+    RString *s = mrb->gc().obj_alloc<RString>(mrb->string_class);
     s->len = len;
     s->aux.capa = len;
     s->ptr = (char *)mrb->gc()._malloc(len+1);
@@ -143,8 +142,7 @@ str_new(mrb_state *mrb, const char *p, mrb_int len)
     return s;
 }
 
-void
-str_with_class(mrb_state *mrb, RString *s, mrb_value obj)
+void str_with_class(RString *s, mrb_value obj)
 {
     s->c = mrb_str_ptr(obj)->c;
 }
@@ -152,49 +150,33 @@ str_with_class(mrb_state *mrb, RString *s, mrb_value obj)
 static mrb_value
 mrb_str_new_empty(mrb_state *mrb, mrb_value str)
 {
-    RString *s = str_new(mrb, 0, 0);
+    RString *s = RString::create(mrb, 0, 0);
 
-    str_with_class(mrb, s, str);
+    str_with_class(s, str);
     return mrb_obj_value(s);
 }
 
-#ifndef MRB_STR_BUF_MIN_SIZE
-# define MRB_STR_BUF_MIN_SIZE 128
-#endif
-
-mrb_value
-mrb_str_buf_new(mrb_state *mrb, mrb_int capa)
+mrb_value mrb_str_buf_new(mrb_state *mrb, mrb_int capa)
 {
-    RString *s = mrb_obj_alloc_string(mrb);
-
-    if (capa < MRB_STR_BUF_MIN_SIZE) {
-        capa = MRB_STR_BUF_MIN_SIZE;
-    }
-    s->len = 0;
-    s->aux.capa = capa;
-    s->ptr = (char *)mrb->gc()._malloc(capa+1);
-    s->ptr[0] = '\0';
-
-    return mrb_obj_value(s);
+    return mrb_obj_value(RString::create(mrb,capa));
 }
 
-static void
-str_buf_cat(mrb_state *mrb, RString *s, const char *ptr, size_t len)
+void RString::str_buf_cat(const char *_ptr, size_t len)
 {
     mrb_int capa;
     mrb_int total;
     ptrdiff_t off = -1;
 
-    str_modify(mrb, s);
-    if (ptr >= s->ptr && ptr <= s->ptr + s->len) {
-        off = ptr - s->ptr;
+    str_modify(m_vm, this);
+    if (_ptr >= this->ptr && _ptr <= this->ptr + this->len) {
+        off = _ptr - this->ptr;
     }
     if (len == 0) return;
-    capa = s->aux.capa;
-    if (s->len >= MRB_INT_MAX - len) {
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "string sizes too big");
+    capa = this->aux.capa;
+    if (this->len >= MRB_INT_MAX - len) {
+        m_vm->mrb_raise(A_ARGUMENT_ERROR(m_vm), "string sizes too big");
     }
-    total = s->len+len;
+    total = this->len+len;
     if (capa <= total) {
         while (total > capa) {
             if (capa + 1 >= MRB_INT_MAX / 2) {
@@ -203,30 +185,28 @@ str_buf_cat(mrb_state *mrb, RString *s, const char *ptr, size_t len)
             }
             capa = (capa + 1) * 2;
         }
-        RESIZE_CAPA(s, capa);
+        this->ptr = (char *)m_vm->gc()._realloc(this->ptr, (capa)+1);
+        aux.capa = capa;
     }
     if (off != -1) {
-        ptr = s->ptr + off;
+        _ptr = this->ptr + off;
     }
-    memcpy(s->ptr + s->len, ptr, len);
-    s->len = total;
-    s->ptr[total] = '\0';   /* sentinel */
+    memcpy(this->ptr + this->len, _ptr, len);
+    this->len = total;
+    this->ptr[total] = '\0';   /* sentinel */
 }
 
-mrb_value
-mrb_str_buf_cat(mrb_state *mrb, mrb_value str, const char *ptr, size_t len)
+mrb_value mrb_str_buf_cat(mrb_value str, const char *ptr, size_t len)
 {
-    if (len == 0) return str;
-    str_buf_cat(mrb, mrb_str_ptr(str), ptr, len);
+    if (len == 0)
+        return str;
+    mrb_str_ptr(str)->str_buf_cat(ptr, len);
     return str;
 }
 
-mrb_value
-mrb_str_new(mrb_state *mrb, const char *p, size_t len)
+mrb_value mrb_str_new(mrb_state *mrb, const char *p, size_t len)
 {
-    RString *s;
-
-    s = str_new(mrb, p, len);
+    RString *s = RString::create(mrb, p, len);
     return mrb_obj_value(s);
 }
 
@@ -237,23 +217,21 @@ mrb_str_new(mrb_state *mrb, const char *p, size_t len)
  *  Returns a new string object containing a copy of <i>str</i>.
  */
 
-mrb_value
-mrb_str_new_cstr(mrb_state *mrb, const char *p)
+mrb_value mrb_str_new_cstr(mrb_state *mrb, const char *p)
 {
-    RString *s;
     size_t len;
 
     if (p) {
         len = strlen(p);
         if ((mrb_int)len < 0) {
-            mrb_raise(mrb, E_ARGUMENT_ERROR, "argument too big");
+            mrb->mrb_raise(E_ARGUMENT_ERROR, "argument too big");
         }
     }
     else {
         len = 0;
     }
 
-    s = mrb_obj_alloc_string(mrb);
+    RString * s = mrb_obj_alloc_string(mrb);
     s->ptr = (char *)mrb->gc()._malloc(len+1);
     if (p) {
         memcpy(s->ptr, p, len);
@@ -284,15 +262,13 @@ void mrb_gc_free_str(mrb_state *mrb, struct RString *str)
 
 char * mrb_str_to_cstr(mrb_state *mrb, mrb_value str0)
 {
-    RString *s;
-
     if (!mrb_string_p(str0)) {
-        mrb_raise(mrb, E_TYPE_ERROR, "expected String");
+        mrb->mrb_raise(E_TYPE_ERROR, "expected String");
     }
 
-    s = str_new(mrb, RSTRING_PTR(str0), RSTRING_LEN(str0));
-    if ((strlen(s->ptr) ^ s->len) != 0) {
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "string contains null byte");
+    RString *s = RString::create(mrb, RSTRING_PTR(str0), RSTRING_LEN(str0));
+    if (strlen(s->ptr) != s->len) {
+        mrb->mrb_raise(E_ARGUMENT_ERROR, "string contains null byte");
     }
     return s->ptr;
 }
@@ -405,9 +381,7 @@ mrb_str_plus(mrb_state *mrb, mrb_value a, mrb_value b)
 {
     RString *s = mrb_str_ptr(a);
     RString *s2 = mrb_str_ptr(b);
-    RString *t;
-
-    t = str_new(mrb, 0, s->len + s2->len);
+    RString *t = RString::create(mrb, 0, s->len + s2->len);
     memcpy(t->ptr, s->ptr, s->len);
     memcpy(t->ptr + s->len, s2->ptr, s2->len);
 
@@ -469,8 +443,7 @@ mrb_str_size(mrb_state *mrb, mrb_value self)
  *
  *     "Ho! " * 3   #=> "Ho! Ho! Ho! "
  */
-static mrb_value
-mrb_str_times(mrb_state *mrb, mrb_value self)
+static mrb_value mrb_str_times(mrb_state *mrb, mrb_value self)
 {
     mrb_int n,len,times;
     RString *str2;
@@ -478,15 +451,15 @@ mrb_str_times(mrb_state *mrb, mrb_value self)
 
     mrb_get_args(mrb, "i", &times);
     if (times < 0) {
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "negative argument");
+        mrb->mrb_raise(E_ARGUMENT_ERROR, "negative argument");
     }
     if (times && MRB_INT_MAX / times < RSTRING_LEN(self)) {
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "argument too big");
+        mrb->mrb_raise(E_ARGUMENT_ERROR, "argument too big");
     }
 
     len = RSTRING_LEN(self)*times;
-    str2 = str_new(mrb, 0, len);
-    str_with_class(mrb, str2, self);
+    str2 = RString::create(mrb, 0, len);
+    str_with_class(str2, self);
     p = str2->ptr;
     if (len > 0) {
         n = RSTRING_LEN(self);
@@ -573,11 +546,11 @@ mrb_str_cmp_m(mrb_state *mrb, mrb_value str1)
             return mrb_nil_value();
         }
         else {
-            mrb_value tmp = mrb_funcall(mrb, str2, "<=>", 1, str1);
+            mrb_value tmp = mrb->funcall(str2, "<=>", 1, str1);
 
             if (mrb_nil_p(tmp)) return mrb_nil_value();
             if (!mrb_fixnum(tmp)) {
-                return mrb_funcall(mrb, mrb_fixnum_value(0), "-", 1, tmp);
+                return mrb->funcall(mrb_fixnum_value(0), "-", 1, tmp);
             }
             result = -mrb_fixnum(tmp);
         }
@@ -588,8 +561,7 @@ mrb_str_cmp_m(mrb_state *mrb, mrb_value str1)
     return mrb_fixnum_value(result);
 }
 
-static int
-str_eql(mrb_state *mrb, const mrb_value &str1, const mrb_value &str2)
+static int str_eql(const mrb_value &str1, const mrb_value &str2)
 {
     const size_t len = RSTRING_LEN(str1);
 
@@ -600,19 +572,20 @@ str_eql(mrb_state *mrb, const mrb_value &str1, const mrb_value &str2)
     return false;
 }
 
-int
-mrb_str_equal(mrb_state *mrb, mrb_value str1, mrb_value str2)
+int mrb_str_equal(mrb_state *mrb, mrb_value str1, mrb_value str2)
 {
-    if (mrb_obj_equal(mrb, str1, str2)) return true;
+    if (mrb_obj_equal(str1, str2))
+        return true;
     if (!mrb_string_p(str2)) {
-        if (mrb_nil_p(str2)) return false;
+        if (mrb_nil_p(str2))
+            return false;
         if (!mrb_respond_to(mrb, str2, mrb_intern2(mrb, "to_str", 6))) {
             return false;
         }
-        str2 = mrb_funcall(mrb, str2, "to_str", 0);
+        str2 = mrb->funcall(str2, "to_str", 0);
         return mrb_equal(mrb, str2, str1);
     }
-    return str_eql(mrb, str1, str2);
+    return str_eql(str1, str2);
 }
 
 /* 15.2.10.5.4  */
@@ -658,7 +631,7 @@ char * mrb_string_value_ptr(mrb_state *mrb, mrb_value ptr)
 }
 static mrb_value noregexp(mrb_state *mrb, mrb_value self)
 {
-    mrb_raise(mrb, E_NOTIMP_ERROR, "Regexp class not implemented");
+    mrb->mrb_raise(E_NOTIMP_ERROR, "Regexp class not implemented");
     return mrb_nil_value();
 }
 static void regexp_check(mrb_state *mrb, mrb_value obj)
@@ -864,7 +837,7 @@ mrb_str_aref_m(mrb_state *mrb, mrb_value str)
         return mrb_str_substr(mrb, str, mrb_fixnum(a1), mrb_fixnum(a2));
     }
     if (argc != 1) {
-        mrb_raisef(mrb, E_ARGUMENT_ERROR, "wrong number of arguments (%S for 1)", mrb_fixnum_value(argc));
+        mrb->mrb_raisef(E_ARGUMENT_ERROR, "wrong number of arguments (%S for 1)", mrb_fixnum_value(argc));
     }
     return mrb_str_aref(mrb, str, a1);
 }
@@ -1164,14 +1137,11 @@ mrb_str_empty_p(mrb_state *mrb, mrb_value self)
  *
  * Two strings are equal if the have the same length and content.
  */
-static mrb_value
-mrb_str_eql(mrb_state *mrb, mrb_value self)
+static mrb_value mrb_str_eql(mrb_state *mrb, mrb_value self)
 {
-    mrb_value str2;
     mrb_bool eql_p;
-
-    mrb_get_args(mrb, "o", &str2);
-    eql_p = (mrb_type(str2) == MRB_TT_STRING) && str_eql(mrb, self, str2);
+    mrb_value str2 = mrb->get_arg<mrb_value>();
+    eql_p = (mrb_type(str2) == MRB_TT_STRING) && str_eql(self, str2);
 
     return mrb_bool_value(eql_p);
 }
@@ -1362,7 +1332,7 @@ mrb_str_index_m(mrb_state *mrb, mrb_value str)
 
         tmp = mrb_check_string_type(mrb, sub);
         if (mrb_nil_p(tmp)) {
-            mrb_raisef(mrb, E_TYPE_ERROR, "type mismatch: %S given", sub);
+            mrb->mrb_raisef(E_TYPE_ERROR, "type mismatch: %S given", sub);
         }
         sub = tmp;
     }
@@ -1491,7 +1461,7 @@ mrb_obj_as_string(mrb_state *mrb, mrb_value obj)
     if (mrb_string_p(obj)) {
         return obj;
     }
-    str = mrb_funcall(mrb, obj, "to_s", 0);
+    str = mrb->funcall(obj, "to_s", 0);
     if (!mrb_string_p(str))
         return mrb_any_to_s(mrb, obj);
     return str;
@@ -1505,7 +1475,7 @@ mrb_ptr_to_str(mrb_state *mrb, void *p)
     char *p2;
     intptr_t n = (intptr_t)p;
 
-    p_str = str_new(mrb, NULL, 2 + sizeof(uintptr_t) * CHAR_BIT / 4);
+    p_str = RString::create(mrb, nullptr, 2 + sizeof(uintptr_t) * CHAR_BIT / 4);
     p1 = p_str->ptr;
     *p1++ = '0';
     *p1++ = 'x';
@@ -1546,13 +1516,12 @@ mrb_check_string_type(mrb_state *mrb, mrb_value str)
 static mrb_value
 mrb_str_reverse(mrb_state *mrb, mrb_value str)
 {
-    RString *s2;
     char *s, *e, *p;
 
     if (RSTRING(str)->len <= 1) return mrb_str_dup(mrb, str);
 
-    s2 = str_new(mrb, 0, RSTRING(str)->len);
-    str_with_class(mrb, s2, str);
+    RString *s2 = RString::create(mrb, 0, RSTRING(str)->len);
+    str_with_class(s2, str);
     s = RSTRING_PTR(str); e = RSTRING_END(str) - 1;
     p = s2->ptr;
 
@@ -1687,7 +1656,7 @@ mrb_str_rindex_m(mrb_state *mrb, mrb_value str)
             sub = mrb_nil_value();
     }
     if (!strcmp(mrb_obj_classname(mrb, sub), REGEXP_CLASS)) {
-        mrb_raise(mrb, E_NOTIMP_ERROR, "Regexp Class not implemented");
+        mrb->mrb_raise(E_NOTIMP_ERROR, "Regexp Class not implemented");
     }
 
     switch (mrb_type(sub)) {
@@ -1707,7 +1676,7 @@ mrb_str_rindex_m(mrb_state *mrb, mrb_value str)
 
         tmp = mrb_check_string_type(mrb, sub);
         if (mrb_nil_p(tmp)) {
-            mrb_raisef(mrb, E_TYPE_ERROR, "type mismatch: %S given", sub);
+            mrb->mrb_raisef(E_TYPE_ERROR, "type mismatch: %S given", sub);
         }
         sub = tmp;
     }
@@ -1979,7 +1948,7 @@ mrb_cstr_to_inum(mrb_state *mrb, const char *str, int base, int badcheck)
         break;
     default:
         if (base < 2 || 36 < base) {
-            mrb_raisef(mrb, E_ARGUMENT_ERROR, "illegal radix %S", mrb_fixnum_value(base));
+            mrb->mrb_raisef(E_ARGUMENT_ERROR, "illegal radix %S", mrb_fixnum_value(base));
         }
         break;
     } /* end of switch (base) { */
@@ -2004,7 +1973,7 @@ mrb_cstr_to_inum(mrb_state *mrb, const char *str, int base, int badcheck)
 
     n = strtoul((char*)str, &end, base);
     if (n > MRB_INT_MAX) {
-        mrb_raisef(mrb, E_ARGUMENT_ERROR, "string (%S) too big for integer", mrb_str_new_cstr(mrb, str));
+        mrb->mrb_raisef(E_ARGUMENT_ERROR, "string (%S) too big for integer", mrb_str_new_cstr(mrb, str));
     }
     val = n;
     if (badcheck) {
@@ -2015,7 +1984,7 @@ mrb_cstr_to_inum(mrb_state *mrb, const char *str, int base, int badcheck)
 
     return mrb_fixnum_value(sign ? val : -val);
 bad:
-    mrb_raisef(mrb, E_ARGUMENT_ERROR, "invalid string for number(%S)", mrb_str_new_cstr(mrb, str));
+    mrb->mrb_raisef(E_ARGUMENT_ERROR, "invalid string for number(%S)", mrb_str_new_cstr(mrb, str));
     /* not reached */
     return mrb_fixnum_value(0);
 }
@@ -2027,13 +1996,12 @@ mrb_string_value_cstr(mrb_state *mrb, mrb_value *ptr)
     char *s = ps->ptr;
 
     if (!s || ps->len != strlen(s)) {
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "string contains null byte");
+        mrb->mrb_raise(E_ARGUMENT_ERROR, "string contains null byte");
     }
     return s;
 }
 
-mrb_value
-mrb_str_to_inum(mrb_state *mrb, mrb_value str, int base, int badcheck)
+mrb_value mrb_str_to_inum(mrb_state *mrb, mrb_value str, int base, int badcheck)
 {
     char *s;
     int len;
@@ -2048,7 +2016,7 @@ mrb_str_to_inum(mrb_state *mrb, mrb_value str, int base, int badcheck)
     if (s) {
         len = RSTRING_LEN(str);
         if (s[len]) {    /* no sentinel somehow */
-            RString *temp_str = str_new(mrb, s, len);
+            RString *temp_str = RString::create(mrb, s, len);
             s = temp_str->ptr;
         }
     }
@@ -2090,7 +2058,7 @@ mrb_str_to_i(mrb_state *mrb, mrb_value self)
         base = mrb_fixnum(argv[0]);
 
     if (base < 0) {
-        mrb_raisef(mrb, E_ARGUMENT_ERROR, "illegal radix %S", mrb_fixnum_value(base));
+        mrb->mrb_raisef(E_ARGUMENT_ERROR, "illegal radix %S", mrb_fixnum_value(base));
     }
     return mrb_str_to_inum(mrb, self, base, 0/*Qfalse*/);
 }
@@ -2119,7 +2087,7 @@ mrb_cstr_to_dbl(mrb_state *mrb, const char * p, int badcheck)
     if (p == end) {
         if (badcheck) {
 bad:
-            mrb_raisef(mrb, E_ARGUMENT_ERROR, "invalid string for float(%S)", mrb_str_new_cstr(mrb, p));
+            mrb->mrb_raisef(E_ARGUMENT_ERROR, "invalid string for float(%S)", mrb_str_new_cstr(mrb, p));
             /* not reached */
         }
         return d;
@@ -2164,8 +2132,7 @@ bad:
     return d;
 }
 
-double
-mrb_str_to_dbl(mrb_state *mrb, mrb_value str, int badcheck)
+double mrb_str_to_dbl(mrb_state *mrb, mrb_value str, int badcheck)
 {
     char *s;
     int len;
@@ -2175,10 +2142,10 @@ mrb_str_to_dbl(mrb_state *mrb, mrb_value str, int badcheck)
     len = RSTRING_LEN(str);
     if (s) {
         if (badcheck && memchr(s, '\0', len)) {
-            mrb_raise(mrb, E_ARGUMENT_ERROR, "string for Float contains null byte");
+            mrb->mrb_raise(E_ARGUMENT_ERROR, "string for Float contains null byte");
         }
         if (s[len]) {    /* no sentinel somehow */
-            RString *temp_str = str_new(mrb, s, len);
+            RString *temp_str = RString::create(mrb, s, len);
             s = temp_str->ptr;
         }
     }
@@ -2315,8 +2282,8 @@ mrb_str_dump(mrb_state *mrb, mrb_value str)
         }
     }
 
-    result = str_new(mrb, 0, len);
-    str_with_class(mrb, result, str);
+    result = RString::create(mrb, 0, len);
+    str_with_class(result, str);
     p = RSTRING_PTR(str); pend = p + RSTRING_LEN(str);
     q = result->ptr;
 
@@ -2394,17 +2361,17 @@ mrb_str_dump(mrb_state *mrb, mrb_value str)
 mrb_value mrb_str_cat(mrb_state *mrb, mrb_value str, const char *ptr, int len)
 {
     if (len < 0) {
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "negative string size (or size too big)");
+        mrb->mrb_raise(E_ARGUMENT_ERROR, "negative string size (or size too big)");
     }
-    str_buf_cat(mrb, mrb_str_ptr(str), ptr, len);
+    mrb_str_ptr(str)->str_cat(ptr, len);
     return str;
 }
 void RString::str_cat(const char *ptr, int len)
 {
     if (len < 0) {
-        mrb_raise(m_vm, A_ARGUMENT_ERROR(m_vm), "negative string size (or size too big)");
+        m_vm->mrb_raise(A_ARGUMENT_ERROR(m_vm), "negative string size (or size too big)");
     }
-    str_buf_cat(m_vm, this, ptr, len);
+    str_buf_cat(ptr, len);
 }
 
 mrb_value mrb_str_cat_cstr(mrb_state *mrb, mrb_value str, const char *ptr)
@@ -2449,12 +2416,12 @@ mrb_value mrb_str_inspect(mrb_state *mrb, mrb_value str)
         c = *p;
         if (c == '"'|| c == '\\' || (c == '#' && IS_EVSTR(p, pend))) {
             buf[0] = '\\'; buf[1] = c;
-            mrb_str_buf_cat(mrb, result, buf, 2);
+            mrb_str_buf_cat(result, buf, 2);
             continue;
         }
         if (ISPRINT(c)) {
             buf[0] = c;
-            mrb_str_buf_cat(mrb, result, buf, 1);
+            mrb_str_buf_cat(result, buf, 1);
             continue;
         }
         switch (c) {
@@ -2471,16 +2438,16 @@ mrb_value mrb_str_inspect(mrb_state *mrb, mrb_value str)
         if (cc) {
             buf[0] = '\\';
             buf[1] = (char)cc;
-            mrb_str_buf_cat(mrb, result, buf, 2);
+            mrb_str_buf_cat(result, buf, 2);
             continue;
         }
         else {
             int n = sprintf(buf, "\\%03o", c & 0377);
-            mrb_str_buf_cat(mrb, result, buf, n);
+            mrb_str_buf_cat(result, buf, n);
             continue;
         }
     }
-    mrb_str_buf_cat(mrb, result, "\"", 1);
+    mrb_str_buf_cat(result, "\"", 1);
 
     return result;
 }

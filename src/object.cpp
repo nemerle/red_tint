@@ -10,8 +10,7 @@
 #include "mruby/string.h"
 #include "error.h"
 
-int
-mrb_obj_eq(mrb_state *mrb, mrb_value v1, mrb_value v2)
+int mrb_obj_eq(mrb_value v1, mrb_value v2)
 {
     if (mrb_type(v1) != mrb_type(v2)) return false;
     switch (mrb_type(v1)) {
@@ -32,21 +31,20 @@ mrb_obj_eq(mrb_state *mrb, mrb_value v1, mrb_value v2)
     }
 }
 
-int
-mrb_obj_equal(mrb_state *mrb, mrb_value v1, mrb_value v2)
+int mrb_obj_equal(mrb_value v1, mrb_value v2)
 {
     /* temporary definition */
-    return mrb_obj_eq(mrb, v1, v2);
+    return mrb_obj_eq(v1, v2);
 }
 
-int
-mrb_equal(mrb_state *mrb, mrb_value obj1, mrb_value obj2)
+int mrb_equal(mrb_state *mrb, mrb_value obj1, mrb_value obj2)
 {
-    mrb_value result;
 
-    if (mrb_obj_eq(mrb, obj1, obj2)) return true;
-    result = mrb_funcall(mrb, obj1, "==", 1, obj2);
-    if (mrb_test(result)) return true;
+    if (mrb_obj_eq(obj1, obj2))
+        return true;
+    mrb_value result = mrb->funcall(obj1, "==", 1, obj2);
+    if (mrb_test(result))
+        return true;
     return false;
 }
 
@@ -64,8 +62,7 @@ mrb_equal(mrb_state *mrb, mrb_value obj1, mrb_value obj2)
  * Only the object <i>nil</i> responds <code>true</code> to <code>nil?</code>.
  */
 
-static mrb_value
-mrb_true(mrb_state *mrb, mrb_value obj)
+static mrb_value mrb_true(mrb_state *mrb, mrb_value obj)
 {
     return mrb_true_value();
 }
@@ -78,14 +75,12 @@ mrb_true(mrb_state *mrb, mrb_value obj)
  *  Always returns the empty string.
  */
 
-static mrb_value
-nil_to_s(mrb_state *mrb, mrb_value obj)
+static mrb_value nil_to_s(mrb_state *mrb, mrb_value obj)
 {
     return mrb_str_new(mrb, 0, 0);
 }
 
-static mrb_value
-nil_inspect(mrb_state *mrb, mrb_value obj)
+static mrb_value nil_inspect(mrb_state *mrb, mrb_value obj)
 {
     return mrb_str_new(mrb, "nil", 3);
 }
@@ -108,8 +103,7 @@ nil_inspect(mrb_state *mrb, mrb_value obj)
  *  <code>nil</code> or <code>false</code>, <code>true</code> otherwise.
  */
 
-static mrb_value
-true_and(mrb_state *mrb, mrb_value obj)
+static mrb_value true_and(mrb_state *mrb, mrb_value obj)
 {
     mrb_bool obj2;
 
@@ -128,8 +122,7 @@ true_and(mrb_state *mrb, mrb_value obj)
  *  otherwise.
  */
 
-static mrb_value
-true_xor(mrb_state *mrb, mrb_value obj)
+static mrb_value true_xor(mrb_state *mrb, mrb_value obj)
 {
     mrb_bool obj2;
 
@@ -145,8 +138,7 @@ true_xor(mrb_state *mrb, mrb_value obj)
  * The string representation of <code>true</code> is "true".
  */
 
-static mrb_value
-true_to_s(mrb_state *mrb, mrb_value obj)
+static mrb_value true_to_s(mrb_state *mrb, mrb_value obj)
 {
     return mrb_str_new(mrb, "true", 4);
 }
@@ -168,8 +160,7 @@ true_to_s(mrb_state *mrb, mrb_value obj)
  *     or
  */
 
-static mrb_value
-true_or(mrb_state *mrb, mrb_value obj)
+static mrb_value true_or(mrb_state *mrb, mrb_value obj)
 {
     mrb_bool obj2;
 
@@ -199,8 +190,7 @@ true_or(mrb_state *mrb, mrb_value obj)
  *  short-circuit evaluation in this case.
  */
 
-static mrb_value
-false_and(mrb_state *mrb, mrb_value obj)
+static mrb_value false_and(mrb_state *mrb, mrb_value obj)
 {
     mrb_bool obj2;
 
@@ -221,8 +211,7 @@ false_and(mrb_state *mrb, mrb_value obj)
  *
  */
 
-static mrb_value
-false_xor(mrb_state *mrb, mrb_value obj)
+static mrb_value false_xor(mrb_state *mrb, mrb_value obj)
 {
     mrb_bool obj2;
 
@@ -241,8 +230,7 @@ false_xor(mrb_state *mrb, mrb_value obj)
  *  <code>nil</code> or <code>false</code>; <code>true</code> otherwise.
  */
 
-static mrb_value
-false_or(mrb_state *mrb, mrb_value obj)
+static mrb_value false_or(mrb_state *mrb, mrb_value obj)
 {
     mrb_bool obj2;
 
@@ -258,14 +246,12 @@ false_or(mrb_state *mrb, mrb_value obj)
  * 'nuf said...
  */
 
-static mrb_value
-false_to_s(mrb_state *mrb, mrb_value obj)
+static mrb_value false_to_s(mrb_state *mrb, mrb_value obj)
 {
     return mrb_str_new(mrb, "false", 5);
 }
 
-void
-mrb_init_object(mrb_state *mrb)
+void mrb_init_object(mrb_state *mrb)
 {
     mrb->nil_class = &mrb->define_class("NilClass",   mrb->object_class)
             .undef_class_method("new")
@@ -296,14 +282,14 @@ mrb_init_object(mrb_state *mrb)
             ;
 }
 
-static mrb_value convert_type(mrb_state *mrb, mrb_value val, const char *tname, const char *method, bool raise)
+static mrb_value convert_type(mrb_state *mrb, const mrb_value &val, const char *tname, const char *method, bool raise)
 {
     mrb_sym m = mrb_intern(mrb, method);
     if (mrb_respond_to(mrb, val, m))
         return mrb_funcall_argv(mrb, val, m, 0, 0);
 
     if (raise)
-        mrb_raisef(mrb, E_TYPE_ERROR, "can't convert %S into %S", val, mrb_str_new_cstr(mrb, tname));
+        mrb->mrb_raisef(E_TYPE_ERROR, "can't convert %S into %S", val, mrb_str_new_cstr(mrb, tname));
 
     return mrb_nil_value();
 }
@@ -318,23 +304,21 @@ mrb_value mrb_check_to_integer(mrb_state *mrb, mrb_value val, const char *method
     return v;
 }
 
-mrb_value
-mrb_convert_type(mrb_state *mrb, const mrb_value &val, mrb_int type, const char *tname, const char *method)
+mrb_value mrb_convert_type(mrb_state *mrb, const mrb_value &val, mrb_int type, const char *tname, const char *method)
 {
     if (mrb_type(val) == type)
         return val;
     mrb_value v = convert_type(mrb, val, tname, method, 1/*Qtrue*/);
     if (mrb_type(v) != type) {
-        mrb_raisef(mrb, E_TYPE_ERROR, "%S cannot be converted to %S by #%S", val,
+        mrb->mrb_raisef(E_TYPE_ERROR, "%S cannot be converted to %S by #%S", val,
                    mrb_str_new_cstr(mrb, tname), mrb_str_new_cstr(mrb, method));
     }
     return v;
 }
 
 mrb_value
-mrb_check_convert_type(mrb_state *mrb, mrb_value val, mrb_int type, const char *tname, const char *method)
+mrb_check_convert_type(mrb_state *mrb, const mrb_value &val, mrb_int type, const char *tname, const char *method)
 {
-
     if (mrb_type(val) == type && type != MRB_TT_DATA)
         return val;
     mrb_value v = convert_type(mrb, val, tname, method, 0/*Qfalse*/);
@@ -371,14 +355,11 @@ static const struct types {
     {-1,  0}
 };
 
-void
-mrb_check_type(mrb_state *mrb, mrb_value x, enum mrb_vtype t)
+void mrb_check_type(mrb_state *mrb, mrb_value x, mrb_vtype t)
 {
     const struct types *type = builtin_types;
     RString *s;
-    enum mrb_vtype xt;
-
-    xt = mrb_type(x);
+    mrb_vtype xt = mrb_type(x);
     if ((xt == t) && (xt != MRB_TT_DATA))
         return;
     while (type->type < MRB_TT_MAXDEFINE) {
@@ -401,12 +382,12 @@ mrb_check_type(mrb_state *mrb, mrb_value x, enum mrb_vtype t)
             else {
                 etype = mrb_obj_classname(mrb, x);
             }
-            mrb_raisef(mrb, E_TYPE_ERROR, "wrong argument type %S (expected %S)",
+            mrb->mrb_raisef(E_TYPE_ERROR, "wrong argument type %S (expected %S)",
                        mrb_str_new_cstr(mrb, etype), mrb_str_new_cstr(mrb, type->name));
         }
         type++;
     }
-    mrb_raisef(mrb, E_TYPE_ERROR, "unknown type %S (%S given)",
+    mrb->mrb_raisef(E_TYPE_ERROR, "unknown type %S (%S given)",
                mrb_fixnum_value(t), mrb_fixnum_value(mrb_type(x)));
 }
 
@@ -421,17 +402,16 @@ mrb_check_type(mrb_state *mrb, mrb_value x, enum mrb_vtype t)
  *  initial execution context of Ruby programs returns ``main.''
  */
 
-mrb_value
-mrb_any_to_s(mrb_state *mrb, mrb_value obj)
+mrb_value mrb_any_to_s(mrb_state *mrb, mrb_value obj)
 {
     mrb_value str = mrb_str_buf_new(mrb, 20);
     const char *cname = mrb_obj_classname(mrb, obj);
 
-    mrb_str_buf_cat(mrb, str, "#<", 2);
+    mrb_str_buf_cat(str, "#<", 2);
     mrb_str_cat2(mrb, str, cname);
     mrb_str_cat(mrb, str, ":", 1);
     mrb_str_concat(mrb, str, mrb_ptr_to_str(mrb, mrb_voidp(obj)));
-    mrb_str_buf_cat(mrb, str, ">", 1);
+    mrb_str_buf_cat(str, ">", 1);
 
     return str;
 }
@@ -462,8 +442,7 @@ mrb_any_to_s(mrb_state *mrb, mrb_value obj)
  *     b.kind_of? M       #=> true
  */
 
-int
-mrb_obj_is_kind_of(mrb_state *mrb, mrb_value obj, RClass *c)
+int mrb_obj_is_kind_of(mrb_state *mrb, mrb_value obj, RClass *c)
 {
     RClass *cl = RClass::mrb_class(mrb, obj);
 
@@ -474,7 +453,7 @@ mrb_obj_is_kind_of(mrb_state *mrb, mrb_value obj, RClass *c)
             break;
 
         default:
-            mrb_raise(mrb, E_TYPE_ERROR, "class or module required");
+            mrb->mrb_raise(E_TYPE_ERROR, "class or module required");
     }
 
     while (cl) {
@@ -485,45 +464,45 @@ mrb_obj_is_kind_of(mrb_state *mrb, mrb_value obj, RClass *c)
     return false;
 }
 
-static mrb_value
-mrb_to_integer(mrb_state *mrb, mrb_value val, const char *method)
+static mrb_value mrb_to_integer(mrb_state *mrb, mrb_value val, const char *method)
 {
 
     if (mrb_fixnum_p(val))
         return val;
     mrb_value v = convert_type(mrb, val, "Integer", method, true);
     if (!mrb_obj_is_kind_of(mrb, v, mrb->fixnum_class)) {
-        mrb_raisef(mrb, E_TYPE_ERROR, "can't convert %S to Integer (%S#%S gives %S)",
+        mrb->mrb_raisef(E_TYPE_ERROR, "can't convert %S to Integer (%S#%S gives %S)",
                    val, val, mrb_str_new_cstr(mrb, method), v);
     }
     return v;
 }
 
-mrb_value
-mrb_to_int(mrb_state *mrb, mrb_value val)
+mrb_value mrb_to_int(mrb_state *mrb, mrb_value val)
 {
     return mrb_to_integer(mrb, val, "to_int");
 }
 
-static mrb_value
-mrb_convert_to_integer(mrb_state *mrb, mrb_value val, int base)
+static mrb_value mrb_convert_to_integer(mrb_state *mrb, mrb_value val, int base)
 {
     mrb_value tmp;
 
     if (mrb_nil_p(val)) {
-        if (base != 0) goto arg_error;
-        mrb_raise(mrb, E_TYPE_ERROR, "can't convert nil into Integer");
+        if (base != 0)
+            goto arg_error;
+        mrb->mrb_raise(E_TYPE_ERROR, "can't convert nil into Integer");
     }
     switch (mrb_type(val)) {
         case MRB_TT_FLOAT:
-            if (base != 0) goto arg_error;
+            if (base != 0)
+                goto arg_error;
             if (FIXABLE(mrb_float(val))) {
                 break;
             }
             return mrb_flo_to_fixnum(mrb, val);
 
         case MRB_TT_FIXNUM:
-            if (base != 0) goto arg_error;
+            if (base != 0)
+                goto arg_error;
             return val;
 
         case MRB_TT_STRING:
@@ -535,9 +514,10 @@ string_conv:
     }
     if (base != 0) {
         tmp = mrb_check_string_type(mrb, val);
-        if (!mrb_nil_p(tmp)) goto string_conv;
+        if (!mrb_nil_p(tmp))
+            goto string_conv;
 arg_error:
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "base specified for non string value");
+        mrb->mrb_raise(E_ARGUMENT_ERROR, "base specified for non string value");
     }
     tmp = convert_type(mrb, val, "Integer", "to_int", false);
     if (mrb_nil_p(tmp)) {
@@ -546,17 +526,15 @@ arg_error:
     return tmp;
 }
 
-mrb_value
-mrb_Integer(mrb_state *mrb, mrb_value val)
+mrb_value mrb_Integer(mrb_state *mrb, mrb_value val)
 {
     return mrb_convert_to_integer(mrb, val, 0);
 }
 
-mrb_value
-mrb_Float(mrb_state *mrb, mrb_value val)
+mrb_value mrb_Float(mrb_state *mrb, mrb_value val)
 {
     if (mrb_nil_p(val)) {
-        mrb_raise(mrb, E_TYPE_ERROR, "can't convert nil into Float");
+        mrb->mrb_raise(E_TYPE_ERROR, "can't convert nil into Float");
     }
     switch (mrb_type(val)) {
         case MRB_TT_FIXNUM:
@@ -573,24 +551,22 @@ mrb_Float(mrb_state *mrb, mrb_value val)
     }
 }
 
-mrb_value
-mrb_inspect(mrb_state *mrb, mrb_value obj)
+mrb_value mrb_inspect(mrb_state *mrb, mrb_value obj)
 {
-    return mrb_obj_as_string(mrb, mrb_funcall(mrb, obj, "inspect", 0, 0));
+    return mrb_obj_as_string(mrb, mrb->funcall(obj, "inspect", 0, 0));
 }
 
-int
-mrb_eql(mrb_state *mrb, mrb_value obj1, mrb_value obj2)
+int mrb_eql(mrb_state *mrb, mrb_value obj1, mrb_value obj2)
 {
-    if (mrb_obj_eq(mrb, obj1, obj2)) return true;
-    return mrb_test(mrb_funcall(mrb, obj1, "eql?", 1, obj2));
+    if (mrb_obj_eq(obj1, obj2))
+        return true;
+    return mrb_test(mrb->funcall(obj1, "eql?", 1, obj2));
 }
 mrb_value mrb_value::check_type(mrb_state *mrb, mrb_vtype t, const char *c, const char *m) const {
-    mrb_value tmp;
 
-    tmp = mrb_check_convert_type(mrb, *this, t, c, m);
+    mrb_value tmp = mrb_check_convert_type(mrb, *this, t, c, m);
     if (mrb_nil_p(tmp)) {
-        mrb_raisef(mrb, E_TYPE_ERROR, "expected %S", mrb_str_new_cstr(mrb, c));
+        mrb->mrb_raisef(E_TYPE_ERROR, "expected %S", mrb_str_new_cstr(mrb, c));
     }
     return tmp;
 }
@@ -631,6 +607,6 @@ void mrb_state::get_arg(const mrb_value &arg, mrb_sym &tgt) {
         tgt = mrb_intern_str(this, arg.to_str(this));
     }
     else {
-        mrb_raisef(this, I_TYPE_ERROR, "%S is not a symbol", mrb_funcall(this, arg, "inspect", 0));
+        mrb_raisef(I_TYPE_ERROR, "%S is not a symbol", funcall(arg, "inspect", 0));
     }
 }

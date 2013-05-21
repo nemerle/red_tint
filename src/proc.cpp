@@ -74,7 +74,7 @@ mrb_proc_initialize(mrb_state *mrb, mrb_value self)
     mrb_get_args(mrb, "&", &blk);
     if (mrb_nil_p(blk)) {
         /* Calling Proc.new without a block is not implemented yet */
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "tried to create Proc object without a block");
+        mrb->mrb_raise(E_ARGUMENT_ERROR, "tried to create Proc object without a block");
     }
     else {
         mrb_proc_ptr(self)->copy_from(mrb_proc_ptr(blk));
@@ -85,11 +85,9 @@ mrb_proc_initialize(mrb_state *mrb, mrb_value self)
 static mrb_value
 mrb_proc_init_copy(mrb_state *mrb, mrb_value self)
 {
-    mrb_value proc;
-
-    mrb_get_args(mrb, "o", &proc);
+    mrb_value proc = mrb->get_arg<mrb_value>();
     if (mrb_type(proc) != MRB_TT_PROC) {
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "not a proc");
+        mrb->mrb_raise(E_ARGUMENT_ERROR, "not a proc");
     }
     mrb_proc_ptr(self)->copy_from(mrb_proc_ptr(proc));
     return self;
@@ -146,7 +144,7 @@ proc_lambda(mrb_state *mrb, mrb_value self)
 
     mrb_get_args(mrb, "&", &blk);
     if (mrb_nil_p(blk)) {
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "tried to create Proc object without a block");
+        mrb->mrb_raise(E_ARGUMENT_ERROR, "tried to create Proc object without a block");
     }
     p = mrb_proc_ptr(blk);
     if (!MRB_PROC_STRICT_P(p)) {

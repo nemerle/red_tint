@@ -20,7 +20,7 @@ static void printstr(const mrb_state *, const mrb_value &obj)
 void mrb_p(mrb_state *mrb, mrb_value obj)
 {
 #ifdef ENABLE_STDIO
-    obj = mrb_funcall(mrb, obj, "inspect", 0);
+    obj = mrb->funcall(obj, "inspect", 0);
     printstr(mrb, obj);
     putc('\n', stdout);
 #endif

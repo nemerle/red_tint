@@ -22,15 +22,14 @@ static RClass * struct_class(mrb_state *mrb)
     return mrb_class_get(mrb, "Struct");
 }
 
-static inline mrb_value
-struct_ivar_get(mrb_state *mrb, mrb_value c, mrb_sym id)
+static inline mrb_value struct_ivar_get(mrb_state *mrb, mrb_value c, mrb_sym id)
 {
     RClass* kclass;
     RClass* sclass = struct_class(mrb);
     mrb_value ans;
 
     for (;;) {
-        ans = mrb_iv_get(mrb, c, id);
+        ans = mrb_iv_get(c, id);
         if (!mrb_nil_p(ans)) return ans;
         kclass = RCLASS_SUPER(c);
         if (kclass == 0 || kclass == sclass)
@@ -39,33 +38,30 @@ struct_ivar_get(mrb_state *mrb, mrb_value c, mrb_sym id)
     }
 }
 
-mrb_value
-mrb_struct_iv_get(mrb_state *mrb, mrb_value c, const char *name)
+mrb_value mrb_struct_iv_get(mrb_state *mrb, mrb_value c, const char *name)
 {
     return struct_ivar_get(mrb, c, mrb_intern(mrb, name));
 }
 
-mrb_value
-mrb_struct_s_members(mrb_state *mrb, mrb_value klass)
+mrb_value mrb_struct_s_members(mrb_state *mrb, mrb_value klass)
 {
     mrb_value members = struct_ivar_get(mrb, klass, mrb_intern2(mrb, "__members__", 11));
 
     if (mrb_nil_p(members)) {
-        mrb_raise(mrb, E_TYPE_ERROR, "uninitialized struct");
+        mrb->mrb_raise(E_TYPE_ERROR, "uninitialized struct");
     }
     if (!mrb_array_p(members)) {
-        mrb_raise(mrb, E_TYPE_ERROR, "corrupted struct");
+        mrb->mrb_raise(E_TYPE_ERROR, "corrupted struct");
     }
     return members;
 }
 
-mrb_value
-mrb_struct_members(mrb_state *mrb, mrb_value s)
+mrb_value mrb_struct_members(mrb_state *mrb, mrb_value s)
 {
     mrb_value members = mrb_struct_s_members(mrb, mrb_obj_value(mrb_obj_class(mrb, s)));
     if (!strcmp(mrb_class_name(mrb, mrb_obj_class(mrb, s)), "Struct")) {
         if (RSTRUCT_LEN(s) != RARRAY_LEN(members)) {
-            mrb_raisef(mrb, E_TYPE_ERROR,
+            mrb->mrb_raisef(E_TYPE_ERROR,
                        "struct size differs (%S required %S given)",
                        mrb_fixnum_value(RARRAY_LEN(members)), mrb_fixnum_value(RSTRUCT_LEN(s)));
         }
@@ -120,11 +116,11 @@ mrb_struct_getmember(mrb_state *mrb, mrb_value obj, mrb_sym id)
     slot = mrb_symbol_value(id);
     len = RARRAY_LEN(members);
     for (i=0; i<len; i++) {
-        if (mrb_obj_equal(mrb, ptr_members[i], slot)) {
+        if (mrb_obj_equal(ptr_members[i], slot)) {
             return ptr[i];
         }
     }
-    mrb_raisef(mrb, E_INDEX_ERROR, "%S is not struct member", mrb_sym2str(mrb, id));
+    mrb->mrb_raisef(E_INDEX_ERROR, "%S is not struct member", mrb_sym2str(mrb, id));
     return mrb_nil_value();       /* not reached */
 }
 
@@ -203,7 +199,7 @@ mrb_struct_set(mrb_state *mrb, mrb_value obj, mrb_value val)
             return ptr[i] = val;
         }
     }
-    mrb_raisef(mrb, E_INDEX_ERROR, "`%S' is not a struct member", mrb_sym2str(mrb, mid));
+    mrb->mrb_raisef(E_INDEX_ERROR, "`%S' is not a struct member", mrb_sym2str(mrb, mid));
     return mrb_nil_value();            /* not reached */
 }
 
@@ -383,7 +379,7 @@ mrb_struct_s_def(mrb_state *mrb, mrb_value klass)
     }
     st = make_struct(mrb, name, rest, struct_class(mrb));
     if (!mrb_nil_p(b)) {
-        mrb_funcall(mrb, b, "call", 1, &st);
+        mrb->funcall(b, "call", 1, &st);
     }
 
     return st;
@@ -395,7 +391,7 @@ static int num_members(mrb_state *mrb, RClass *klass)
 
     members = struct_ivar_get(mrb, mrb_obj_value(klass), mrb_intern2(mrb, "__members__", 11));
     if (!mrb_array_p(members)) {
-        mrb_raise(mrb, E_TYPE_ERROR, "broken members");
+        mrb->mrb_raise(E_TYPE_ERROR, "broken members");
     }
     return RARRAY_LEN(members);
 }
@@ -411,7 +407,7 @@ mrb_struct_initialize_withArg(mrb_state *mrb, int argc, mrb_value *argv, mrb_val
 
     n = num_members(mrb, klass);
     if (n < argc) {
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "struct size differs");
+        mrb->mrb_raise(E_ARGUMENT_ERROR, "struct size differs");
     }
 
     RArray *p_self(RSTRUCT_ARY(self));
@@ -504,23 +500,23 @@ mrb_struct_inspect(mrb_state *mrb, mrb_value s)
 
 /* 15.2.18.4.9  */
 /* :nodoc: */
-mrb_value
-mrb_struct_init_copy(mrb_state *mrb, mrb_value copy)
+mrb_value mrb_struct_init_copy(mrb_state *mrb, mrb_value copy)
 {
-    mrb_value s;
     int i, len;
 
-    mrb_get_args(mrb, "o", &s);
+    mrb_value s = mrb->get_arg<mrb_value>();
 
-    if (mrb_obj_equal(mrb, copy, s)) return copy;
+
+    if (mrb_obj_equal(copy, s))
+        return copy;
     if (!mrb_obj_is_instance_of(mrb, s, mrb_obj_class(mrb, copy))) {
-        mrb_raise(mrb, E_TYPE_ERROR, "wrong argument class");
+        mrb->mrb_raise(E_TYPE_ERROR, "wrong argument class");
     }
     if (!mrb_array_p(s)) {
-        mrb_raise(mrb, E_TYPE_ERROR, "corrupted struct");
+        mrb->mrb_raise(E_TYPE_ERROR, "corrupted struct");
     }
     if (RSTRUCT_LEN(copy) != RSTRUCT_LEN(s)) {
-        mrb_raise(mrb, E_TYPE_ERROR, "struct size mismatch");
+        mrb->mrb_raise(E_TYPE_ERROR, "struct size mismatch");
     }
     len = RSTRUCT_LEN(copy);
     for (i = 0; i < len; i++) {
@@ -544,7 +540,7 @@ mrb_struct_aref_id(mrb_state *mrb, mrb_value s, mrb_sym id)
             return ptr[i];
         }
     }
-    mrb_raisef(mrb, E_INDEX_ERROR, "no member '%S' in struct", mrb_sym2str(mrb, id));
+    mrb->mrb_raisef(E_INDEX_ERROR, "no member '%S' in struct", mrb_sym2str(mrb, id));
     return mrb_nil_value();       /* not reached */
 }
 
@@ -576,7 +572,7 @@ mrb_struct_aref_n(mrb_state *mrb, mrb_value s, mrb_value idx)
         mrb_value sym = mrb_check_intern_str(mrb, idx);
 
         if (mrb_nil_p(sym)) {
-            mrb_raisef(mrb, E_INDEX_ERROR, "no member '%S' in struct", idx);
+            mrb->mrb_raisef(E_INDEX_ERROR, "no member '%S' in struct", idx);
         }
         idx = sym;
     }
@@ -587,11 +583,11 @@ mrb_struct_aref_n(mrb_state *mrb, mrb_value s, mrb_value idx)
     i = mrb_fixnum(idx);
     if (i < 0) i = RSTRUCT_LEN(s) + i;
     if (i < 0)
-        mrb_raisef(mrb, E_INDEX_ERROR,
+        mrb->mrb_raisef(E_INDEX_ERROR,
                    "offset %S too small for struct(size:%S)",
                    mrb_fixnum_value(i), mrb_fixnum_value(RSTRUCT_LEN(s)));
     if (RSTRUCT_LEN(s) <= i)
-        mrb_raisef(mrb, E_INDEX_ERROR,
+        mrb->mrb_raisef(E_INDEX_ERROR,
                    "offset %S too large for struct(size:%S)",
                    mrb_fixnum_value(i), mrb_fixnum_value(RSTRUCT_LEN(s)));
     return RSTRUCT_PTR(s)[i];
@@ -615,7 +611,7 @@ mrb_struct_aset_id(mrb_state *mrb, mrb_value s, mrb_sym id, mrb_value val)
     members = mrb_struct_members(mrb, s);
     len = RARRAY_LEN(members);
     if (RSTRUCT_LEN(s) != len) {
-        mrb_raisef(mrb, E_TYPE_ERROR,
+        mrb->mrb_raisef(E_TYPE_ERROR,
                    "struct size differs (%S required %S given)",
                    mrb_fixnum_value(len), mrb_fixnum_value(RSTRUCT_LEN(s)));
     }
@@ -627,7 +623,7 @@ mrb_struct_aset_id(mrb_state *mrb, mrb_value s, mrb_sym id, mrb_value val)
             return val;
         }
     }
-    mrb_raisef(mrb, E_INDEX_ERROR, "no member '%S' in struct", mrb_sym2str(mrb, id));
+    mrb->mrb_raisef(E_INDEX_ERROR, "no member '%S' in struct", mrb_sym2str(mrb, id));
     return val;                   /* not reach */
 }
 
@@ -669,12 +665,12 @@ mrb_struct_aset(mrb_state *mrb, mrb_value s)
     i = mrb_fixnum(idx);
     if (i < 0) i = RSTRUCT_LEN(s) + i;
     if (i < 0) {
-        mrb_raisef(mrb, E_INDEX_ERROR,
+        mrb->mrb_raisef(E_INDEX_ERROR,
                    "offset %S too small for struct(size:%S)",
                    mrb_fixnum_value(i), mrb_fixnum_value(RSTRUCT_LEN(s)));
     }
     if (RSTRUCT_LEN(s) <= i) {
-        mrb_raisef(mrb, E_INDEX_ERROR,
+        mrb->mrb_raisef(E_INDEX_ERROR,
                    "offset %S too large for struct(size:%S)",
                    mrb_fixnum_value(i), mrb_fixnum_value(RSTRUCT_LEN(s)));
     }
@@ -702,13 +698,13 @@ mrb_struct_aset(mrb_state *mrb, mrb_value s)
 static mrb_value
 mrb_struct_equal(mrb_state *mrb, mrb_value s)
 {
-    mrb_value s2;
     mrb_value *ptr, *ptr2;
     mrb_int i, len;
     mrb_bool equal_p;
 
-    mrb_get_args(mrb, "o", &s2);
-    if (mrb_obj_equal(mrb, s, s2)) {
+    mrb_value s2 = mrb->get_arg<mrb_value>();
+
+    if (mrb_obj_equal(s, s2)) {
         equal_p = 1;
     }
     else if (!strcmp(mrb_class_name(mrb, mrb_obj_class(mrb, s)), "Struct") ||
@@ -743,16 +739,15 @@ mrb_struct_equal(mrb_state *mrb, mrb_value s)
  * Two structures are equal if they are the same object, or if all their
  * fields are equal (using <code>eql?</code>).
  */
-static mrb_value
-mrb_struct_eql(mrb_state *mrb, mrb_value s)
+static mrb_value mrb_struct_eql(mrb_state *mrb, mrb_value s)
 {
-    mrb_value s2;
     mrb_value *ptr, *ptr2;
     mrb_int i, len;
     mrb_bool eql_p;
 
-    mrb_get_args(mrb, "o", &s2);
-    if (mrb_obj_equal(mrb, s, s2)) {
+    mrb_value s2 = mrb->get_arg<mrb_value>();
+
+    if (mrb_obj_equal(s, s2)) {
         eql_p = 1;
     }
     else if (strcmp(mrb_class_name(mrb, mrb_obj_class(mrb, s2)), "Struct") ||

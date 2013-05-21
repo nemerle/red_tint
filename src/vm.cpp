@@ -127,7 +127,7 @@ void stack_extend(mrb_state *mrb, int room, int keep)
         /* Raise an exception if the new stack size will be too large,
     to prevent infinite recursion. However, do this only after resizing the stack, so mrb_raise has stack space to work with. */
         if (size > MRB_STACK_MAX) {
-            mrb_raise(mrb, E_RUNTIME_ERROR, "stack level too deep. (limit=" TO_STR(MRB_STACK_MAX) ")");
+            mrb->mrb_raise(E_RUNTIME_ERROR, "stack level too deep. (limit=" TO_STR(MRB_STACK_MAX) ")");
         }
     }
 
@@ -188,7 +188,7 @@ mrb_callinfo* cipush(mrb_state *mrb)
         size_t size = ci - c->cibase;
 
         c->cibase = (mrb_callinfo *)mrb->gc()._realloc(c->cibase, sizeof(mrb_callinfo)*size*2);
-        ci = mrb->m_ctx->cibase + size;
+        c->m_ci = ci = mrb->m_ctx->cibase + size;
         c->ciend = c->cibase + size * 2;
     }
     ci = ++c->m_ci;
@@ -255,16 +255,16 @@ void call_stack_sizing(mrb_state *mrb,const mrb_callinfo *_ci,const mrb_irep *ir
 #define MRB_FUNCALL_ARGC_MAX 16
 #endif
 
-mrb_value mrb_funcall(mrb_state *mrb, mrb_value self, const char *name, int argc, ...)
+mrb_value mrb_state::funcall(mrb_value self, const char *name, int argc, ...)
 {
-    mrb_sym mid = mrb_intern_cstr(mrb, name);
+    mrb_sym mid = mrb_intern_cstr(this, name);
 
     if (argc == 0) {
-        return mrb_funcall_argv(mrb, self, mid, 0, 0);
+        return mrb_funcall_argv(this, self, mid, 0, 0);
     }
     mrb_value argv[MRB_FUNCALL_ARGC_MAX];
     if (argc > MRB_FUNCALL_ARGC_MAX) {
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "Too long arguments. (limit=" TO_STR(MRB_FUNCALL_ARGC_MAX) ")");
+        mrb_raise(I_ARGUMENT_ERROR, "Too long arguments. (limit=" TO_STR(MRB_FUNCALL_ARGC_MAX) ")");
     }
     va_list ap;
     va_start(ap, argc);
@@ -272,7 +272,7 @@ mrb_value mrb_funcall(mrb_state *mrb, mrb_value self, const char *name, int argc
         argv[i] = va_arg(ap, mrb_value);
     }
     va_end(ap);
-    return mrb_funcall_argv(mrb, self, mid, argc, argv);
+    return mrb_funcall_argv(this, self, mid, argc, argv);
 }
 
 mrb_value mrb_funcall_with_block(mrb_state *mrb, mrb_value self, mrb_sym mid, int argc, const mrb_value *argv, mrb_value blk)
@@ -306,7 +306,7 @@ mrb_value mrb_funcall_with_block(mrb_state *mrb, mrb_value self, mrb_sym mid, in
         }
         int n = mrb->m_ctx->m_ci->nregs;
         if (argc < 0) {
-            mrb_raisef(mrb, E_ARGUMENT_ERROR, "negative argc for funcall (%S)", mrb_fixnum_value(argc));
+            mrb->mrb_raisef(E_ARGUMENT_ERROR, "negative argc for funcall (%S)", mrb_fixnum_value(argc));
         }
         RClass *c = RClass::mrb_class(mrb, self);
         RProc *p = RClass::method_search_vm(mrb, &c, mid);
@@ -369,7 +369,7 @@ mrb_value mrb_yield_internal(mrb_state *mrb, mrb_value b, int argc, mrb_value *a
     int n = mrb->m_ctx->m_ci->nregs;
     mrb_value val;
     if (mrb_nil_p(b)) {
-         mrb_raise(mrb, E_ARGUMENT_ERROR, "no block given");
+         mrb->mrb_raise(E_ARGUMENT_ERROR, "no block given");
     }
     RProc *p = mrb_proc_ptr(b);
     mrb_callinfo *ci = cipush(mrb);
@@ -432,9 +432,9 @@ static void localjump_error(mrb_state *mrb, localjump_error_kind kind)
     static const char lead[] = "unexpected ";
 
     mrb_value msg = mrb_str_buf_new(mrb, sizeof(lead) + 7);
-    mrb_str_buf_cat(mrb, msg, lead, sizeof(lead) - 1);
-    mrb_str_buf_cat(mrb, msg, kind_str[kind], kind_str_len[kind]);
-    mrb_value exc = mrb_exc_new3(mrb, E_LOCALJUMP_ERROR, msg);
+    mrb_str_buf_cat(msg, lead, sizeof(lead) - 1);
+    mrb_str_buf_cat(msg, kind_str[kind], kind_str_len[kind]);
+    mrb_value exc = mrb_exc_new3(E_LOCALJUMP_ERROR, msg);
     mrb->m_exc = mrb_obj_ptr(exc);
 }
 
@@ -452,7 +452,7 @@ static void argnum_error(mrb_state *mrb, int num)
         str = mrb_format(mrb, "wrong number of arguments (%S for %S)",
                          mrb_fixnum_value(mrb->m_ctx->m_ci->argc), mrb_fixnum_value(num));
     }
-    exc = mrb_exc_new3(mrb, E_ARGUMENT_ERROR, str);
+    exc = mrb_exc_new3(E_ARGUMENT_ERROR, str);
     mrb->m_exc = mrb_obj_ptr(exc);
 }
 
@@ -1003,7 +1003,7 @@ L_SEND:
                 if (!e) {
                     mrb_value exc;
                     static const char m[] = "super called outside of method";
-                    exc = mrb_exc_new(this, I_NOMETHOD_ERROR, m, sizeof(m) - 1);
+                    exc = mrb_exc_new(I_NOMETHOD_ERROR, m, sizeof(m) - 1);
                     m_exc = mrb_obj_ptr(exc);
                     goto L_RAISE;
                 }
@@ -1570,7 +1570,7 @@ L_RESCUE:
         CASE(OP_EQ) {
             /* A B C  R(A) := R(A)<R(A+1) (Syms[B]=:==,C=1)*/
             int a = GETARG_A(i);
-            if (mrb_obj_eq(this, regs[a], regs[a+1])) {
+            if (mrb_obj_eq(regs[a], regs[a+1])) {
                 regs[a] = mrb_true_value();
             }
             else {
@@ -1835,7 +1835,7 @@ L_RESCUE:
             /* A B    R(A) := target_class */
             if (!m_ctx->m_ci->target_class) {
                 static const char msg[] = "no target class or module";
-                mrb_value exc = mrb_exc_new(this, I_TYPE_ERROR, msg, sizeof(msg) - 1);
+                mrb_value exc = mrb_exc_new(I_TYPE_ERROR, msg, sizeof(msg) - 1);
                 m_exc = mrb_obj_ptr(exc);
                 goto L_RAISE;
             }
@@ -1886,7 +1886,7 @@ L_STOP:
             if (GETARG_A(i) != 0) {
                 excep_class = I_LOCALJUMP_ERROR;
             }
-            m_exc = mrb_obj_ptr(mrb_exc_new3(this, excep_class, msg));
+            m_exc = mrb_obj_ptr(mrb_exc_new3(excep_class, msg));
             goto L_RAISE;
         }
     }

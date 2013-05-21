@@ -75,14 +75,14 @@ RClass *mrb_define_module(mrb_state *, const char*);
 #else
 #define NORET(x)  [[noreturn]] x
 #endif
-mrb_value mrb_exc_new(mrb_state *mrb, struct RClass *c, const char *ptr, long len);
+mrb_value mrb_exc_new(struct RClass *c, const char *ptr, long len);
 NORET(void mrb_exc_raise(mrb_state *mrb, mrb_value exc));
-NORET(void mrb_raise(mrb_state *mrb, RClass *c, const char *msg));
-NORET(void mrb_raisef(mrb_state *mrb, RClass *c, const char *fmt, ...));
+NORET(void mrb_raise(RClass *c, const char *msg));
+//NORET(void mrb_raisef(mrb_state *mrb, RClass *c, const char *fmt, ...));
 NORET(void mrb_name_error(mrb_state *mrb, mrb_sym id, const char *fmt, ...));
 int mrb_get_args(mrb_state *mrb, const char *format, ...);
 
-mrb_value mrb_funcall(mrb_state*, mrb_value, const char*, int,...);
+//mrb_value mrb_funcall(mrb_state*, mrb_value, const char*, int,...);
 mrb_value mrb_funcall_argv(mrb_state*, mrb_value, mrb_sym, int, mrb_value*);
 mrb_value mrb_funcall_with_block(mrb_state*, mrb_value, mrb_sym, int, const mrb_value *, mrb_value);
 mrb_sym mrb_intern_cstr(mrb_state*,const char*);
@@ -202,6 +202,9 @@ public:
         return res;
     }
     NORET(void mrb_raise(RClass *m_ctx, const char *msg));
+    NORET(void mrb_raisef(RClass *c, const char *fmt...));
+
+    mrb_value funcall(mrb_value self, const char *name, int argc...);
 protected:
     void get_arg(const mrb_value &arg, mrb_int &tgt);
     void get_arg(const mrb_value &arg, mrb_sym &tgt);
@@ -242,7 +245,6 @@ void mrb_include_module(mrb_state*, RClass*, RClass*);
 void mrb_define_class_method(RClass *, const char *, mrb_func_t, mrb_aspec);
 //void mrb_define_singleton_method(struct RObject*, const char*, mrb_func_t, mrb_aspec);
 void mrb_define_module_function(mrb_state*, RClass*, const char*, mrb_func_t, mrb_aspec);
-void mrb_define_const(mrb_state*, struct RClass*, const char *name, mrb_value);
 void mrb_undef_method(mrb_state*, struct RClass*, const char*);
 void mrb_undef_class_method(mrb_state*, struct RClass*, const char*);
 mrb_value mrb_instance_new(mrb_state *mrb, mrb_value cv);
@@ -252,7 +254,7 @@ int mrb_class_defined(mrb_state *mrb, const char *name);
 RClass * mrb_class_get(mrb_state *mrb, const char *name);
 
 mrb_value mrb_obj_dup(mrb_state *mrb, mrb_value obj);
-mrb_value mrb_check_to_integer(mrb_state *mrb, mrb_value val, const char *method);
+mrb_value mrb_check_to_integer(mrb_state *mrb, const mrb_value &val, const char *method);
 RClass * mrb_define_class_under(mrb_state *mrb, RClass *outer, const char *name, struct RClass *super);
 RClass * mrb_define_module_under(mrb_state *mrb, RClass *outer, const char *name);
 
@@ -307,8 +309,8 @@ void mrb_p(mrb_state*, mrb_value);
 mrb_int mrb_obj_id(const mrb_value &obj);
 mrb_sym mrb_obj_to_sym(mrb_state *mrb, mrb_value name);
 
-int mrb_obj_eq(mrb_state*, mrb_value, mrb_value);
-int mrb_obj_equal(mrb_state*, mrb_value, mrb_value);
+int mrb_obj_eq(mrb_value , mrb_value );
+int mrb_obj_equal(mrb_value , mrb_value );
 int mrb_equal(mrb_state *mrb, mrb_value obj1, mrb_value obj2);
 mrb_value mrb_Integer(mrb_state *mrb, mrb_value val);
 mrb_value mrb_Float(mrb_state *mrb, mrb_value val);
@@ -323,7 +325,7 @@ int mrb_eql(mrb_state *mrb, mrb_value obj1, mrb_value obj2);
 } while (0)
 //void mrb_write_barrier(mrb_state *, struct RBasic*);
 
-mrb_value mrb_check_convert_type(mrb_state *mrb, mrb_value val, mrb_int type, const char *tname, const char *method);
+mrb_value mrb_check_convert_type(mrb_state *mrb, const mrb_value &val, mrb_int type, const char *tname, const char *method);
 mrb_value mrb_any_to_s(mrb_state *mrb, mrb_value obj);
 const char * mrb_obj_classname(mrb_state *mrb, mrb_value obj);
 RClass* mrb_obj_class(mrb_state *mrb, mrb_value obj);
@@ -375,7 +377,7 @@ const char *mrb_class_name(mrb_state *mrb, RClass* klass);
 void mrb_define_global_const(mrb_state *mrb, const char *name, mrb_value val);
 
 mrb_value mrb_block_proc(void);
-mrb_value mrb_attr_get(mrb_state *mrb, mrb_value obj, mrb_sym id);
+mrb_value mrb_attr_get(mrb_value obj, mrb_sym id);
 
 int mrb_respond_to(mrb_state *mrb, const mrb_value &obj, mrb_sym mid);
 bool mrb_obj_is_instance_of(mrb_state *mrb, mrb_value obj, struct RClass* c);

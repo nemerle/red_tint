@@ -3,9 +3,14 @@
 **
 ** See Copyright Notice in mruby.h
 */
-
 #pragma once
+
+#include "mrbconf.h"
 #include "mruby/value.h"
+
+#ifndef MRB_STR_BUF_MIN_SIZE
+# define MRB_STR_BUF_MIN_SIZE 128
+#endif
 
 #define IS_EVSTR(p,e) ((p) < (e) && (*(p) == '$' || *(p) == '@' || *(p) == '{'))
 
@@ -20,14 +25,26 @@ struct RString : public RBasic {
     } aux;
     char *ptr;
 public:
+    static RString *create(mrb_state *mrb, const char *p, mrb_int len);
+    static RString *create(mrb_state *mrb, mrb_int capa) {
+        RString *s = ((mrb)->gc().obj_alloc<RString>((mrb)->string_class));
+
+        if (capa < MRB_STR_BUF_MIN_SIZE) {
+            capa = MRB_STR_BUF_MIN_SIZE;
+        }
+        s->len = 0;
+        s->aux.capa = capa;
+        s->ptr = (char *)mrb->gc()._malloc(capa+1);
+        s->ptr[0] = '\0';
+        return s;
+    }
+
     void str_cat(const char *ptr, int len);
     void buf_append(mrb_value str2);
     void str_append(mrb_value str2);
+    void str_buf_cat(const char *ptr, size_t len);
+private:
 };
-#if defined(__cplusplus)
-extern "C" {
-#endif
-
 
 #define mrb_str_ptr(s)    ((struct RString*)((s).value.p))
 #define RSTRING(s)        ((struct RString*)((s).value.p))
@@ -46,7 +63,7 @@ mrb_value mrb_str_resize(mrb_state *mrb, mrb_value str, mrb_int len); /* mrb_str
 mrb_value mrb_str_substr(mrb_state *mrb, mrb_value str, mrb_int beg, mrb_int len);
 mrb_value mrb_check_string_type(mrb_state *mrb, mrb_value str);
 mrb_value mrb_str_buf_new(mrb_state *mrb, mrb_int capa);
-mrb_value mrb_str_buf_cat(mrb_state *mrb, mrb_value str, const char *ptr, size_t len);
+mrb_value mrb_str_buf_cat(mrb_value str, const char *ptr, size_t len);
 
 char *mrb_string_value_cstr(mrb_state *mrb, mrb_value *ptr);
 char *mrb_string_value_ptr(mrb_state *mrb, mrb_value ptr);
@@ -73,7 +90,3 @@ static inline mrb_value
 mrb_str_cat2(mrb_state *mrb, mrb_value str, const char *ptr) {
     return mrb_str_cat_cstr(mrb, str, ptr);
 }
-
-#if defined(__cplusplus)
-}  /* extern "C" { */
-#endif

@@ -141,7 +141,7 @@ mrb_value mrb_obj_inspect(mrb_state *mrb, mrb_value obj)
 static mrb_value mrb_obj_equal_m(mrb_state *mrb, mrb_value self)
 {
     mrb_value arg = mrb->get_arg<mrb_value>();
-    mrb_bool eql_p = mrb_obj_equal(mrb, self, arg);
+    mrb_bool eql_p = mrb_obj_equal(self, arg);
 
     return mrb_bool_value(eql_p);
 }
@@ -337,7 +337,7 @@ static void init_copy(mrb_state *mrb, mrb_value dest, mrb_value obj)
     default:
         break;
     }
-    mrb_funcall(mrb, dest, "initialize_copy", 1, obj);
+    mrb->funcall(dest, "initialize_copy", 1, obj);
 }
 
 /* 15.3.1.3.8  */
@@ -371,7 +371,7 @@ mrb_obj_clone(mrb_state *mrb, mrb_value self)
 {
 
     if (mrb_special_const_p(self)) {
-        mrb_raisef(mrb, E_TYPE_ERROR, "can't clone %S", self);
+        mrb->mrb_raisef(E_TYPE_ERROR, "can't clone %S", self);
     }
     RObject *p      = mrb->gc().obj_alloc<RObject>(mrb_type(self), mrb_obj_class(mrb, self));
     p->c    = mrb_singleton_class_clone(mrb, self);
@@ -404,7 +404,7 @@ mrb_value mrb_obj_dup(mrb_state *mrb, mrb_value obj)
 {
 
     if (mrb_special_const_p(obj)) {
-        mrb_raisef(mrb, E_TYPE_ERROR, "can't dup %S", obj);
+        mrb->mrb_raisef(E_TYPE_ERROR, "can't dup %S", obj);
     }
     RBasic *p = mrb->gc().obj_alloc<RBasic>(mrb_type(obj), mrb_obj_class(mrb, obj));
     mrb_value dup = mrb_obj_value(p);
@@ -417,14 +417,14 @@ static mrb_value mrb_obj_extend(mrb_state *mrb, int argc, mrb_value *argv, mrb_v
 {
 
     if (argc == 0) {
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "wrong number of arguments (at least 1)");
+        mrb->mrb_raise(E_ARGUMENT_ERROR, "wrong number of arguments (at least 1)");
     }
     for (int i = 0; i < argc; i++) {
         mrb_check_type(mrb, argv[i], MRB_TT_MODULE);
     }
     while (argc--) {
-        mrb_funcall(mrb, argv[argc], "extend_object", 1, obj);
-        mrb_funcall(mrb, argv[argc], "extended", 1, obj);
+        mrb->funcall(argv[argc], "extend_object", 1, obj);
+        mrb->funcall(argv[argc], "extended", 1, obj);
     }
     return obj;
 }
@@ -486,10 +486,10 @@ mrb_value
 mrb_obj_init_copy(mrb_state *mrb, mrb_value self)
 {
     mrb_value orig = mrb->get_arg<mrb_value>();
-    if (mrb_obj_equal(mrb, self, orig))
+    if (mrb_obj_equal(self, orig))
         return self;
     if ((mrb_type(self) != mrb_type(orig)) || (mrb_obj_class(mrb, self) != mrb_obj_class(mrb, orig))) {
-        mrb_raise(mrb, E_TYPE_ERROR, "initialize_copy should take same class object");
+        mrb->mrb_raise(E_TYPE_ERROR, "initialize_copy should take same class object");
     }
     return self;
 }
@@ -523,7 +523,7 @@ mrb_value mrb_obj_instance_eval(mrb_state *mrb, mrb_value self)
     RClass *c;
 
     if (mrb_get_args(mrb, "|S&", &a, &b) == 1) {
-        mrb_raise(mrb, E_NOTIMP_ERROR, "instance_eval with string not implemented");
+        mrb->mrb_raise(E_NOTIMP_ERROR, "instance_eval with string not implemented");
     }
     switch (mrb_type(self)) {
     case MRB_TT_SYMBOL:
@@ -612,13 +612,12 @@ mrb_value mrb_obj_ivar_defined(mrb_state *mrb, mrb_value self)
  *     fred.instance_variable_get(:@a)    #=> "cat"
  *     fred.instance_variable_get("@b")   #=> 99
  */
-mrb_value
-mrb_obj_ivar_get(mrb_state *mrb, mrb_value self)
+mrb_value mrb_obj_ivar_get(mrb_state *mrb, mrb_value self)
 {
     mrb_sym id=mrb->get_arg<mrb_sym>();
 
     check_iv_name(mrb, id);
-    return mrb_iv_get(mrb, self, id);
+    return mrb_iv_get(self, id);
 }
 
 /* 15.3.1.3.22 */
@@ -830,7 +829,7 @@ mrb_value mrb_f_raise(mrb_state *mrb, mrb_value self)
     argc = mrb_get_args(mrb, "|oo", &a[0], &a[1]);
     switch (argc) {
     case 0:
-        mrb_raise(mrb, E_RUNTIME_ERROR, "");
+        mrb->mrb_raise(E_RUNTIME_ERROR, "");
         break;
     case 1:
         a[1] = mrb_check_string_type(mrb, a[0]);
@@ -877,7 +876,7 @@ mrb_obj_remove_instance_variable(mrb_state *mrb, mrb_value self)
 
     mrb_sym sym=mrb->get_arg<mrb_sym>();
     check_iv_name(mrb, sym);
-    val = mrb_iv_remove(mrb, self, sym);
+    val = mrb_iv_remove(self, sym);
     if (mrb_undef_p(val)) {
         mrb_name_error(mrb, sym, "instance variable %S not defined", mrb_sym2str(mrb, sym));
     }
@@ -928,7 +927,7 @@ mrb_value obj_respond_to(mrb_state *mrb, mrb_value self)
             tmp = mrb_check_string_type(mrb, mid);
             if (mrb_nil_p(tmp)) {
                 tmp = mrb_inspect(mrb, mid);
-                mrb_raisef(mrb, E_TYPE_ERROR, "%S is not a symbol", tmp);
+                mrb->mrb_raisef(E_TYPE_ERROR, "%S is not a symbol", tmp);
             }
         }
         tmp = mrb_check_intern_str(mrb, mid);

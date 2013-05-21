@@ -100,7 +100,7 @@
 # define PRIxMRB_INT PRIx32
 # define PRIXMRB_INT PRIX32
 #endif
-typedef short mrb_sym;
+typedef uint16_t mrb_sym;
 
 /* define ENABLE_XXXX from DISABLE_XXX */
 #define ENABLE_STDIO 1

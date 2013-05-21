@@ -25,10 +25,10 @@ range_check(mrb_state *mrb, mrb_value a, mrb_value b)
         return;
     }
 
-    ans =  mrb_funcall(mrb, a, "<=>", 1, b);
+    ans =  mrb->funcall(a, "<=>", 1, b);
     if (mrb_nil_p(ans)) {
         /* can not be compared */
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "bad value for range");
+        mrb->mrb_raise(E_ARGUMENT_ERROR, "bad value for range");
     }
 }
 
@@ -145,12 +145,10 @@ mrb_range_eq(mrb_state *mrb, mrb_value range)
 {
     RRange *rr;
     RRange *ro;
-    mrb_value obj;
     mrb_bool eq_p;
+    mrb_value obj = mrb->get_arg<mrb_value>();
 
-    mrb_get_args(mrb, "o", &obj);
-
-    if (mrb_obj_equal(mrb, range, obj)) {
+    if (mrb_obj_equal(range, obj)) {
         eq_p = 1;
     }
     else if (!mrb_obj_is_instance_of(mrb, obj, mrb_obj_class(mrb, range))) { /* same class? */
@@ -159,8 +157,8 @@ mrb_range_eq(mrb_state *mrb, mrb_value range)
     else {
         rr = mrb_range_ptr(range);
         ro = mrb_range_ptr(obj);
-        if (!mrb_obj_equal(mrb, rr->edges->beg, ro->edges->beg) ||
-                !mrb_obj_equal(mrb, rr->edges->end, ro->edges->end) ||
+        if (!mrb_obj_equal(rr->edges->beg, ro->edges->beg) ||
+                !mrb_obj_equal(rr->edges->end, ro->edges->end) ||
                 rr->excl != ro->excl) {
             eq_p = 0;
         }
@@ -175,7 +173,7 @@ mrb_range_eq(mrb_state *mrb, mrb_value range)
 static int
 r_le(mrb_state *mrb, mrb_value a, mrb_value b)
 {
-    mrb_value r = mrb_funcall(mrb, a, "<=>", 1, b); /* compare result */
+    mrb_value r = mrb->funcall(a, "<=>", 1, b); /* compare result */
     /* output :a < b => -1, a = b =>  0, a > b => +1 */
 
     if (mrb_type(r) == MRB_TT_FIXNUM) {
@@ -189,7 +187,7 @@ r_le(mrb_state *mrb, mrb_value a, mrb_value b)
 static int
 r_gt(mrb_state *mrb, mrb_value a, mrb_value b)
 {
-    mrb_value r = mrb_funcall(mrb, a, "<=>", 1, b);
+    mrb_value r = mrb->funcall(a, "<=>", 1, b);
     /* output :a < b => -1, a = b =>  0, a > b => +1 */
 
     if (mrb_type(r) == MRB_TT_FIXNUM) {
@@ -202,7 +200,7 @@ r_gt(mrb_state *mrb, mrb_value a, mrb_value b)
 static int
 r_ge(mrb_state *mrb, mrb_value a, mrb_value b)
 {
-    mrb_value r = mrb_funcall(mrb, a, "<=>", 1, b); /* compare result */
+    mrb_value r = mrb->funcall(a, "<=>", 1, b); /* compare result */
     /* output :a < b => -1, a = b =>  0, a > b => +1 */
 
     if (mrb_type(r) == MRB_TT_FIXNUM) {
@@ -224,7 +222,7 @@ mrb_value
 mrb_range_include(mrb_state *mrb, mrb_value range)
 {
     mrb_value val;
-    struct RRange *r = mrb_range_ptr(range);
+    RRange *r = mrb_range_ptr(range);
     mrb_value beg, end;
     mrb_bool include_p;
 
@@ -267,10 +265,10 @@ mrb_int
 mrb_range_beg_len(mrb_state *mrb, mrb_value range, mrb_int *begp, mrb_int *lenp, mrb_int len)
 {
     mrb_int beg, end, b, e;
-    struct RRange *r = mrb_range_ptr(range);
+    RRange *r = mrb_range_ptr(range);
 
     if (mrb_type(range) != MRB_TT_RANGE) {
-        mrb_raise(mrb, E_TYPE_ERROR, "expected Range.");
+        mrb->mrb_raise(E_TYPE_ERROR, "expected Range.");
     }
 
     beg = b = mrb_fixnum(r->edges->beg);
@@ -309,7 +307,7 @@ static mrb_value
 range_to_s(mrb_state *mrb, mrb_value range)
 {
     mrb_value str, str2;
-    struct RRange *r = mrb_range_ptr(range);
+    RRange *r = mrb_range_ptr(range);
 
     str  = mrb_obj_as_string(mrb, r->edges->beg);
     str2 = mrb_obj_as_string(mrb, r->edges->end);
@@ -377,12 +375,12 @@ range_inspect(mrb_state *mrb, mrb_value range)
 static mrb_value
 range_eql(mrb_state *mrb, mrb_value range)
 {
-    mrb_value obj;
-    struct RRange *r, *o;
+    RRange *r, *o;
     mrb_bool eql_p;
 
-    mrb_get_args(mrb, "o", &obj);
-    if (mrb_obj_equal(mrb, range, obj)) {
+    mrb_value obj = mrb->get_arg<mrb_value>();
+
+    if (mrb_obj_equal(range, obj)) {
         eql_p = 1;
     }
     else if (!mrb_obj_is_kind_of(mrb, obj, RANGE_CLASS)) {
@@ -410,20 +408,17 @@ range_eql(mrb_state *mrb, mrb_value range)
 }
 
 /* 15.2.14.4.15(x) */
-mrb_value
-range_initialize_copy(mrb_state *mrb, mrb_value copy)
+mrb_value range_initialize_copy(mrb_state *mrb, mrb_value copy)
 {
-    mrb_value src;
-    struct RRange *r;
+    mrb_value src = mrb->get_arg<mrb_value>();
 
-    mrb_get_args(mrb, "o", &src);
-
-    if (mrb_obj_equal(mrb, copy, src)) return copy;
+    if (mrb_obj_equal(copy, src))
+        return copy;
     if (!mrb_obj_is_instance_of(mrb, src, mrb_obj_class(mrb, copy))) {
-        mrb_raise(mrb, E_TYPE_ERROR, "wrong argument class");
+        mrb->mrb_raise(E_TYPE_ERROR, "wrong argument class");
     }
 
-    r = mrb_range_ptr(src);
+    RRange * r = mrb_range_ptr(src);
     range_init(mrb, copy, r->edges->beg, r->edges->end, r->excl);
 
     return copy;

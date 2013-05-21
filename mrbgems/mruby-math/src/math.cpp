@@ -6,11 +6,11 @@
 
 #include "mruby.h"
 #include "mruby/array.h"
-
+#include "mruby/class.h"
 #include <math.h>
 
 #define domain_error(msg) \
-    mrb_raise(mrb, E_RANGE_ERROR, "Numerical argument is out of domain - " #msg)
+    mrb->mrb_raise(E_RANGE_ERROR, "Numerical argument is out of domain - " #msg)
 
 /* math functions not provided under Microsoft Visual C++ */
 #ifdef _MSC_VER
@@ -631,25 +631,24 @@ math_erfc(mrb_state *mrb, mrb_value obj)
 void
 mrb_mruby_math_gem_init(mrb_state* mrb)
 {
-  struct RClass *mrb_math;
-  mrb_math = mrb_define_module(mrb, "Math");
+  RClass *mrb_math = mrb_define_module(mrb, "Math");
 
 #ifdef M_PI
-  mrb_define_const(mrb, mrb_math, "PI", mrb_float_value(M_PI));
+  mrb_math->define_const("PI", mrb_float_value(M_PI));
 #else
-  mrb_define_const(mrb, mrb_math, "PI", mrb_float_value(atan(1.0)*4.0));
+  mrb_math->define_const("PI", mrb_float_value(atan(1.0)*4.0));
 #endif
 
 #ifdef M_E
-  mrb_define_const(mrb, mrb_math, "E", mrb_float_value(M_E));
+  mrb_math->define_const("E", mrb_float_value(M_E));
 #else
-  mrb_define_const(mrb, mrb_math, "E", mrb_float_value(exp(1.0)));
+  mrb_math->define_const("E", mrb_float_value(exp(1.0)));
 #endif
 
 #ifdef MRB_USE_FLOAT
-  mrb_define_const(mrb, mrb_math, "TOLERANCE", mrb_float_value(1e-5));
+  mrb_math->define_const("TOLERANCE", mrb_float_value(1e-5));
 #else
-  mrb_define_const(mrb, mrb_math, "TOLERANCE", mrb_float_value(1e-12));
+  mrb_math->define_const("TOLERANCE", mrb_float_value(1e-12));
 #endif
 
   mrb_define_module_function(mrb, mrb_math, "sin", math_sin, MRB_ARGS_REQ(1));

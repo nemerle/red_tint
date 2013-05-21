@@ -38,7 +38,7 @@ mrb_to_flo(mrb_state *mrb, mrb_value val)
         case MRB_TT_FLOAT:
             break;
         default:
-            mrb_raise(mrb, E_TYPE_ERROR, "non float value");
+            mrb->mrb_raise(E_TYPE_ERROR, "non float value");
     }
     return mrb_float(val);
 }
@@ -63,14 +63,12 @@ num_uplus(mrb_state *mrb, mrb_value num)
  *  Unary Minus---Returns the receiver's value, negated.
  */
 
-static mrb_value
-num_uminus(mrb_state *mrb, mrb_value num)
+static mrb_value num_uminus(mrb_state *mrb, mrb_value num)
 {
     return mrb_float_value((mrb_float)0 - mrb_to_flo(mrb, num));
 }
 
-static mrb_value
-fix_uminus(mrb_state *mrb, mrb_value num)
+static mrb_value fix_uminus(mrb_state *mrb, mrb_value num)
 {
     return mrb_fixnum_value(0 - mrb_fixnum(num));
 }
@@ -84,15 +82,14 @@ fix_uminus(mrb_state *mrb, mrb_value num)
  *
  *    2.0**3      #=> 8.0
  */
-static mrb_value
-num_pow(mrb_state *mrb, mrb_value x)
+static mrb_value num_pow(mrb_state *mrb, mrb_value x)
 {
-    mrb_value y;
     int both_int = false;
     mrb_float d;
+    mrb_value y = mrb->get_arg<mrb_value>();
 
-    mrb_get_args(mrb, "o", &y);
-    if (mrb_fixnum_p(x) && mrb_fixnum_p(y)) both_int = true;
+    if (mrb_fixnum_p(x) && mrb_fixnum_p(y))
+        both_int = true;
     d = pow(mrb_to_flo(mrb, x), mrb_to_flo(mrb, y));
     if (both_int && FIXABLE(d))
         return mrb_fixnum_value((mrb_int)d);
@@ -124,8 +121,7 @@ mrb_num_div(mrb_state *mrb, mrb_value x, mrb_value y)
  *  Returns most exact division.
  */
 
-static mrb_value
-num_div(mrb_state *mrb, mrb_value x)
+static mrb_value num_div(mrb_state *mrb, mrb_value x)
 {
     mrb_float y;
 
@@ -145,8 +141,7 @@ num_div(mrb_state *mrb, mrb_value x)
  *     -34.56.abs     #=> 34.56
  */
 
-static mrb_value
-num_abs(mrb_state *mrb, mrb_value num)
+static mrb_value num_abs(mrb_state *mrb, mrb_value num)
 {
     if (mrb_to_flo(mrb, num) < 0) {
         return num_uminus(mrb, num);
@@ -163,17 +158,16 @@ num_abs(mrb_state *mrb, mrb_value num)
  *  representation.
  */
 
-mrb_value
-mrb_flo_to_str(mrb_state *mrb, mrb_value flo, int max_digit)
+mrb_value mrb_flo_to_str(mrb_state *mrb, mrb_value flo, int max_digit)
 {
     mrb_value result;
     mrb_float n;
 
     if (max_digit > 40) {
-        mrb_raise(mrb, E_RANGE_ERROR, "Too large max_digit.");
+        mrb->mrb_raise(E_RANGE_ERROR, "Too large max_digit.");
     }
     else if (!mrb_float_p(flo)) {
-        mrb_raise(mrb, E_TYPE_ERROR, "non float value");
+        mrb->mrb_raise(E_TYPE_ERROR, "non float value");
     }
 
     n = mrb_float(flo);
@@ -247,7 +241,7 @@ mrb_flo_to_str(mrb_state *mrb, mrb_value flo, int max_digit)
             }
 
             if (exp >= 100) {
-                mrb_raise(mrb, E_RANGE_ERROR, "Too large expornent.");
+                mrb->mrb_raise(E_RANGE_ERROR, "Too large expornent.");
             }
 
             *(c++) = '0' + exp / 10;
@@ -273,8 +267,7 @@ mrb_flo_to_str(mrb_state *mrb, mrb_value flo, int max_digit)
  *  ``<code>-Infinity</code>''.
  */
 
-static mrb_value
-flo_to_s(mrb_state *mrb, mrb_value flt)
+static mrb_value flo_to_s(mrb_state *mrb, mrb_value flt)
 {
 #ifdef MRB_USE_FLOAT
     return mrb_flo_to_str(mrb, flt, 7);
@@ -292,12 +285,9 @@ flo_to_s(mrb_state *mrb, mrb_value flt)
  * and <code>other</code>.
  */
 
-static mrb_value
-flo_minus(mrb_state *mrb, mrb_value x)
+static mrb_value flo_minus(mrb_state *mrb, mrb_value x)
 {
-    mrb_value y;
-
-    mrb_get_args(mrb, "o", &y);
+    mrb_value y = mrb->get_arg<mrb_value>();
     return mrb_float_value(mrb_float(x) - mrb_to_flo(mrb, y));
 }
 
@@ -310,17 +300,13 @@ flo_minus(mrb_state *mrb, mrb_value x)
  * and <code>other</code>.
  */
 
-static mrb_value
-flo_mul(mrb_state *mrb, mrb_value x)
+static mrb_value flo_mul(mrb_state *mrb, mrb_value x)
 {
-    mrb_value y;
-
-    mrb_get_args(mrb, "o", &y);
+    mrb_value y = mrb->get_arg<mrb_value>();
     return mrb_float_value(mrb_float(x) * mrb_to_flo(mrb, y));
 }
 
-static void
-flodivmod(mrb_state *mrb, mrb_float x, mrb_float y, mrb_float *divp, mrb_float *modp)
+static void flodivmod(mrb_state *mrb, mrb_float x, mrb_float y, mrb_float *divp, mrb_float *modp)
 {
     mrb_float div;
     mrb_float mod;
@@ -357,13 +343,10 @@ flodivmod(mrb_state *mrb, mrb_float x, mrb_float y, mrb_float *divp, mrb_float *
  *     6543.21.modulo(137.24)   #=> 92.9299999999996
  */
 
-static mrb_value
-flo_mod(mrb_state *mrb, mrb_value x)
+static mrb_value flo_mod(mrb_state *mrb, mrb_value x)
 {
-    mrb_value y;
     mrb_float fy, mod;
-
-    mrb_get_args(mrb, "o", &y);
+    mrb_value y = mrb->get_arg<mrb_value>();
 
     fy = mrb_to_flo(mrb, y);
     flodivmod(mrb, mrb_float(x), fy, 0, &mod);
@@ -382,28 +365,23 @@ flo_mod(mrb_state *mrb, mrb_value x)
  *     1.eql?(1.0)       #=> false
  *     (1.0).eql?(1.0)   #=> true
  */
-static mrb_value
-num_eql(mrb_state *mrb, mrb_value x)
+static mrb_value num_eql(mrb_state *mrb, mrb_value x)
 {
-    mrb_value y;
-    mrb_bool eql_p;
+    mrb_bool eql_p=false;
 
-    mrb_get_args(mrb, "o", &y);
-    if (mrb_type(x) != mrb_type(y)) {
-        eql_p = 0;
-    }
-    else {
+    mrb_value y = mrb->get_arg<mrb_value>();
+    if (mrb_type(x) == mrb_type(y)) {
         eql_p = mrb_equal(mrb, x, y);
     }
 
     return mrb_bool_value(eql_p);
 }
 
-static mrb_value
-num_equal(mrb_state *mrb, mrb_value x, mrb_value y)
+static mrb_value num_equal(mrb_state *mrb, mrb_value x, mrb_value y)
 {
-    if (mrb_obj_equal(mrb, x, y)) return mrb_true_value();
-    return mrb_funcall(mrb, y, "==", 1, x);
+    if (mrb_obj_equal(x, y))
+        return mrb_true_value();
+    return mrb->funcall(y, "==", 1, x);
 }
 
 /* 15.2.9.3.7  */
@@ -419,13 +397,10 @@ num_equal(mrb_state *mrb, mrb_value x, mrb_value y)
  *
  */
 
-static mrb_value
-flo_eq(mrb_state *mrb, mrb_value x)
+static mrb_value flo_eq(mrb_state *mrb, mrb_value x)
 {
-    mrb_value y;
-    volatile mrb_float a, b;
-
-    mrb_get_args(mrb, "o", &y);
+    mrb_float a, b;
+    mrb_value y = mrb->get_arg<mrb_value>();
 
     switch (mrb_type(y)) {
         case MRB_TT_FIXNUM:
@@ -448,8 +423,7 @@ flo_eq(mrb_state *mrb, mrb_value x)
  *
  * Returns a hash code for this float.
  */
-static mrb_value
-flo_hash(mrb_state *mrb, mrb_value num)
+static mrb_value flo_hash(mrb_state *mrb, mrb_value num)
 {
     mrb_float d;
     char *c;
@@ -475,8 +449,7 @@ flo_hash(mrb_state *mrb, mrb_value num)
  * As <code>flt</code> is already a float, returns +self+.
  */
 
-static mrb_value
-flo_to_f(mrb_state *mrb, mrb_value num)
+static mrb_value flo_to_f(mrb_state *mrb, mrb_value num)
 {
     return num;
 }
@@ -607,8 +580,7 @@ flo_ceil(mrb_state *mrb, mrb_value num)
  *
  */
 
-static mrb_value
-flo_round(mrb_state *mrb, mrb_value num)
+static mrb_value flo_round(mrb_state *mrb, mrb_value num)
 {
     double number, f;
     mrb_int ndigits = 0;
@@ -729,7 +701,7 @@ static mrb_value
 int_succ(mrb_state *mrb, mrb_value num)
 {
     if (mrb_fixnum_p(num)) return fix_succ(mrb, num);
-    return mrb_funcall(mrb, num, "+", 1, mrb_fixnum_value(1));
+    return mrb->funcall(num, "+", 1, mrb_fixnum_value(1));
 }
 
 #define SQRT_INT_MAX ((mrb_int)1<<((sizeof(mrb_int)*CHAR_BIT-1)/2))
@@ -768,12 +740,9 @@ mrb_fixnum_mul(mrb_state *mrb, mrb_value x, mrb_value y)
  * result.
  */
 
-static mrb_value
-fix_mul(mrb_state *mrb, mrb_value x)
+static mrb_value fix_mul(mrb_state *mrb, mrb_value x)
 {
-    mrb_value y;
-
-    mrb_get_args(mrb, "o", &y);
+    mrb_value y = mrb->get_arg<mrb_value>();
     return mrb_fixnum_mul(mrb, x, y);
 }
 
@@ -818,10 +787,9 @@ fixdivmod(mrb_state *mrb, mrb_int x, mrb_int y, mrb_int *divp, mrb_int *modp)
 static mrb_value
 fix_mod(mrb_state *mrb, mrb_value x)
 {
-    mrb_value y;
     mrb_int a, b;
 
-    mrb_get_args(mrb, "o", &y);
+    mrb_value y = mrb->get_arg<mrb_value>();
     a = mrb_fixnum(x);
     if (mrb_fixnum_p(y) && (b=mrb_fixnum(y)) != 0) {
         mrb_int mod;
@@ -846,12 +814,9 @@ fix_mod(mrb_state *mrb, mrb_value x)
  *
  *  See <code>Numeric#divmod</code>.
  */
-static mrb_value
-fix_divmod(mrb_state *mrb, mrb_value x)
+static mrb_value fix_divmod(mrb_state *mrb, mrb_value x)
 {
-    mrb_value y;
-
-    mrb_get_args(mrb, "o", &y);
+    mrb_value y = mrb->get_arg<mrb_value>();
 
     if (mrb_fixnum_p(y)) {
         mrb_int div, mod;
@@ -889,12 +854,11 @@ fix_divmod(mrb_state *mrb, mrb_value x)
 static mrb_value
 fix_equal(mrb_state *mrb, mrb_value x)
 {
-    mrb_value y;
     mrb_bool equal_p;
 
-    mrb_get_args(mrb, "o", &y);
+    mrb_value y = mrb->get_arg<mrb_value>();
 
-    equal_p = mrb_obj_equal(mrb, x, y) ||
+    equal_p = mrb_obj_equal(x, y) ||
             (mrb_type(y) == MRB_TT_FLOAT &&
              (mrb_float)mrb_fixnum(x) == mrb_float(y));
 
@@ -912,21 +876,18 @@ fix_equal(mrb_state *mrb, mrb_value x)
  *   ex.0---00100 (4)-> 1---11011 (-5)
  */
 
-static mrb_value
-fix_rev(mrb_state *mrb, mrb_value num)
+static mrb_value fix_rev(mrb_state *mrb, mrb_value num)
 {
     mrb_int val = mrb_fixnum(num);
-
     val = ~val;
     return mrb_fixnum_value(val);
 }
 
-static mrb_value
-bit_coerce(mrb_state *mrb, mrb_value x)
+static mrb_value bit_coerce(mrb_state *mrb, mrb_value x)
 {
     while (!mrb_fixnum_p(x)) {
         if (mrb_float_p(x)) {
-            mrb_raise(mrb, E_TYPE_ERROR, "can't convert Float into Integer");
+            mrb->mrb_raise(E_TYPE_ERROR, "can't convert Float into Integer");
         }
         x = mrb_to_int(mrb, x);
     }
@@ -941,13 +902,10 @@ bit_coerce(mrb_state *mrb, mrb_value x)
  * Bitwise AND.
  */
 
-static mrb_value
-fix_and(mrb_state *mrb, mrb_value x)
+static mrb_value fix_and(mrb_state *mrb, mrb_value x)
 {
-    mrb_value y;
     mrb_int val;
-
-    mrb_get_args(mrb, "o", &y);
+    mrb_value y = mrb->get_arg<mrb_value>();
 
     y = bit_coerce(mrb, y);
     val = mrb_fixnum(x) & mrb_fixnum(y);
@@ -962,13 +920,11 @@ fix_and(mrb_state *mrb, mrb_value x)
  * Bitwise OR.
  */
 
-static mrb_value
-fix_or(mrb_state *mrb, mrb_value x)
+static mrb_value fix_or(mrb_state *mrb, mrb_value x)
 {
-    mrb_value y;
     mrb_int val;
 
-    mrb_get_args(mrb, "o", &y);
+    mrb_value y = mrb->get_arg<mrb_value>();
 
     y = bit_coerce(mrb, y);
     val = mrb_fixnum(x) | mrb_fixnum(y);
@@ -983,14 +939,11 @@ fix_or(mrb_state *mrb, mrb_value x)
  * Bitwise EXCLUSIVE OR.
  */
 
-static mrb_value
-fix_xor(mrb_state *mrb, mrb_value x)
+static mrb_value fix_xor(mrb_state *mrb, mrb_value x)
 {
-    mrb_value y;
     mrb_int val;
 
-    mrb_get_args(mrb, "o", &y);
-
+    mrb_value y = mrb->get_arg<mrb_value>();
     y = bit_coerce(mrb, y);
     val = mrb_fixnum(x) ^ mrb_fixnum(y);
     return mrb_fixnum_value(val);
@@ -1002,7 +955,7 @@ static mrb_value
 lshift(mrb_state *mrb, mrb_int val, int width)
 {
     if (width > NUMERIC_SHIFT_WIDTH_MAX) {
-        mrb_raisef(mrb, E_RANGE_ERROR, "width(%S) > (%S:sizeof(mrb_int)*CHAR_BIT-1)",
+        mrb->mrb_raisef(E_RANGE_ERROR, "width(%S) > (%S:sizeof(mrb_int)*CHAR_BIT-1)",
                    mrb_fixnum_value(width),
                    mrb_fixnum_value(NUMERIC_SHIFT_WIDTH_MAX));
     }
@@ -1031,9 +984,7 @@ rshift(mrb_int val, int width)
 static inline void
 fix_shift_get_width(mrb_state *mrb, mrb_int *width)
 {
-    mrb_value y;
-
-    mrb_get_args(mrb, "o", &y);
+    mrb_value y = mrb->get_arg<mrb_value>();
     y = bit_coerce(mrb, y);
     *width = mrb_fixnum(y);
 }
@@ -1139,36 +1090,35 @@ fix_to_f(mrb_state *mrb, mrb_value num)
  *     FloatDomainError: Infinity
  */
 /* ------------------------------------------------------------------------*/
-mrb_value
-mrb_flo_to_fixnum(mrb_state *mrb, mrb_value x)
+mrb_value mrb_flo_to_fixnum(mrb_state *mrb, mrb_value x)
 {
     mrb_int z;
 
     if (mrb_float_p(x)) {
-        mrb_raise(mrb, E_TYPE_ERROR, "non float value");
+        mrb->mrb_raise(E_TYPE_ERROR, "non float value");
         z = 0; /* not reached. just supress warnings. */
     }
     else {
         mrb_float d = mrb_float(x);
 
         if (isinf(d)) {
-            mrb_raise(mrb, E_FLOATDOMAIN_ERROR, d < 0 ? "-Infinity" : "Infinity");
+            mrb->mrb_raise(E_FLOATDOMAIN_ERROR, d < 0 ? "-Infinity" : "Infinity");
         }
         if (isnan(d)) {
-            mrb_raise(mrb, E_FLOATDOMAIN_ERROR, "NaN");
+            mrb->mrb_raise(E_FLOATDOMAIN_ERROR, "NaN");
         }
         z = (mrb_int)d;
     }
     return mrb_fixnum_value(z);
 }
 
-mrb_value
-mrb_fixnum_plus(mrb_state *mrb, mrb_value x, mrb_value y)
+mrb_value mrb_fixnum_plus(mrb_state *mrb, mrb_value x, mrb_value y)
 {
     mrb_int a;
 
     a = mrb_fixnum(x);
-    if (a == 0) return y;
+    if (a == 0)
+        return y;
     if (mrb_fixnum_p(y)) {
         mrb_int b, c;
 
@@ -1192,17 +1142,13 @@ mrb_fixnum_plus(mrb_state *mrb, mrb_value x, mrb_value y)
  * the class of <code>numeric</code> and on the magnitude of the
  * result.
  */
-static mrb_value
-fix_plus(mrb_state *mrb, mrb_value self)
+static mrb_value fix_plus(mrb_state *mrb, mrb_value self)
 {
-    mrb_value other;
-
-    mrb_get_args(mrb, "o", &other);
+    mrb_value other = mrb->get_arg<mrb_value>();
     return mrb_fixnum_plus(mrb, self, other);
 }
 
-mrb_value
-mrb_fixnum_minus(mrb_state *mrb, mrb_value x, mrb_value y)
+mrb_value mrb_fixnum_minus(mrb_state *mrb, mrb_value x, mrb_value y)
 {
     mrb_int a;
 
@@ -1231,25 +1177,21 @@ mrb_fixnum_minus(mrb_state *mrb, mrb_value x, mrb_value y)
  * the class of <code>numeric</code> and on the magnitude of the
  * result.
  */
-static mrb_value
-fix_minus(mrb_state *mrb, mrb_value self)
+static mrb_value fix_minus(mrb_state *mrb, mrb_value self)
 {
-    mrb_value other;
-
-    mrb_get_args(mrb, "o", &other);
+    mrb_value other = mrb->get_arg<mrb_value>();
     return mrb_fixnum_minus(mrb, self, other);
 }
 
 
-mrb_value
-mrb_fixnum_to_str(mrb_state *mrb, mrb_value x, int base)
+mrb_value mrb_fixnum_to_str(mrb_state *mrb, mrb_value x, int base)
 {
     char buf[sizeof(mrb_int)*CHAR_BIT+1];
     char *b = buf + sizeof buf;
     mrb_int val = mrb_fixnum(x);
 
     if (base < 2 || 36 < base) {
-        mrb_raisef(mrb, E_ARGUMENT_ERROR, "invalid radix %S", mrb_fixnum_value(base));
+        mrb->mrb_raisef(E_ARGUMENT_ERROR, "invalid radix %S", mrb_fixnum_value(base));
     }
 
     if (val == 0) {
@@ -1306,10 +1248,9 @@ fix_to_s(mrb_state *mrb, mrb_value self)
  */
 static mrb_value num_cmp(mrb_state *mrb, mrb_value self)
 {
-    mrb_value other;
     mrb_float x, y;
 
-    mrb_get_args(mrb, "o", &other);
+    mrb_value other = mrb->get_arg<mrb_value>();
 
     x = mrb_to_flo(mrb, self);
     switch (mrb_type(other)) {

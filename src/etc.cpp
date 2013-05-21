@@ -35,7 +35,7 @@ void mrb_data_check_type(mrb_state *mrb, const mrb_value &obj, const mrb_data_ty
     if (DATA_TYPE(obj) != type) {
         const mrb_data_type *t2 = DATA_TYPE(obj);
         if (t2) {
-            mrb_raisef(mrb, E_TYPE_ERROR, "wrong argument type %S (expected %S)",
+            mrb->mrb_raisef(E_TYPE_ERROR, "wrong argument type %S (expected %S)",
                        mrb_str_new_cstr(mrb, t2->struct_name), mrb_str_new_cstr(mrb, type->struct_name));
         }
     }
@@ -83,7 +83,7 @@ mrb_sym mrb_obj_to_sym(mrb_state *mrb, mrb_value name)
             tmp = mrb_check_string_type(mrb, name);
             if (mrb_nil_p(tmp)) {
                 tmp = mrb_inspect(mrb, name);
-                mrb_raisef(mrb, E_TYPE_ERROR, "%S is not a symbol", tmp);
+                mrb->mrb_raisef(E_TYPE_ERROR, "%S is not a symbol", tmp);
             }
             name = tmp;
             /* fall through */
