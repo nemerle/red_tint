@@ -254,7 +254,7 @@ public:
     bool            is_strterm_type(int str_func)  {
                         return ((int)(intptr_t)(m_lex_strterm->left()) & (str_func));
                     }
-    void            backref_error(mrb_ast_node *n);
+    void            backref_error(const mrb_ast_node *n);
     void            yyerror_i(const char *fmt, int i);
     int             heredoc_identifier();
     int             arg_ambiguous();

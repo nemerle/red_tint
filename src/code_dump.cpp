@@ -7,7 +7,6 @@
 #include "mruby.h"
 #include "mruby/compile.h"
 #include "mruby/irep.h"
-#include "mruby/numeric.h"
 #include "mruby/string.h"
 #include "mruby/node.h"
 #include "mruby/NodeVisitor.h"

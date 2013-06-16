@@ -313,10 +313,10 @@ RClass* mrb_singleton_class_clone(mrb_state *mrb, mrb_value obj)
         clone->iv_set(mrb_intern2(mrb, "__attached__", 12), obj);
         }
         if (klass->mt) {
-            clone->mt = klass->mt->copy(mrb);
+            clone->mt = klass->mt->copy(mrb->gc());
         }
         else {
-            clone->mt = RClass::kh_mt::init(mrb);
+            clone->mt = RClass::kh_mt::init(mrb->gc());
         }
         clone->tt = MRB_TT_SCLASS;
         return clone;
@@ -840,7 +840,7 @@ mrb_value mrb_f_raise(mrb_state *mrb, mrb_value self)
         /* fall through */
     default:
         exc = mrb_make_exception(mrb, argc, a);
-        mrb_obj_ptr(exc)->iv_set(mrb_intern2(mrb, "lastpc", 6), mrb_voidp_value(mrb->m_ctx->m_ci->pc));
+        mrb_obj_ptr(exc)->iv_set(mrb_intern2(mrb, "lastpc", 6), mrb_voidp_value(mrb,mrb->m_ctx->m_ci->pc));
         mrb_exc_raise(mrb, exc);
         break;
     }
@@ -923,7 +923,7 @@ mrb_value obj_respond_to(mrb_state *mrb, mrb_value self)
         id = mrb_symbol(mid);
     } else {
         mrb_value tmp;
-        if (!mrb_string_p(mid)) {
+        if (!mrb_is_a_string(mid)) {
             tmp = mrb_check_string_type(mrb, mid);
             if (mrb_nil_p(tmp)) {
                 tmp = mrb_inspect(mrb, mid);

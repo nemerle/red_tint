@@ -5,7 +5,7 @@
 */
 
 #pragma once
-#include "mruby.h"
+#include "mrbconf.h"
 #ifndef MRB_NAN_BOXING
 
 struct RClass;
@@ -38,8 +38,64 @@ enum mrb_vtype {
     MRB_TT_ENV,         /*  20 */
     MRB_TT_DATA,        /*  21 */
     MRB_TT_FIBER,       /*  22 */
-    MRB_TT_MAXDEFINE    /*  22 */
+    MRB_TT_MAXDEFINE    /*  23 */
 };
+
+#if defined(MRB_WORD_BOXING)
+
+#define MRB_TT_HAS_BASIC  MRB_TT_FLOAT
+
+enum mrb_special_consts {
+  MRB_Qnil    = 0,
+  MRB_Qfalse  = 2,
+  MRB_Qtrue   = 4,
+  MRB_Qundef  = 6,
+};
+
+#define MRB_FIXNUM_FLAG   0x01
+#define MRB_FIXNUM_SHIFT  1
+#define MRB_SYMBOL_FLAG   0x0e
+#define MRB_SPECIAL_SHIFT 8
+
+typedef union mrb_value {
+  union {
+    void *p;
+    struct {
+      unsigned int i_flag : MRB_FIXNUM_SHIFT;
+      mrb_int i : (sizeof(mrb_int) * 8 - MRB_FIXNUM_SHIFT);
+    };
+    struct {
+      unsigned int sym_flag : MRB_SPECIAL_SHIFT;
+      int sym : (sizeof(mrb_sym) * 8);
+    };
+    struct RBasic *bp;
+    struct RFloat *fp;
+    struct RVoidp *vp;
+  } value;
+  unsigned long w;
+} mrb_value;
+
+#define mrb_float(o)  (o).value.fp->f
+
+#define MRB_SET_VALUE(o, ttt, attr, v) do {\
+  (o).w = 0;\
+  (o).attr = (v);\
+  switch (ttt) {\
+  case MRB_TT_FALSE:  (o).w = (v) ? MRB_Qfalse : MRB_Qnil; break;\
+  case MRB_TT_TRUE:   (o).w = MRB_Qtrue; break;\
+  case MRB_TT_UNDEF:  (o).w = MRB_Qundef; break;\
+  case MRB_TT_FIXNUM: (o).value.i_flag = MRB_FIXNUM_FLAG; break;\
+  case MRB_TT_SYMBOL: (o).value.sym_flag = MRB_SYMBOL_FLAG; break;\
+  default:            if ((o).value.bp) (o).value.bp->tt = ttt; break;\
+  }\
+} while (0)
+
+extern mrb_value
+mrb_float_value(struct mrb_state *mrb, mrb_float f);
+
+#else /* No MRB_xxx_BOXING */
+
+#define MRB_TT_HAS_BASIC  MRB_TT_OBJECT
 
 struct mrb_value {
     union {
@@ -72,84 +128,12 @@ static inline mrb_value mrb_float_value(mrb_float f)
     MRB_SET_VALUE(v, MRB_TT_FLOAT, value.f, f);
     return v;
 }
+#endif  /* no boxing */
+
 #else  /* MRB_NAN_BOXING */
 
-#ifdef MRB_USE_FLOAT
-# error ---->> MRB_NAN_BOXING and MRB_USE_FLOAT conflict <<----
-#endif
+#error ---->> No NAN boxing <<----
 
-enum mrb_vtype {
-    MRB_TT_FALSE = 1,   /*   1 */
-    MRB_TT_FREE,        /*   2 */
-    MRB_TT_TRUE,        /*   3 */
-    MRB_TT_FIXNUM,      /*   4 */
-    MRB_TT_SYMBOL,      /*   5 */
-    MRB_TT_UNDEF,       /*   6 */
-    MRB_TT_FLOAT,       /*   7 */
-    MRB_TT_VOIDP,       /*   8 */
-    MRB_TT_OBJECT,      /*   9 */
-    MRB_TT_CLASS,       /*  10 */
-    MRB_TT_MODULE,      /*  11 */
-    MRB_TT_ICLASS,      /*  12 */
-    MRB_TT_SCLASS,      /*  13 */
-    MRB_TT_PROC,        /*  14 */
-    MRB_TT_ARRAY,       /*  15 */
-    MRB_TT_HASH,        /*  16 */
-    MRB_TT_STRING,      /*  17 */
-    MRB_TT_RANGE,       /*  18 */
-    MRB_TT_EXCEPTION,   /*  19 */
-    MRB_TT_FILE,        /*  20 */
-    MRB_TT_ENV,         /*  21 */
-    MRB_TT_DATA,        /*  22 */
-    MRB_TT_FIBER,       /*  22 */
-    MRB_TT_MAXDEFINE    /*  23 */
-};
-
-#ifdef MRB_ENDIAN_BIG
-#define MRB_ENDIAN_LOHI(a,b) a b
-#else
-#define MRB_ENDIAN_LOHI(a,b) b a
-#endif
-
-typedef struct mrb_value {
-    union {
-        mrb_float f;
-        struct {
-            MRB_ENDIAN_LOHI(
-                    uint32_t ttt;
-            ,union {
-                void *p;
-                mrb_int i;
-                mrb_sym sym;
-            } value;
-            )
-        };
-    };
-} mrb_value;
-
-#define mrb_tt(o)     ((o).ttt & 0xff)
-#define mrb_mktt(tt)  (0xfff00000|(tt))
-#define mrb_type(o)   ((uint32_t)0xfff00000 < (o).ttt ? mrb_tt(o) : MRB_TT_FLOAT)
-#define mrb_float(o)  (o).f
-
-#define MRB_SET_VALUE(o, tt, attr, v) do {\
-    (o).ttt = mrb_mktt(tt);\
-    (o).attr = v;\
-    } while (0)
-
-static inline mrb_value
-mrb_float_value(mrb_float f)
-{
-    mrb_value v;
-
-    if (f != f) {
-        v.ttt = 0x7ff80000;
-        v.value.i = 0;
-    } else {
-        v.f = f;
-    }
-    return v;
-}
 #endif	/* MRB_NAN_BOXING */
 
 #define mrb_fixnum(o) (o).value.i
@@ -160,8 +144,8 @@ mrb_float_value(mrb_float f)
 #define mrb_undef_p(o) (mrb_type(o) == MRB_TT_UNDEF)
 #define mrb_nil_p(o)  (mrb_type(o) == MRB_TT_FALSE && !(o).value.i)
 #define mrb_symbol_p(o) (mrb_type(o) == MRB_TT_SYMBOL)
-#define mrb_array_p(o) (mrb_type(o) == MRB_TT_ARRAY)
-#define mrb_string_p(o) (mrb_type(o) == MRB_TT_STRING)
+#define mrb_is_a_array(o) (mrb_type(o) == MRB_TT_ARRAY)
+#define mrb_is_a_string(o) (mrb_type(o) == MRB_TT_STRING)
 #define mrb_hash_p(o) (mrb_type(o) == MRB_TT_HASH)
 #define mrb_voidp_p(o) (mrb_type(o) == MRB_TT_VOIDP)
 #define mrb_as_bool(o)   (mrb_type(o) != MRB_TT_FALSE)
@@ -183,6 +167,8 @@ mrb_float_value(mrb_float f)
 struct RBasic {
     enum mrb_vtype tt:8;
     uint32_t color:3;
+    // REnv uses flags to store number of children.
+    //
     uint32_t flags:21;
     RClass *c;
     RBasic *gcnext;
@@ -214,15 +200,38 @@ struct RFiber : public RObject {
   mrb_context *cxt;
 };
 
-namespace mruby {
-static inline mrb_value toRuby(RBasic *p)
-{
-    mrb_value v;
-    MRB_SET_VALUE(v, p->tt, value.p, p);
-    return v;
-}
+#ifdef MRB_WORD_BOXING
+struct RFloat {
+  MRB_OBJECT_HEADER;
+  mrb_float f;
+};
 
-} // end of mruby namespace
+struct RVoidp {
+  MRB_OBJECT_HEADER;
+  void *p;
+};
+
+static inline enum mrb_vtype
+mrb_type(mrb_value o)
+{
+  switch (o.w) {
+  case MRB_Qfalse:
+  case MRB_Qnil:
+    return MRB_TT_FALSE;
+  case MRB_Qtrue:
+    return MRB_TT_TRUE;
+  case MRB_Qundef:
+    return MRB_TT_UNDEF;
+  }
+  if (o.value.i_flag == MRB_FIXNUM_FLAG) {
+    return MRB_TT_FIXNUM;
+  }
+  if (o.value.sym_flag == MRB_SYMBOL_FLAG) {
+    return MRB_TT_SYMBOL;
+  }
+  return o.value.bp->tt;
+}
+#endif  /* MRB_WORD_BOXING */
 
 static inline mrb_value mrb_fixnum_value(mrb_int i)
 {
@@ -249,13 +258,19 @@ static inline mrb_value mrb_obj_value(void *p)
     return v;
 }
 
-static inline mrb_value mrb_voidp_value(void *p)
+#ifdef MRB_WORD_BOXING
+mrb_value
+mrb_voidp_value(struct mrb_state *mrb, void *p);
+#else
+static inline mrb_value
+mrb_voidp_value(struct mrb_state *mrb, void *p)
 {
     mrb_value v;
 
     MRB_SET_VALUE(v, MRB_TT_VOIDP, value.p, p);
     return v;
 }
+#endif
 
 static inline mrb_value mrb_false_value(void)
 {
@@ -296,4 +311,14 @@ static inline mrb_value mrb_bool_value(mrb_bool boolean)
     MRB_SET_VALUE(v, boolean ? MRB_TT_TRUE : MRB_TT_FALSE, value.i, 1);
     return v;
 }
+
+namespace mruby {
+static inline mrb_value toRuby(RBasic *p)
+{
+    mrb_value v;
+    MRB_SET_VALUE(v, p->tt, value.p, p);
+    return v;
+}
+
+} // end of mruby namespace
 

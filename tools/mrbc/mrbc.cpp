@@ -89,62 +89,62 @@ static int parse_args(mrb_state *mrb, int argc, char **argv, mrbc_args *args)
     for (i=1; i<argc; i++) {
         if (argv[i][0] == '-') {
             switch ((argv[i])[1]) {
-            case 'o':
-                if (args->outfile) {
-                    fprintf(stderr, "%s: an output file is already specified. (%s)\n",
-                            args->prog, outfile);
-                    return -1;
-                }
-                if (argv[i][2] == '\0' && argv[i+1]) {
-                    i++;
-                    args->outfile = get_outfilename(mrb, argv[i], "");
-                }
-                else {
-                    args->outfile = get_outfilename(mrb, argv[i] + 2, "");
-                }
-                break;
-            case 'B':
-                if (argv[i][2] == '\0' && argv[i+1]) {
-                    i++;
-                    args->initname = argv[i];
-                }
-                else {
-                    args->initname = argv[i]+2;
-                }
-                if (*args->initname == '\0') {
-                    fprintf(stderr, "%s: function name is not specified.\n", args->prog);
-                    return -1;
-                }
-                break;
-            case 'c':
-                args->check_syntax = 1;
-                break;
-            case 'v':
-                if (!args->verbose) mrb_show_version(mrb);
-                args->verbose = 1;
-                break;
-            case 'g':
-                args->debug_info = 1;
-                break;
-            case '-':
-                if (argv[i][1] == '\n') {
-                    return i;
-                }
-                if (strcmp(argv[i] + 2, "version") == 0) {
-                    mrb_show_version(mrb);
-                    exit(EXIT_SUCCESS);
-                }
-                else if (strcmp(argv[i] + 2, "verbose") == 0) {
+                case 'o':
+                    if (args->outfile) {
+                        fprintf(stderr, "%s: an output file is already specified. (%s)\n",
+                                args->prog, outfile);
+                        return -1;
+                    }
+                    if (argv[i][2] == '\0' && argv[i+1]) {
+                        i++;
+                        args->outfile = get_outfilename(mrb, argv[i], "");
+                    }
+                    else {
+                        args->outfile = get_outfilename(mrb, argv[i] + 2, "");
+                    }
+                    break;
+                case 'B':
+                    if (argv[i][2] == '\0' && argv[i+1]) {
+                        i++;
+                        args->initname = argv[i];
+                    }
+                    else {
+                        args->initname = argv[i]+2;
+                    }
+                    if (*args->initname == '\0') {
+                        fprintf(stderr, "%s: function name is not specified.\n", args->prog);
+                        return -1;
+                    }
+                    break;
+                case 'c':
+                    args->check_syntax = 1;
+                    break;
+                case 'v':
+                    if (!args->verbose) mrb_show_version(mrb);
                     args->verbose = 1;
                     break;
-                }
-                else if (strcmp(argv[i] + 2, "copyright") == 0) {
-                    mrb_show_copyright(mrb);
-                    exit(EXIT_SUCCESS);
-                }
-                return -1;
-            default:
-                return i;
+                case 'g':
+                    args->debug_info = 1;
+                    break;
+                case '-':
+                    if (argv[i][1] == '\n') {
+                        return i;
+                    }
+                    if (strcmp(argv[i] + 2, "version") == 0) {
+                        mrb_show_version(mrb);
+                        exit(EXIT_SUCCESS);
+                    }
+                    else if (strcmp(argv[i] + 2, "verbose") == 0) {
+                        args->verbose = 1;
+                        break;
+                    }
+                    else if (strcmp(argv[i] + 2, "copyright") == 0) {
+                        mrb_show_copyright(mrb);
+                        exit(EXIT_SUCCESS);
+                    }
+                    return -1;
+                default:
+                    return i;
             }
         }
         else {
@@ -166,18 +166,20 @@ static int partial_hook(mrb_parser_state *p)
 {
     mrbc_context *c = p->m_cxt;
     mrbc_args *args = (struct mrbc_args *)c->partial_data;
+    const char *fn;
 
     if (p->f) fclose(p->f);
     if (args->idx >= args->argc) {
         p->f = NULL;
         return -1;
     }
-    mrbc_filename(p->m_mrb, c, args->argv[args->idx++]);
-    p->f = fopen(c->filename, "r");
+    fn = args->argv[args->idx++];
+    p->f = fopen(fn, "r");
     if (p->f == NULL) {
-        fprintf(stderr, "%s: cannot open program file. (%s)\n", args->prog, c->filename);
+        fprintf(stderr, "%s: cannot open program file. (%s)\n", args->prog, fn);
         return -1;
     }
+    mrbc_filename(p->m_mrb, c, fn);
     p->m_filename = c->filename;
     p->m_lineno = 1;
     return 0;
@@ -284,12 +286,18 @@ main(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
-    if (args.outfile && (strcmp("-", args.outfile) != 0)) {
-        wfp = fopen(args.outfile, "w");
-        if (wfp == nullptr) {
-            fprintf(stderr, "%s: cannot open output file:(%s)\n", args.prog, args.outfile);
-            return EXIT_FAILURE;
+    if (args.outfile) {
+        if((strcmp("-", args.outfile) != 0)) {
+            wfp = fopen(args.outfile, "wb");
+            if (wfp == nullptr) {
+                fprintf(stderr, "%s: cannot open output file:(%s)\n", args.prog, args.outfile);
+                return EXIT_FAILURE;
+            }
         }
+    }
+    else {
+        fprintf(stderr, "Output file is required\n");
+        return EXIT_FAILURE;
     }
     result = dump_file(mrb, wfp, args.outfile, &args);
     if(wfp!=stdout)

@@ -273,7 +273,7 @@ public:
         khiter_t k = h->put(sym);
         h->value(k) = val;
     }
-    mrb_bool iv_get(mrb_sym sym, mrb_value &vp)
+    bool iv_get(mrb_sym sym, mrb_value &vp)
     {
         khiter_t k = h->get(sym);
         if (k != h->end() ) {
@@ -282,7 +282,7 @@ public:
         }
         return false;
     }
-    mrb_bool iv_get(mrb_sym sym) const
+    bool iv_get(mrb_sym sym) const
     {
         khiter_t k = h->get(sym);
         if (k != h->end() ) {
@@ -290,7 +290,7 @@ public:
         }
         return false;
     }
-    mrb_bool iv_del(mrb_sym sym, mrb_value *vp)
+    bool iv_del(mrb_sym sym, mrb_value *vp)
     {
         if(!h)
             return false;
@@ -328,13 +328,13 @@ public:
     static iv_tbl* iv_new(mrb_state *mrb)
     {
         iv_tbl * res = new(mrb->gc()._malloc(sizeof(iv_tbl))) iv_tbl;
-        res->h = hashtab::init_size(mrb,MRB_IVHASH_INIT_SIZE);
+        res->h = hashtab::init_size(mrb->gc(),MRB_IVHASH_INIT_SIZE);
         return res;
     }
     iv_tbl* iv_copy(mrb_state *mrb)
     {
         iv_tbl * res = new(mrb->gc()._malloc(sizeof(iv_tbl))) iv_tbl;
-        res->h = h->copy(mrb);
+        res->h = h->copy(mrb->gc());
         return res;
     }
 
@@ -505,8 +505,8 @@ static int inspect_i(mrb_sym sym, mrb_value v, void *p)
     RString *p_str = RSTRING(*(mrb_value*)p);
 
     /* need not to show internal data */
-    if (p_str->ptr[0] == '-') { /* first element */
-        p_str->ptr[0] = '#';
+    if (p_str->m_ptr[0] == '-') { /* first element */
+        p_str->m_ptr[0] = '#';
         p_str->str_cat(" ",1);
     }
     else {
@@ -759,7 +759,7 @@ mrb_vm_cv_set(mrb_state *mrb, mrb_sym sym, mrb_value v)
     c->iv->iv_put(sym, v);
 }
 
-mrb_bool mrb_const_defined(mrb_state *mrb, const mrb_value &mod, mrb_sym sym)
+bool mrb_const_defined(mrb_state *mrb, const mrb_value &mod, mrb_sym sym)
 {
     const RClass *m = mrb_class_ptr(mod);
     const iv_tbl *t = m->iv;
@@ -844,7 +844,7 @@ mrb_value mrb_vm_const_get(mrb_state *mrb, mrb_sym sym)
         }
         c2 = c;
         for (;;) {
-            c2 = mrb_class_outer_module(mrb, c2);
+            c2 = c2->outer_module();
             if (!c2)
                 break;
             if (c2->iv && c2->iv->iv_get(sym, v)) {

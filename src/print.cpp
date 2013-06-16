@@ -11,9 +11,9 @@ static void printstr(const mrb_state *, const mrb_value &obj)
 {
 #ifdef ENABLE_STDIO
     RString *str;
-    if (mrb_string_p(obj)) {
+    if (mrb_is_a_string(obj)) {
         str = mrb_str_ptr(obj);
-        fwrite(str->ptr, str->len, 1, stdout);
+        fwrite(str->m_ptr, str->len, 1, stdout);
     }
 #endif
 }
@@ -23,6 +23,20 @@ void mrb_p(mrb_state *mrb, mrb_value obj)
     obj = mrb->funcall(obj, "inspect", 0);
     printstr(mrb, obj);
     putc('\n', stdout);
+#endif
+}
+void mrb_print_error(mrb_state *mrb)
+{
+#ifdef ENABLE_STDIO
+
+    mrb_print_backtrace(mrb);
+    mrb_value s = mrb->funcall(mrb_obj_value(mrb->m_exc), "inspect", 0);
+
+    if (mrb_is_a_string(s)) {
+        RString *str = mrb_str_ptr(s);
+        fwrite(str->m_ptr, str->len, 1, stderr);
+        putc('\n', stderr);
+    }
 #endif
 }
 void mrb_show_version(mrb_state *mrb)

@@ -3,11 +3,8 @@
 **
 ** See Copyright Notice in mruby.h
 */
-
+#include <vector>
 #ifndef SIZE_MAX
-/* Some versions of VC++
-  * has SIZE_MAX in stdint.h
-  */
 #include <limits.h>
 #endif
 #include "mruby.h"
@@ -15,14 +12,18 @@
 #include "mruby/class.h"
 #include "mruby/string.h"
 #include "value_array.h"
+#include "allocator.h"
 
 #define ARY_DEFAULT_LEN   4
 #define ARY_SHRINK_RATIO  5 /* must be larger than 2 */
 #define ARY_C_MAX_SIZE (SIZE_MAX / sizeof(mrb_value))
 #define ARY_MAX_SIZE ((ARY_C_MAX_SIZE < (size_t)MRB_INT_MAX) ? (mrb_int)ARY_C_MAX_SIZE : MRB_INT_MAX)
-
+#define ARY_SHIFT_SHARED_MIN 10
+size_t gAllocatedSize=0;
 RArray* RArray::ary_new_capa(mrb_state *mrb, size_t capa)
 {
+    Allocator<mrb_value> allocz(&mrb->gc());
+    std::vector<mrb_value,Allocator<mrb_value> > vec(allocz);
     size_t blen = capa * sizeof(mrb_value) ;
 
     // check for size_t wrap-around blen < capa -> wrap around occured.
@@ -91,12 +92,14 @@ void RArray::ary_modify()
     mrb_shared_array *shared = m_aux.shared;
 
     if (shared->refcnt == 1 && m_ptr == shared->ptr) {
+        // single reference, we can use already allocated buffer
         m_ptr = shared->ptr;
-        m_aux.capa = m_len;
+        m_aux.capa = m_len; // overwrites m_aux.shared
         m_vm->gc()._free(shared);
     }
     else {
-        mrb_value * _ptr    = (mrb_value *)m_vm->gc()._malloc(m_len * sizeof(mrb_value));
+        // multiple references, we have to create a copy
+        mrb_value * _ptr = (mrb_value *)m_vm->gc()._malloc(m_len * sizeof(mrb_value));
         if (m_ptr) {
             array_copy(_ptr, m_ptr, m_len);
         }
@@ -252,11 +255,11 @@ mrb_value RArray::plus() const
 mrb_value RArray::cmp() const
 {
     mrb_value ary2;
-    mrb_value r = mrb_nil_value();
+    mrb_value r;
 
     ary2 = m_vm->get_arg<mrb_value>();
-    if (!mrb_array_p(ary2))
-        return r;
+    if (!mrb_is_a_array(ary2))
+        return mrb_nil_value();
     RArray *a2 = RARRAY(ary2);
     if (m_len == a2->m_len && m_ptr == a2->m_ptr)
         return mrb_fixnum_value(0);
@@ -405,7 +408,6 @@ mrb_value RArray::pop()
     return m_ptr[--m_len];
 }
 
-#define ARY_SHIFT_SHARED_MIN 10
 
 mrb_value RArray::shift()
 {
@@ -426,15 +428,10 @@ mrb_value RArray::shift()
         m_len--;
         return val;
     }
-    mrb_value *ptr = m_ptr;
-    mrb_int size = m_len;
-
-    mrb_value val = *ptr;
-    while((int)(--size)) {
-        *ptr = *(ptr+1);
-        ++ptr;
-    }
+    mrb_value val = *m_ptr;
     --m_len;
+    assert(m_len<m_aux.capa);
+    memmove(m_ptr,m_ptr+1,sizeof(mrb_value)*m_len);
     return val;
 }
 
@@ -446,7 +443,7 @@ void RArray::unshift(const mrb_value &item)
 {
     if ((this->flags & MRB_ARY_SHARED)
             && m_aux.shared->refcnt == 1 /* shared only referenced from this array */
-            && m_ptr - m_aux.shared->ptr >= 1) /* there's room for unshifted item */ {
+            && m_ptr - base_ptr() >= 1) /* there's room for unshifted item */ {
         m_ptr--;
     }
     else {
@@ -468,7 +465,7 @@ void RArray::unshift_m()
     mrb_get_args(m_vm, "*", &vals, &len);
     if ((this->flags & MRB_ARY_SHARED)
             && m_aux.shared->refcnt == 1 /* shared only referenced from this array */
-            && m_ptr - m_aux.shared->ptr >= len) /* there's room for unshifted item */ {
+            && m_ptr - base_ptr() >= len) /* there's room for unshifted item */ {
         m_ptr -= len;
     }
     else {
@@ -479,7 +476,7 @@ void RArray::unshift_m()
             this->ary_expand_capa(m_vm, m_len + len);
         value_move(m_ptr + len, m_ptr, m_len);
     }
-    array_copy(this->m_ptr, vals, len);
+    array_copy(m_ptr, vals, len);
     m_len += len;
     m_vm->gc().mrb_write_barrier(this);
 }
@@ -534,7 +531,7 @@ void RArray::splice(mrb_int head, mrb_int len, const mrb_value &rpl)
     mrb_int tail = head + len;
 
     /* size check */
-    if (mrb_array_p(rpl)) {
+    if (mrb_is_a_array(rpl)) {
         argc = RARRAY_LEN(rpl);
         argv = RARRAY_PTR(rpl);
     }
@@ -739,7 +736,7 @@ mrb_value RArray::rindex_m()
 
 mrb_value RArray::splat(mrb_state *mrb, const mrb_value &v)
 {
-    if (mrb_array_p(v)) {
+    if (mrb_is_a_array(v)) {
         return v;
     }
     mrb_value ary = RArray::new_capa(mrb, 1);
@@ -787,7 +784,7 @@ static constexpr bool simpleArrComp(const RArray *a, const mrb_value &b) {
 mrb_value RArray::inspect_ary(RArray *list_arr)
 {
     mrb_int i;
-    mrb_value s, arystr;
+    mrb_value s;
     static constexpr char head[] = { '[' };
     static constexpr char sep[] = { ',', ' ' };
     static constexpr char tail[] = { ']' };
@@ -801,11 +798,10 @@ mrb_value RArray::inspect_ary(RArray *list_arr)
 
     list_arr->push(t);
     RString *strr = RString::create(m_vm,64);
-    arystr = mrb_obj_value(strr);
 
     //mrb_str_buf_cat(m_vm, arystr, head, sizeof(head));
     strr->str_cat(head,sizeof(head));
-
+    assert(m_ptr!=0);
     for(i=0; i<m_len; i++) {
         int ai = m_vm->gc().arena_save();
 
@@ -813,7 +809,7 @@ mrb_value RArray::inspect_ary(RArray *list_arr)
             strr->str_cat(sep, sizeof(sep));
             //mrb_str_buf_cat(m_vm, arystr, sep, sizeof(sep));
         }
-        if (mrb_array_p(m_ptr[i])) {
+        if (mrb_is_a_array(m_ptr[i])) {
             s = RARRAY(m_ptr[i])->inspect_ary(list_arr);
         } else {
             s = mrb_inspect(m_vm, m_ptr[i]);
@@ -821,11 +817,10 @@ mrb_value RArray::inspect_ary(RArray *list_arr)
         strr->str_cat(RSTRING_PTR(s), RSTRING_LEN(s));
         m_vm->gc().arena_restore(ai);
     }
-
-    mrb_str_buf_cat(arystr, tail, sizeof(tail));
+    strr->str_buf_cat(tail,sizeof(tail));
     list_arr->pop();
 
-    return arystr;
+    return mrb_obj_value(strr);
 }
 
 /* 15.2.12.5.31 (x) */
@@ -856,12 +851,11 @@ mrb_value RArray::join_ary(const mrb_value &sep, RArray *list_arr)
     }
     mrb_value t = {{(void *)this},MRB_TT_ARRAY};
     list_arr->push(t);
-
-    mrb_value result = mrb_str_buf_new(m_vm, 64);
+    RString *str  = RString::create(m_vm,64);
 
     for(mrb_int i=0; i<m_len; i++) {
         if (i > 0 && !mrb_nil_p(sep)) {
-            mrb_str_buf_cat(result, RSTRING_PTR(sep), RSTRING_LEN(sep));
+            str->str_buf_cat(RSTRING_PTR(sep), RSTRING_LEN(sep));
         }
 
         mrb_value val = m_ptr[i];
@@ -871,30 +865,30 @@ mrb_value RArray::join_ary(const mrb_value &sep, RArray *list_arr)
                 /* fall through */
 
             case MRB_TT_STRING:
-                mrb_str_buf_cat(result, RSTRING_PTR(val), RSTRING_LEN(val));
+                str->str_buf_cat(RSTRING_PTR(val), RSTRING_LEN(val));
                 break;
 
             default:
                 tmp = mrb_check_string_type(m_vm, val);
                 if (!mrb_nil_p(tmp)) {
                     val = tmp;
-                    mrb_str_buf_cat(result, RSTRING_PTR(tmp), RSTRING_LEN(tmp));
+                    str->str_buf_cat(RSTRING_PTR(tmp), RSTRING_LEN(tmp));
                     break;
                 }
                 tmp = mrb_check_convert_type(m_vm, val, MRB_TT_ARRAY, "Array", "to_ary");
                 if (!mrb_nil_p(tmp)) {
                     val = RARRAY(tmp)->join_ary(sep, list_arr);
-                    mrb_str_buf_cat(result, RSTRING_PTR(val), RSTRING_LEN(val));
+                    str->str_buf_cat(RSTRING_PTR(val), RSTRING_LEN(val));
                     break;
                 }
                 val = mrb_obj_as_string(m_vm, val);
-                mrb_str_buf_cat(result, RSTRING_PTR(val), RSTRING_LEN(val));
+                str->str_buf_cat(RSTRING_PTR(val), RSTRING_LEN(val));
                 break;
         }
     }
 
     list_arr->pop();
-    return result;
+    return mrb_obj_value(str);
 }
 
 mrb_value RArray::join(mrb_value sep)
@@ -949,7 +943,7 @@ mrb_value RArray::mrb_ary_equal()
     if (mrb_special_const_p(ary2)) {
         return mrb_bool_value(false);
     }
-    if (!mrb_array_p(ary2)) {
+    if (!mrb_is_a_array(ary2)) {
         if (mrb_respond_to(m_vm, ary2, mrb_intern2(m_vm, "to_ary", 6))) {
             return mrb_bool_value(mrb_equal(m_vm, ary2, mrb_obj_value(this)));
         }
@@ -984,7 +978,7 @@ mrb_value RArray::mrb_ary_eql()
     if ( this == ary2.value.p) {  //was mrb_obj_equal(m_vm, ary1, ary2)
         return mrb_bool_value(true);
     }
-    if (!mrb_array_p(ary2)) {
+    if (!mrb_is_a_array(ary2)) {
         return mrb_bool_value(false);
     }
     RArray *ary_2p = RARRAY(ary2);

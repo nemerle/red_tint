@@ -23,9 +23,7 @@ struct RProc : public RBasic {
         target_class = src->target_class;
         env   = src->env;
     }
-    static RProc *alloc(mrb_state *mrb) {
-        return (RProc*)mrb->gc().mrb_obj_alloc(MRB_TT_PROC, mrb->proc_class);
-    }
+    static RProc *alloc(mrb_state *mrb);
     static RProc *copy_construct(mrb_state *mrb,RProc *from) {
         RProc * r = alloc(mrb);
         r->copy_from(from);
@@ -36,9 +34,7 @@ struct REnv : public RBasic {
     mrb_value *stack;
     mrb_sym mid;
     int cioff;
-    static REnv *alloc(mrb_state *mrb) {
-        return (REnv *)mrb->gc().mrb_obj_alloc(MRB_TT_ENV, (RClass*)mrb->m_ctx->m_ci->proc->env);
-    }
+    static REnv *alloc(mrb_state *mrb);
 };
 
 /* aspec access */
@@ -50,9 +46,9 @@ struct REnv : public RBasic {
 #define MRB_ASPEC_KDICT(a) ((a) & (1<<1))
 #define MRB_ASPEC_BLOCK(a) ((a) & 1)
 
-#define MRB_PROC_CFUNC 128
+#define MRB_PROC_CFUNC (1<<7)
 #define MRB_PROC_CFUNC_P(p) ((p)->flags & MRB_PROC_CFUNC)
-#define MRB_PROC_STRICT 256
+#define MRB_PROC_STRICT (1<<8)
 #define MRB_PROC_STRICT_P(p) ((p)->flags & MRB_PROC_STRICT)
 
 #define mrb_proc_ptr(v)    ((RProc*)((v).value.p))

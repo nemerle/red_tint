@@ -23,35 +23,25 @@ struct RString : public RBasic {
         mrb_int capa;
         struct mrb_shared_string *shared;
     } aux;
-    char *ptr;
+    char *m_ptr;
 public:
     static RString *create(mrb_state *mrb, const char *p, mrb_int len);
-    static RString *create(mrb_state *mrb, mrb_int capa) {
-        RString *s = ((mrb)->gc().obj_alloc<RString>((mrb)->string_class));
+    static RString *create(mrb_state *mrb, mrb_int capa);
 
-        if (capa < MRB_STR_BUF_MIN_SIZE) {
-            capa = MRB_STR_BUF_MIN_SIZE;
-        }
-        s->len = 0;
-        s->aux.capa = capa;
-        s->ptr = (char *)mrb->gc()._malloc(capa+1);
-        s->ptr[0] = '\0';
-        return s;
-    }
-
-    void str_cat(const char *ptr, int len);
+    void str_cat(const char *m_ptr, int len);
     void buf_append(mrb_value str2);
     void str_append(mrb_value str2);
-    void str_buf_cat(const char *ptr, size_t len);
+    void str_buf_cat(const char *ptr) { str_buf_cat(ptr,strlen(ptr)); }
+    void str_buf_cat(const char *m_ptr, size_t len);
 private:
 };
 
-#define mrb_str_ptr(s)    ((struct RString*)((s).value.p))
-#define RSTRING(s)        ((struct RString*)((s).value.p))
-#define RSTRING_PTR(s)    (RSTRING(s)->ptr)
+#define mrb_str_ptr(s)    ((RString*)((s).value.p))
+#define RSTRING(s)        ((RString*)((s).value.p))
+#define RSTRING_PTR(s)    (RSTRING(s)->m_ptr)
 #define RSTRING_LEN(s)    (RSTRING(s)->len)
 #define RSTRING_CAPA(s)   (RSTRING(s)->aux.capa)
-#define RSTRING_END(s)    (RSTRING(s)->ptr + RSTRING(s)->len)
+#define RSTRING_END(s)    (RSTRING(s)->m_ptr + RSTRING(s)->len)
 
 void mrb_gc_free_str(mrb_state*, RString*);
 mrb_value mrb_str_literal(mrb_state*, mrb_value);

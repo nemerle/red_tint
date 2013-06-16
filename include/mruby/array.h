@@ -12,7 +12,7 @@
 
 #define RARRAY_LEN(a) (RARRAY(a)->m_len)
 #define RARRAY_PTR(a) (RARRAY(a)->m_ptr)
-#define MRB_ARY_SHARED      256
+#define MRB_ARY_SHARED      (1<<8)
 
 struct mrb_state;
 struct mrb_shared_array {
@@ -22,16 +22,18 @@ struct mrb_shared_array {
 };
 
 struct RArray : public RBasic {
-    static const mrb_vtype ttype=MRB_TT_ARRAY;
-    mrb_int m_len;
-    union {
-        mrb_int capa;
-        mrb_shared_array *shared;
-    } m_aux;
+
+static const mrb_vtype ttype=MRB_TT_ARRAY;
+
+        mrb_int m_len;
+        union {
+            mrb_int capa;
+            mrb_shared_array *shared;
+        } m_aux;
         //TODO: semantics of this field change depending on the shared flag
         // When not shared this is a pointer to base data
         // when shared it's an 'iterator'-like element over shared->ptr
-    mrb_value *m_ptr;
+        mrb_value * m_ptr;
 public:
 static  RArray *    create(mrb_state *mrb, size_t capa=0) {return ary_new_capa(mrb,capa);}
 static  mrb_value   new_capa(mrb_state *mrb, mrb_int capa);
@@ -75,6 +77,9 @@ static  mrb_value   splat(mrb_state *mrb, const mrb_value &v);
         mrb_value   inspect();
         void        splice(mrb_int head, mrb_int len, const mrb_value &rpl);
 protected:
+        mrb_value * base_ptr() {
+            return (flags & MRB_ARY_SHARED) ? m_aux.shared->ptr : m_ptr;
+        }
 static  RArray *    ary_new_capa(mrb_state *mrb, size_t capa);
         mrb_value   inspect_ary(RArray *list_arr);
         mrb_value   join_ary(const mrb_value &sep, RArray *list_arr);
@@ -85,13 +90,13 @@ static  RArray *    ary_new_capa(mrb_state *mrb, size_t capa);
         void        ary_concat(const mrb_value *m_ptr, mrb_int blen);
         void        ary_shrink_capa();
         void        ary_modify();
-    mrb_value ary_elt(mrb_int offset)
-    {
-                        if ((m_len == 0) || (offset < 0 || offset >= m_len)  ) {
-            return mrb_nil_value();
-        }
-        return m_ptr[offset];
-    }
+        mrb_value   ary_elt(mrb_int offset)
+                    {
+                                        if ((m_len == 0) || (offset < 0 || offset >= m_len)  ) {
+                            return mrb_nil_value();
+                        }
+                        return m_ptr[offset];
+                    }
         mrb_value & unchecked_ref(mrb_int offset) { return m_ptr[offset];}
 };
 

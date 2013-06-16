@@ -30,6 +30,7 @@
 #include <cstring>
 #include "mrbconf.h"
 #include "mruby/value.h"
+#include "mruby/class.h"
 #include "mruby/array.h"
 #include "mruby/mem_manager.h"
 
@@ -39,35 +40,36 @@
  + exception objects obtained from those macros are local to mrb
  */
 #define A_RUNTIME_ERROR(x)          ((x)->class_get("RuntimeError"))
-#define E_RUNTIME_ERROR             (mrb_class_get(mrb, "RuntimeError"))
+#define E_RUNTIME_ERROR             (mrb->class_get( "RuntimeError"))
 #define A_TYPE_ERROR(x)             ((x)->class_get("TypeError"))
-#define E_TYPE_ERROR                (mrb_class_get(mrb, "TypeError"))
+#define E_TYPE_ERROR                (mrb->class_get( "TypeError"))
 #define I_TYPE_ERROR                (this->class_get("TypeError"))
 #define A_ARGUMENT_ERROR(x)         ((x)->class_get("ArgumentError"))
-#define E_ARGUMENT_ERROR            (mrb_class_get(mrb, "ArgumentError"))
+#define E_ARGUMENT_ERROR            (mrb->class_get( "ArgumentError"))
 #define I_ARGUMENT_ERROR            (this->class_get("ArgumentError"))
 #define A_INDEX_ERROR(x)            ((x)->class_get("IndexError"))
-#define E_INDEX_ERROR               (mrb_class_get(mrb, "IndexError"))
+#define E_INDEX_ERROR               (mrb->class_get( "IndexError"))
 #define I_RANGE_ERROR               (this->class_get("RangeError"))
-#define E_RANGE_ERROR               (mrb_class_get(mrb, "RangeError"))
-#define E_NAME_ERROR                (mrb_class_get(mrb, "NameError"))
-#define E_NOMETHOD_ERROR            (mrb_class_get(mrb, "NoMethodError"))
-#define I_NOMETHOD_ERROR            (mrb_class_get(this, "NoMethodError"))
-#define E_SCRIPT_ERROR              (mrb_class_get(mrb, "ScriptError"))
-#define E_SYNTAX_ERROR              (mrb_class_get(mrb, "SyntaxError"))
-#define E_LOCALJUMP_ERROR           (mrb_class_get(mrb, "LocalJumpError"))
-#define I_LOCALJUMP_ERROR           (mrb_class_get(this, "LocalJumpError"))
-#define E_REGEXP_ERROR              (mrb_class_get(mrb, "RegexpError"))
+#define E_RANGE_ERROR               (mrb->class_get( "RangeError"))
+#define E_NAME_ERROR                (mrb->class_get( "NameError"))
+#define E_NOMETHOD_ERROR            (mrb->class_get( "NoMethodError"))
+#define I_NOMETHOD_ERROR            (this->class_get("NoMethodError"))
+#define E_SCRIPT_ERROR              (mrb->class_get( "ScriptError"))
+#define E_SYNTAX_ERROR              (mrb->class_get( "SyntaxError"))
+#define E_LOCALJUMP_ERROR           (mrb->class_get( "LocalJumpError"))
+#define I_LOCALJUMP_ERROR           (this->class_get("LocalJumpError"))
+#define E_REGEXP_ERROR              (mrb->class_get( "RegexpError"))
 
-#define E_NOTIMP_ERROR              (mrb_class_get(mrb, "NotImplementedError"))
-#define E_FLOATDOMAIN_ERROR         (mrb_class_get(mrb, "FloatDomainError"))
+#define E_NOTIMP_ERROR              (mrb->class_get( "NotImplementedError"))
+#define E_FLOATDOMAIN_ERROR         (mrb->class_get( "FloatDomainError"))
 
-#define E_KEY_ERROR                 (mrb_class_get(mrb, "KeyError"))
+#define E_KEY_ERROR                 (mrb->class_get( "KeyError"))
 struct RClass;
 struct RProc;
 struct REnv;
 struct mrb_state;
 struct mrb_pool;
+typedef void (each_object_callback)(mrb_state *mrb, RBasic* obj, void *data);
 RClass *mrb_define_class(mrb_state *, const char*, RClass*);
 RClass *mrb_define_module(mrb_state *, const char*);
 #ifndef __clang__
@@ -109,6 +111,12 @@ struct mrb_callinfo {
     int eidx;
     REnv *env;
 };
+enum mrb_fiber_state {
+     MRB_FIBER_CREATED = 0,
+    MRB_FIBER_RUNNING,
+    MRB_FIBER_RESUMED,
+    MRB_FIBER_TERMINATED,
+};
 struct mrb_context {
   mrb_context *prev;
 
@@ -122,6 +130,8 @@ struct mrb_context {
   int m_rsize;
   RProc **m_ensure;
   int m_esize;
+  uint8_t status;
+  struct RFiber *fib;
 };
 struct SysInterface {
     virtual void print_f(const char *fmt, ...);
@@ -180,7 +190,7 @@ struct mrb_state {
         return *mrb_define_module(this, name);
     }
     RClass *class_get(const char *name) {
-        return class_from_sym(object_class, intern_cstr(name));
+        return object_class->from_sym(intern_cstr(name));
     }
     mrb_sym intern_cstr(const char *name)
     {
@@ -205,11 +215,12 @@ public:
     NORET(void mrb_raisef(RClass *c, const char *fmt...));
 
     mrb_value funcall(mrb_value self, const char *name, int argc...);
+    bool class_defined(const char *name);
+    void mrb_objspace_each_objects(each_object_callback *callback, void *data);
 protected:
     void get_arg(const mrb_value &arg, mrb_int &tgt);
     void get_arg(const mrb_value &arg, mrb_sym &tgt);
     void get_arg(const mrb_value &arg, mrb_value &tgt) { tgt = arg; }
-    RClass * class_from_sym(RClass *klass, mrb_sym id);
     RProc *prepare_method_missing(RClass *c, mrb_sym mid, const int &a, int &n, mrb_value *regs);
     template<bool optional=false>
     mrb_value *arg_read_prepare(int args) {
@@ -241,22 +252,12 @@ typedef mrb_value (*mrb_func_t)(mrb_state *mrb, mrb_value);
 
 
 mrb_value mrb_singleton_class(mrb_state*, mrb_value);
-void mrb_include_module(mrb_state*, RClass*, RClass*);
-void mrb_define_class_method(RClass *, const char *, mrb_func_t, mrb_aspec);
-//void mrb_define_singleton_method(struct RObject*, const char*, mrb_func_t, mrb_aspec);
-void mrb_define_module_function(mrb_state*, RClass*, const char*, mrb_func_t, mrb_aspec);
-void mrb_undef_method(mrb_state*, struct RClass*, const char*);
-void mrb_undef_class_method(mrb_state*, struct RClass*, const char*);
 mrb_value mrb_instance_new(mrb_state *mrb, mrb_value cv);
-RClass * mrb_class_new(mrb_state *mrb, struct RClass *super);
 RClass * mrb_module_new(mrb_state *mrb);
 int mrb_class_defined(mrb_state *mrb, const char *name);
-RClass * mrb_class_get(mrb_state *mrb, const char *name);
 
 mrb_value mrb_obj_dup(mrb_state *mrb, mrb_value obj);
 mrb_value mrb_check_to_integer(mrb_state *mrb, const mrb_value &val, const char *method);
-RClass * mrb_define_class_under(mrb_state *mrb, RClass *outer, const char *name, struct RClass *super);
-RClass * mrb_define_module_under(mrb_state *mrb, RClass *outer, const char *name);
 
 /* required arguments */
 #define MRB_ARGS_REQ(n) ((mrb_aspec)((n)&0x1f) << 18)
@@ -329,7 +330,6 @@ mrb_value mrb_check_convert_type(mrb_state *mrb, const mrb_value &val, mrb_int t
 mrb_value mrb_any_to_s(mrb_state *mrb, mrb_value obj);
 const char * mrb_obj_classname(mrb_state *mrb, mrb_value obj);
 RClass* mrb_obj_class(mrb_state *mrb, mrb_value obj);
-mrb_value mrb_class_path(mrb_state *mrb, RClass *c);
 mrb_value mrb_convert_type(mrb_state *mrb, const mrb_value &val, mrb_int type, const char *tname, const char *method);
 int mrb_obj_is_kind_of(mrb_state *mrb, mrb_value obj, RClass *c);
 mrb_value mrb_obj_inspect(mrb_state *mrb, mrb_value self);
@@ -355,6 +355,7 @@ mrb_value mrb_obj_clone(mrb_state *mrb, mrb_value self);
 void mrb_warn(mrb_state *mrb, const char *fmt, ...);
 void mrb_bug(mrb_state *mrb, const char *fmt, ...);
 void mrb_print_backtrace(mrb_state *mrb);
+void mrb_print_error(mrb_state *mrb);
 
 mrb_value mrb_yield(mrb_state *mrb, mrb_value v, mrb_value blk);
 mrb_value mrb_yield_argv(mrb_state *mrb, mrb_value b, int argc, mrb_value *argv);
@@ -372,8 +373,6 @@ typedef enum call_type {
     CALL_TYPE_MAX
 } call_type;
 
-void mrb_define_alias(mrb_state *mrb, RClass *klass, const char *name1, const char *name2);
-const char *mrb_class_name(mrb_state *mrb, RClass* klass);
 void mrb_define_global_const(mrb_state *mrb, const char *name, mrb_value val);
 
 mrb_value mrb_block_proc(void);

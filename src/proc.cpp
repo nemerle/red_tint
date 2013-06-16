@@ -38,8 +38,7 @@ closure_setup(mrb_state *mrb, RProc *p, int nlocals)
     p->env = mrb->m_ctx->m_ci->env;
 }
 
-RProc *
-mrb_closure_new(mrb_state *mrb, mrb_irep *irep)
+RProc *mrb_closure_new(mrb_state *mrb, mrb_irep *irep)
 {
     RProc *p = mrb_proc_new(mrb, irep);
 
@@ -47,8 +46,7 @@ mrb_closure_new(mrb_state *mrb, mrb_irep *irep)
     return p;
 }
 
-RProc *
-mrb_proc_new_cfunc(mrb_state *mrb, mrb_func_t func)
+RProc *mrb_proc_new_cfunc(mrb_state *mrb, mrb_func_t func)
 {
     RProc *p = RProc::alloc(mrb);
     p->body.func = func;
@@ -57,8 +55,7 @@ mrb_proc_new_cfunc(mrb_state *mrb, mrb_func_t func)
     return p;
 }
 
-RProc *
-mrb_closure_new_cfunc(mrb_state *mrb, mrb_func_t func, int nlocals)
+RProc * mrb_closure_new_cfunc(mrb_state *mrb, mrb_func_t func, int nlocals)
 {
     RProc *p = mrb_proc_new_cfunc(mrb, func);
 
@@ -66,8 +63,7 @@ mrb_closure_new_cfunc(mrb_state *mrb, mrb_func_t func, int nlocals)
     return p;
 }
 
-static mrb_value
-mrb_proc_initialize(mrb_state *mrb, mrb_value self)
+static mrb_value mrb_proc_initialize(mrb_state *mrb, mrb_value self)
 {
     mrb_value blk;
 
@@ -82,8 +78,7 @@ mrb_proc_initialize(mrb_state *mrb, mrb_value self)
     return self;
 }
 
-static mrb_value
-mrb_proc_init_copy(mrb_state *mrb, mrb_value self)
+static mrb_value mrb_proc_init_copy(mrb_state *mrb, mrb_value self)
 {
     mrb_value proc = mrb->get_arg<mrb_value>();
     if (mrb_type(proc) != MRB_TT_PROC) {
@@ -93,20 +88,17 @@ mrb_proc_init_copy(mrb_state *mrb, mrb_value self)
     return self;
 }
 
-int
-mrb_proc_cfunc_p(RProc *p)
+int mrb_proc_cfunc_p(RProc *p)
 {
     return MRB_PROC_CFUNC_P(p);
 }
 
-mrb_value
-mrb_proc_call_cfunc(mrb_state *mrb, RProc *p, mrb_value self)
+mrb_value mrb_proc_call_cfunc(mrb_state *mrb, RProc *p, mrb_value self)
 {
     return (p->body.func)(mrb, self);
 }
 
-mrb_code*
-mrb_proc_iseq(mrb_state *mrb, RProc *p)
+mrb_code* mrb_proc_iseq(mrb_state *mrb, RProc *p)
 {
     return p->body.irep->iseq;
 }
@@ -136,17 +128,15 @@ static mrb_value mrb_proc_arity(mrb_state *mrb, mrb_value self)
  * Equivalent to <code>Proc.new</code>, except the resulting Proc objects
  * check the number of parameters passed when called.
  */
-static mrb_value
-proc_lambda(mrb_state *mrb, mrb_value self)
+static mrb_value proc_lambda(mrb_state *mrb, mrb_value self)
 {
     mrb_value blk;
-    RProc *p;
 
     mrb_get_args(mrb, "&", &blk);
     if (mrb_nil_p(blk)) {
         mrb->mrb_raise(E_ARGUMENT_ERROR, "tried to create Proc object without a block");
     }
-    p = mrb_proc_ptr(blk);
+    RProc *p = mrb_proc_ptr(blk);
     if (!MRB_PROC_STRICT_P(p)) {
         RProc *p2 = mrb->gc().obj_alloc<RProc>(p->c);
         p2->copy_from(p);
@@ -156,8 +146,7 @@ proc_lambda(mrb_state *mrb, mrb_value self)
     return blk;
 }
 
-void
-mrb_init_proc(mrb_state *mrb)
+void mrb_init_proc(mrb_state *mrb)
 {
     RProc *m;
     mrb_irep *call_irep = (mrb_irep *)mrb->gc().mrb_alloca(sizeof(mrb_irep));
@@ -183,4 +172,12 @@ mrb_init_proc(mrb_state *mrb)
 
     mrb->kernel_module->define_class_method("lambda", proc_lambda, MRB_ARGS_NONE())        /* 15.3.1.2.6  */
             .define_method("lambda", proc_lambda, MRB_ARGS_NONE());   /* 15.3.1.3.27 */
+}
+
+RProc *RProc::alloc(mrb_state *mrb) {
+    return (RProc*)mrb->gc().mrb_obj_alloc(MRB_TT_PROC, mrb->proc_class);
+}
+
+REnv *REnv::alloc(mrb_state *mrb) {
+    return (REnv *)mrb->gc().mrb_obj_alloc(MRB_TT_ENV, (RClass*)mrb->m_ctx->m_ci->proc->env);
 }

@@ -1,7 +1,5 @@
-#include <new>
 #include <cerrno>
 #include <cassert>
-#include <cstring>
 #include <cstdlib>
 #include <cctype>
 #include <algorithm>
@@ -326,7 +324,7 @@ void mrb_parser_state::yyerror_i(const char *fmt, int i)
     yyerror(buf);
 }
 
-void mrb_parser_state::backref_error(mrb_ast_node *n)
+void mrb_parser_state::backref_error(const mrb_ast_node *n)
 {
     node_type c = n->getType();
 

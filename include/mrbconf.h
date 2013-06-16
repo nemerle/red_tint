@@ -25,6 +25,9 @@
 /* define on big endian machines; used by MRB_NAN_BOXING */
 //#define MRB_ENDIAN_BIG
 
+/* represent mrb_value as a word (natural unit of data for the processor) */
+// #define MRB_WORD_BOXING
+
 /* argv max size in mrb_funcall */
 //#define MRB_FUNCALL_ARGC_MAX 16
 
@@ -73,6 +76,10 @@
 # define str_to_mrb_float(buf) strtod(buf, NULL)
 #endif
 
+#if defined(MRB_INT16) && defined(MRB_INT64)
+# error "You can't define MRB_INT16 and MRB_INT64 at the same time."
+#endif
+
 #if defined(MRB_INT64)
 # ifdef MRB_NAN_BOXING
 #  error Cannot use NaN boxing when mrb_int is 64bit
@@ -100,7 +107,30 @@
 # define PRIxMRB_INT PRIx32
 # define PRIXMRB_INT PRIX32
 #endif
+
 typedef uint16_t mrb_sym;
+
+#ifdef _MSC_VER
+# define _ALLOW_KEYWORD_MACROS
+# include <float.h>
+# define inline __inline
+# define snprintf _snprintf
+# define isnan _isnan
+# define isinf(n) (!_finite(n) && !_isnan(n))
+# define strtoll _strtoi64
+# define PRId32 "I32d"
+# define PRIi32 "I32i"
+# define PRIo32 "I32o"
+# define PRIx32 "I32x"
+# define PRIX32 "I32X"
+# define PRId64 "I64d"
+# define PRIi64 "I64i"
+# define PRIo64 "I64o"
+# define PRIx64 "I64x"
+# define PRIX64 "I64X"
+#else
+# include <inttypes.h>
+#endif
 
 /* define ENABLE_XXXX from DISABLE_XXX */
 #define ENABLE_STDIO 1

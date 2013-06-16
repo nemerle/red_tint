@@ -20,7 +20,7 @@ struct symbol_name {
 };
 
 struct SymHashFunc {
-    inline khint_t operator()(mrb_state *mrb, const symbol_name &s) const
+    inline khint_t operator()(MemManager *, const symbol_name &s) const
     {
         khint_t h = 0;
         size_t i;
@@ -33,7 +33,7 @@ struct SymHashFunc {
     }
 };
 struct SymHashEqual {
-    khint_t operator()(mrb_state *,const symbol_name &a,const symbol_name &b) const
+    khint_t operator()(MemManager *,const symbol_name &a,const symbol_name &b) const
     {
         return (a.len == b.len && memcmp(a.name, b.name, a.len) == 0);
     }
@@ -45,7 +45,7 @@ struct SymTable {
     typedef kh_n2s::iterator iterator;
 
     SymTable(mrb_state *mrb) {
-        m_tab = kh_n2s::init(mrb);
+        m_tab = kh_n2s::init(mrb->gc());
     }
     iterator find(const symbol_name &k) {
         return m_tab->get(k);
@@ -382,11 +382,11 @@ static mrb_value sym_inspect(mrb_state *mrb, mrb_value sym)
 
     name = mrb_sym2name_len(mrb, id, len);
     str = mrb_str_new(mrb, 0, len+1);
-    RSTRING(str)->ptr[0] = ':';
-    memcpy(RSTRING(str)->ptr+1, name, len);
+    RSTRING(str)->m_ptr[0] = ':';
+    memcpy(RSTRING(str)->m_ptr+1, name, len);
     if (!symname_p(name) || strlen(name) != len) {
         str = mrb_str_dump(mrb, str);
-        memcpy(RSTRING(str)->ptr, ":\"", 2);
+        memcpy(RSTRING(str)->m_ptr, ":\"", 2);
     }
     return str;
 }
@@ -416,7 +416,7 @@ const char* mrb_sym2name(mrb_state *mrb, mrb_sym sym) {
     }
     else {
         mrb_value str = mrb_str_dump(mrb, mrb_str_new_static(mrb, name, len));
-        return RSTRING(str)->ptr;
+        return RSTRING(str)->m_ptr;
     }
 }
 

@@ -9,21 +9,28 @@ MRuby::CrossBuild.new("chipKitMax32") do |conf|
   toolchain :gcc
 
   # Mac OS X
-  # MPIDE_PATH = '/Applications/mpide.app/Contents/Resources/Java'
+  # MPIDE_PATH = '/Applications/Mpide.app/Contents/Resources/Java'
   # GNU Linux
   MPIDE_PATH = '/opt/mpide-0023-linux-20120903'
 
   PIC32_PATH = "#{MPIDE_PATH}/hardware/pic32"  
 
   conf.cc do |cc|
-    cc.command="#{PIC32_PATH}/compiler/pic32-tools/bin/pic32-gcc"
-    cc.include_paths = ["#{PIC32_PATH}/cores/pic32",
+    cc.command = "#{PIC32_PATH}/compiler/pic32-tools/bin/pic32-gcc"
+    cc.include_paths << ["#{PIC32_PATH}/cores/pic32",
                         "#{PIC32_PATH}/variants/Max32",
-                        "#{MRUBY_ROOT}/include"]
-    cc.flags << "-O2 -mno-smart-io -w -ffunction-sections -fdata-sections -g -mdebugger -Wcast-align " +
-                "-fno-short-double -mprocessor=32MX795F512L -DF_CPU=80000000L -DARDUINO=23 -D_BOARD_MEGA_ " +
-                "-DMPIDEVER=0x01000202 -DMPIDE=23"
+                        "#{PIC32_PATH}/libraries"]
+    cc.flags = %w(-O2 -mno-smart-io -w -ffunction-sections -fdata-sections -g -mdebugger -Wcast-align 
+                -fno-short-double -mprocessor=32MX795F512L -DF_CPU=80000000L -DARDUINO=23 -D_BOARD_MEGA_ 
+                -DMPIDEVER=0x01000202 -DMPIDE=23)
     cc.compile_options = "%{flags} -o %{outfile} -c %{infile}"
+  end
+
+  conf.cxx do |cxx|
+    cxx.command = conf.cc.command.dup
+    cxx.include_paths = conf.cc.include_paths.dup
+    cxx.flags = conf.cc.flags.dup
+    cxx.compile_options = conf.cc.compile_options.dup
   end
 
   conf.archiver do |archiver|
@@ -31,6 +38,7 @@ MRuby::CrossBuild.new("chipKitMax32") do |conf|
     archiver.archive_options = 'rcs %{outfile} %{objs}'
   end
 
-  # No binaries necessary
+  #no executables
   conf.bins = []
+
 end

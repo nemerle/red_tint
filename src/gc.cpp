@@ -20,6 +20,7 @@
 #include "mruby/range.h"
 #include "mruby/string.h"
 #include "mruby/variable.h"
+#include "mruby/gc.h"
 
 extern void mrb_free_context(mrb_state *mrb, struct mrb_context *ctx);
 /*
@@ -170,6 +171,7 @@ void* MemManager::_realloc(void *p, size_t len)
     else {
         out_of_memory = false;
     }
+
     return p2;
 }
 
@@ -181,13 +183,17 @@ void* MemManager::_malloc(size_t len)
 void* MemManager::_calloc(size_t nelem, size_t len)
 {
     void *p = nullptr;
-    if (nelem <= SIZE_MAX / len) {
+    if (nelem > 0 && len > 0 && nelem <= SIZE_MAX / len) {
         size_t size = nelem * len;
         p = _realloc(0, size);
 
-        if (p && size > 0)
+        if (p) {
             memset(p, 0, size);
+        }
+    } else {
+        p = NULL;
     }
+
     return p;
 }
 
@@ -378,8 +384,8 @@ void MemManager::mark_context(mrb_context *ctx)
         mark(ci->proc);
         mark(ci->target_class);
     }
-    if (ctx->prev)
-        mark_context(ctx->prev);
+    if (ctx->prev && ctx->prev->fib)
+        mark(ctx->prev->fib);
 }
 void MemManager::mark_children(RBasic *obj)
 {
@@ -434,9 +440,7 @@ void MemManager::mark_children(RBasic *obj)
         case MRB_TT_FIBER:
         {
             mrb_context *c = ((RFiber*)obj)->cxt;
-
             mark_context(c);
-            ((RFiber*)obj)->cxt = nullptr;
         }
             break;
         case MRB_TT_ARRAY:
@@ -562,6 +566,7 @@ void MemManager::obj_free(RBasic *obj)
 
 void MemManager::root_scan_phase()
 {
+    int j;
     size_t i, e;
     mrb_callinfo *ci;
 
@@ -1127,6 +1132,23 @@ gc_generational_mode_set(mrb_state *mrb, mrb_value self)
     return mrb_bool_value(enable);
 }
 
+void mrb_state::mrb_objspace_each_objects(each_object_callback* callback, void *data)
+{
+    struct heap_page* page = this->gc().m_heaps;
+
+    while (page != NULL) {
+        RVALUE *p, *pend;
+
+        p = page->objects;
+        pend = p + MRB_HEAP_PAGE_SIZE;
+        for (;p < pend; p++) {
+            (*callback)(this, &p->as.basic, data);
+        }
+
+        page = page->next;
+    }
+}
+
 #ifdef GC_TEST
 #ifdef GC_DEBUG
 static mrb_value gc_test(mrb_state *, mrb_value);
@@ -1149,9 +1171,8 @@ mrb_init_gc(mrb_state *mrb)
         #ifndef GC_TEST
             ;
 #else
-            .define_class_method(mrb, "test", gc_test, ARGS_NONE());
-#ifdef GC_DEBUG
-    mrb_define_class_method(mrb, gc, "test", gc_test, ARGS_NONE());
+        #ifdef GC_DEBUG
+            mrb_define_class_method(mrb, gc, "test", gc_test, MRB_ARGS_NONE());
 #endif
 #endif
 }

@@ -377,7 +377,7 @@ void mrb_check_type(mrb_state *mrb, mrb_value x, mrb_vtype t)
             }
             else if (mrb_special_const_p(x)) {
                 s = mrb_str_ptr(mrb_obj_as_string(mrb, x));
-                etype = s->ptr;
+                etype = s->m_ptr;
             }
             else {
                 etype = mrb_obj_classname(mrb, x);
@@ -404,15 +404,14 @@ void mrb_check_type(mrb_state *mrb, mrb_value x, mrb_vtype t)
 
 mrb_value mrb_any_to_s(mrb_state *mrb, mrb_value obj)
 {
-    mrb_value str = mrb_str_buf_new(mrb, 20);
+    RString * rs = RString::create(mrb, 20);
     const char *cname = mrb_obj_classname(mrb, obj);
-
-    mrb_str_buf_cat(str, "#<", 2);
-    mrb_str_cat2(mrb, str, cname);
-    mrb_str_cat(mrb, str, ":", 1);
+    rs->str_buf_cat("#<", 2);
+    rs->str_cat(cname,strlen(cname));
+    rs->str_cat(":", 1);
+    mrb_value str(mrb_obj_value(rs));
     mrb_str_concat(mrb, str, mrb_ptr_to_str(mrb, mrb_voidp(obj)));
-    mrb_str_buf_cat(str, ">", 1);
-
+    rs->str_buf_cat(">", 1);
     return str;
 }
 
@@ -603,7 +602,7 @@ void mrb_state::get_arg(const mrb_value &arg, mrb_sym &tgt) {
     if (mrb_type(arg) == MRB_TT_SYMBOL) {
         tgt = mrb_symbol(arg);
     }
-    else if (mrb_string_p(arg)) {
+    else if (mrb_is_a_string(arg)) {
         tgt = mrb_intern_str(this, arg.to_str(this));
     }
     else {

@@ -5,8 +5,8 @@
 */
 
 #include "mruby.h"
-#include "mruby/variable.h"
 #include "mruby/proc.h"
+#include "mruby/class.h"
 #ifdef ENABLE_STDIO
 #include <stdio.h>
 #endif
@@ -18,7 +18,7 @@ void mrb_print_backtrace(mrb_state *mrb)
     const char *filename, *method, *sep;
     int i, line;
 
-    printf("trace:\n");
+    fputs("trace:\n", stderr);
     ciidx = mrb_fixnum(mrb->m_exc->iv_get(mrb->intern_cstr("ciidx")));
     if (ciidx >= mrb->m_ctx->ciend - mrb->m_ctx->cibase)
         ciidx = 10; /* ciidx is broken... */
@@ -57,17 +57,17 @@ void mrb_print_backtrace(mrb_state *mrb)
 
         method = mrb_sym2name(mrb, ci->mid);
         if (method) {
-            const char *cn = mrb_class_name(mrb, ci->proc->target_class);
+            const char *cn = ci->proc->target_class->class_name();
 
             if (cn) {
-                printf("\t[%d] %s:%d:in %s%s%s\n", i, filename, line, cn, sep, method);
+                fprintf(stderr,"\t[%d] %s:%d:in %s%s%s\n", i, filename, line, cn, sep, method);
             }
             else {
-                printf("\t[%d] %s:%d:in %s\n", i, filename, line, method);
+                fprintf(stderr,"\t[%d] %s:%d:in %s\n", i, filename, line, method);
             }
         }
         else {
-            printf("\t[%d] %s:%d\n", i, filename, line);
+            fprintf(stderr,"\t[%d] %s:%d\n", i, filename, line);
         }
     }
 #endif

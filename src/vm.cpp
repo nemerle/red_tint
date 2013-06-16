@@ -135,9 +135,9 @@ void stack_extend(mrb_state *mrb, int room, int keep)
 #ifndef MRB_NAN_BOXING
         stack_clear(&(mrb->m_ctx->m_stack[keep]), room - keep);
 #else
-        int i;
-        for (i=keep; i<room; i++) {
-            SET_NIL_VALUE(mrb->stack[i]);
+        mrb_context *c = mrb->m_ctx;
+        for (int i=keep; i<room; i++) {
+            SET_NIL_VALUE(c->stack[i]);
         }
 #endif
     }
@@ -188,7 +188,7 @@ mrb_callinfo* cipush(mrb_state *mrb)
         size_t size = ci - c->cibase;
 
         c->cibase = (mrb_callinfo *)mrb->gc()._realloc(c->cibase, sizeof(mrb_callinfo)*size*2);
-        c->m_ci = ci = mrb->m_ctx->cibase + size;
+        c->m_ci = mrb->m_ctx->cibase + size;
         c->ciend = c->cibase + size * 2;
     }
     ci = ++c->m_ci;
@@ -309,11 +309,11 @@ mrb_value mrb_funcall_with_block(mrb_state *mrb, mrb_value self, mrb_sym mid, in
             mrb->mrb_raisef(E_ARGUMENT_ERROR, "negative argc for funcall (%S)", mrb_fixnum_value(argc));
         }
         RClass *c = RClass::mrb_class(mrb, self);
-        RProc *p = RClass::method_search_vm(mrb, &c, mid);
+        RProc *p = RClass::method_search_vm(&c, mid);
         if (!p) {
             undef = mid;
             mid = mrb_intern2(mrb, "method_missing", 14);
-            p = RClass::method_search_vm(mrb, &c, mid);
+            p = RClass::method_search_vm(&c, mid);
             n++;
             argc++;
         }
@@ -347,7 +347,6 @@ mrb_value mrb_funcall_with_block(mrb_state *mrb, mrb_value self, mrb_sym mid, in
             int ai = mrb->gc().arena_save();
             val = p->body.func(mrb, self);
             mrb->gc().arena_restore(ai);
-            mrb_gc_protect(mrb, val);
             mrb->m_ctx->m_stack = mrb->m_ctx->m_stbase + mrb->m_ctx->m_ci->stackidx;
             cipop(mrb);
         }
@@ -355,6 +354,7 @@ mrb_value mrb_funcall_with_block(mrb_state *mrb, mrb_value self, mrb_sym mid, in
             val = mrb->mrb_run(p, self);
         }
     }
+    mrb_gc_protect(mrb, val);
     return val;
 }
 
@@ -369,7 +369,7 @@ mrb_value mrb_yield_internal(mrb_state *mrb, mrb_value b, int argc, mrb_value *a
     int n = mrb->m_ctx->m_ci->nregs;
     mrb_value val;
     if (mrb_nil_p(b)) {
-         mrb->mrb_raise(E_ARGUMENT_ERROR, "no block given");
+        mrb->mrb_raise(E_ARGUMENT_ERROR, "no block given");
     }
     RProc *p = mrb_proc_ptr(b);
     mrb_callinfo *ci = cipush(mrb);
@@ -493,7 +493,7 @@ RProc * mrb_state::prepare_method_missing(RClass *c,mrb_sym mid_,const int &a,in
     mrb_value sym = mrb_symbol_value(mid_);
 
     mrb_sym missing_id = mrb_intern2(this, "method_missing", 14);
-    RProc *m =  RClass::method_search_vm(this, &c, missing_id);
+    RProc *m =  RClass::method_search_vm(&c, missing_id);
     if (n == CALL_MAXARGS) {
         RARRAY(regs[a+1])->unshift(sym);
     }
@@ -732,9 +732,9 @@ mrb_value mrb_state::mrb_run(RProc *proc, mrb_value self)
                     m_ctx->m_rsize = 16;
                 else
                     m_ctx->m_rsize *= 2;
-                this->m_ctx->rescue = (mrb_code **)gc()._realloc(this->m_ctx->rescue, sizeof(mrb_code*) * m_ctx->m_rsize);
+                m_ctx->rescue = (mrb_code **)gc()._realloc(m_ctx->rescue, sizeof(mrb_code*) * m_ctx->m_rsize);
             }
-            this->m_ctx->rescue[m_ctx->m_ci->ridx++] = pc + GETARG_sBx(i);
+            m_ctx->rescue[m_ctx->m_ci->ridx++] = pc + GETARG_sBx(i);
             NEXT;
         }
 
@@ -814,7 +814,7 @@ L_SEND:
             }
 
             RClass *c = RClass::mrb_class(this, recv);
-            RProc *m = RClass::method_search_vm(this, &c, mid);
+            RProc *m = RClass::method_search_vm(&c, mid);
             if (!m) {
                 m = prepare_method_missing(c,mid,a,n,regs);
             }
@@ -851,13 +851,13 @@ L_SEND:
                 if (m_exc)
                     goto L_RAISE;
                 /* pop stackpos */
-                _ci = this->m_ctx->m_ci;
+                _ci = m_ctx->m_ci;
                 if (!MRB_PROC_CFUNC_P(_ci[-1].proc)) {
                     irep = _ci[-1].proc->body.irep;
                     pool = irep->m_pool;
                     syms = irep->syms;
                 }
-                regs = this->m_ctx->m_stack = m_ctx->m_stbase + m_ctx->m_ci->stackidx;
+                regs = m_ctx->m_stack = m_ctx->m_stbase + m_ctx->m_ci->stackidx;
                 pc = _ci->pc;
                 cipop(this);
                 JUMP;
@@ -940,7 +940,7 @@ L_SEND:
 
             mrb_value recv = regs[0];
             RClass *c = m_ctx->m_ci->target_class->super;
-            RProc *m = RClass::method_search_vm(this, &c, mid);
+            RProc *m = RClass::method_search_vm(&c, mid);
             if (!m) {
                 m = prepare_method_missing(c,ci->mid,a,n,regs);
             }
@@ -1016,7 +1016,7 @@ L_SEND:
                 mrb_value *pp = nullptr;
                 int len = 0;
 
-                if (mrb_array_p(stack[m1])) {
+                if (mrb_is_a_array(stack[m1])) {
                     RArray *ary = mrb_ary_ptr(stack[m1]);
 
                     pp = ary->m_ptr;
@@ -1071,7 +1071,7 @@ L_SEND:
                     }
                 }
             }
-            else if (len > 1 && argc == 1 && mrb_array_p(argv[0])) {
+            else if (len > 1 && argc == 1 && mrb_is_a_array(argv[0])) {
                 argc = mrb_ary_ptr(argv[0])->m_len;
                 argv = mrb_ary_ptr(argv[0])->m_ptr;
             }
@@ -1082,9 +1082,13 @@ L_SEND:
                     value_move(&regs[1], argv, argc-m2); /* m1 + o */
                 }
                 if (m2) {
-                    value_move(&regs[len-m2+1], &argv[argc-m2], m2); /* m2 */
+                    int mlen = m2;
+                    if (argc-m2 <= m1) {
+                        mlen = argc - m1;
+                    }
+                    value_move(&regs[len-m2+1], &argv[argc-mlen], mlen);
                 }
-                if (r) {                  /* r */
+                if (r) {
                     regs[m1+o+1] = RArray::new_capa(this, 0);
                 }
                 pc++;
@@ -1094,13 +1098,14 @@ L_SEND:
             else {
                 if (argv0 != argv) {
                     regs[len+1] = *blk; /* move block */
-                    value_move(&regs[1], argv, m1+o); /* m1 + o */
+                    value_move(&regs[1], argv, m1+o);
                 }
                 if (r) {                  /* r */
                     regs[m1+o+1] = RArray::new_from_values(this, argc-m1-o-m2, argv+m1+o);
                 }
                 if (m2) {
-                    value_move(&regs[m1+o+r+1], &argv[argc-m2], m2);
+                    if (argc-m2 > m1)
+                        value_move(&regs[m1+o+r+1], &argv[argc-m2], m2);
                 }
                 if (argv0 == argv) {
                     regs[len+1] = *blk; /* move block */
@@ -1121,9 +1126,9 @@ L_SEND:
             /* A C            R(A) := kdict */
             NEXT;
         }
-        L_RETURN:
-            i = MKOP_AB(OP_RETURN, GETARG_A(i), OP_R_NORMAL);
-            /* fall through */
+L_RETURN:
+        i = MKOP_AB(OP_RETURN, GETARG_A(i), OP_R_NORMAL);
+        /* fall through */
         CASE(OP_RETURN) {
             /* A      return R(A) */
             if (m_exc) {
@@ -1132,10 +1137,10 @@ L_SEND:
 
 L_RAISE:
                 _ci = m_ctx->m_ci;
-                mrb_obj_iv_ifnone(this, m_exc, mrb_intern2(this, "lastpc", 6), mrb_voidp_value(pc));
-                mrb_obj_iv_ifnone(this, m_exc, mrb_intern2(this, "ciidx", 5), mrb_fixnum_value(_ci - this->m_ctx->cibase));
+                mrb_obj_iv_ifnone(this, m_exc, mrb_intern2(this, "lastpc", 6), mrb_voidp_value(this,pc));
+                mrb_obj_iv_ifnone(this, m_exc, mrb_intern2(this, "ciidx", 5), mrb_fixnum_value(_ci - m_ctx->cibase));
                 eidx = _ci->eidx;
-                if (_ci == this->m_ctx->cibase) {
+                if (_ci == m_ctx->cibase) {
                     if (_ci->ridx == 0) goto L_STOP;
                     goto L_RESCUE;
                 }
@@ -1153,7 +1158,7 @@ L_RAISE:
                     while (eidx > _ci->eidx) {
                         ecall(this, --eidx);
                     }
-                    if (_ci == this->m_ctx->cibase) {
+                    if (_ci == m_ctx->cibase) {
                         if (_ci->ridx == 0) {
                             regs = m_ctx->m_stack = m_ctx->m_stbase;
                             goto L_STOP;
@@ -1166,7 +1171,7 @@ L_RESCUE:
                 pool = irep->m_pool;
                 syms = irep->syms;
                 regs = m_ctx->m_stack = m_ctx->m_stbase + _ci[1].stackidx;
-                pc = this->m_ctx->rescue[--_ci->ridx];
+                pc = m_ctx->rescue[--_ci->ridx];
             }
             else {
                 mrb_callinfo *ci = m_ctx->m_ci;
@@ -1183,8 +1188,8 @@ L_RESCUE:
                                 localjump_error(this, LOCALJUMP_ERROR_RETURN);
                                 goto L_RAISE;
                             }
-                            ci = this->m_ctx->cibase + e->cioff;
-                            if (ci == this->m_ctx->cibase) {
+                            ci = m_ctx->cibase + e->cioff;
+                            if (ci == m_ctx->cibase) {
                                 localjump_error(this, LOCALJUMP_ERROR_RETURN);
                                 goto L_RAISE;
                             }
@@ -1192,12 +1197,20 @@ L_RESCUE:
                             break;
                         }
                     case OP_R_NORMAL:
-                        if (ci == this->m_ctx->cibase) {
+                        if (ci == m_ctx->cibase) {
                             if (!m_ctx->prev) { /* toplevel return */
-                            localjump_error(this, LOCALJUMP_ERROR_RETURN);
-                            goto L_RAISE;
-                        }
-                            m_ctx = m_ctx->prev; /* automatic yield at the end */
+                                localjump_error(this, LOCALJUMP_ERROR_RETURN);
+                                goto L_RAISE;
+                            }
+                            if (m_ctx->prev->m_ci == m_ctx->prev->cibase) {
+                                mrb_value exc = mrb_exc_new3(A_RUNTIME_ERROR(this),
+                                                             mrb_str_new(this, "double resume", 13));
+                                m_exc = mrb_obj_ptr(exc);
+                                goto L_RAISE;
+                            }
+                            /* automatic yield at the end */
+                            m_ctx->status = MRB_FIBER_TERMINATED;
+                            m_ctx = m_ctx->prev;
                         }
                         ci = m_ctx->m_ci;
                         break;
@@ -1206,7 +1219,7 @@ L_RESCUE:
                             localjump_error(this, LOCALJUMP_ERROR_BREAK);
                             goto L_RAISE;
                         }
-                        ci = m_ctx->m_ci = this->m_ctx->cibase + proc->env->cioff + 1;
+                        ci = m_ctx->m_ci = m_ctx->cibase + proc->env->cioff + 1;
                         break;
                     default:
                         /* cannot happen */
@@ -1242,7 +1255,7 @@ L_RESCUE:
             mrb_sym mid = syms[GETARG_B(i)];
             mrb_value recv = regs[a];
             RClass *c = RClass::mrb_class(this, recv);
-            RProc *m = RClass::method_search_vm(this, &c, mid);
+            RProc *m = RClass::method_search_vm(&c, mid);
             if (!m) {
                 m = prepare_method_missing(c,mid,a,n,regs);
             }
@@ -1363,7 +1376,7 @@ L_RESCUE:
                     x = mrb_fixnum(regs[a]);
                     y = mrb_fixnum(regs[a+1]);
                     if (((x^y) & (((x ^ ((x^y)
-                        & (1 << (sizeof(mrb_int)*8-1))))-y)^y)) < 0) {
+                                         & (1 << (sizeof(mrb_int)*8-1))))-y)^y)) < 0) {
                         /* integer overflow */
                         SET_FLT_VALUE(regs[a], (mrb_float)x - (mrb_float)y);
                     }
@@ -1401,9 +1414,9 @@ L_RESCUE:
                 {
                     mrb_int x, y;
                     static_assert(
-                      sizeof(long long) >= 2 * sizeof(mrb_int),
-                      "Unable to detect overflow after multiplication"
-                    );
+                                sizeof(long long) >= 2 * sizeof(mrb_int),
+                                "Unable to detect overflow after multiplication"
+                                );
                     x = mrb_fixnum(regs[a]);
                     y = mrb_fixnum(regs[a+1]);
                     long long z = x * y;
@@ -1517,7 +1530,7 @@ L_RESCUE:
                     mrb_int x = mrb_fixnum(regs_a[0]);
                     mrb_int y = GETARG_C(i);
                     if (((x^y) & (((x ^ ((x^y)
-                        & (1 << (sizeof(mrb_int)*8-1))))-y)^y)) < 0) {
+                                         & (1 << (sizeof(mrb_int)*8-1))))-y)^y)) < 0) {
                         /* integer overflow */
                         SET_FLT_VALUE(regs[a], (mrb_float)x - (mrb_float)y);
                     }
@@ -1539,10 +1552,10 @@ L_RESCUE:
 
 #define OP_CMP_BODY(op,v1,v2) do {\
     if (regs[a].v1 op regs[a+1].v2) {\
-        regs[a]=mrb_true_value();\
+    regs[a]=mrb_true_value();\
     }\
     else {\
-        regs[a]=mrb_false_value();\
+    regs[a]=mrb_false_value();\
     }\
     } while(0)
 
@@ -1629,7 +1642,7 @@ L_RESCUE:
             int c = GETARG_C(i);
             mrb_value v = regs[GETARG_B(i)];
 
-            if (!mrb_array_p(v)) {
+            if (!mrb_is_a_array(v)) {
                 if (c == 0) {
                     regs[GETARG_A(i)] = v;
                 }
@@ -1656,7 +1669,7 @@ L_RESCUE:
             int pre  = GETARG_B(i);
             int post = GETARG_C(i);
 
-            if (!mrb_array_p(v)) {
+            if (!mrb_is_a_array(v)) {
                 regs[a++] = RArray::new_capa(this, 0);
                 while (post--) {
                     regs[a] = mrb_nil_value();

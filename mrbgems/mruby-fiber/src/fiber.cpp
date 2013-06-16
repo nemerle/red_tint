@@ -5,8 +5,8 @@
 
 #define FIBER_STACK_INIT_SIZE 64
 #define FIBER_CI_INIT_SIZE 8
-
-
+/* mark return from context modifying method */
+#define MARK_CONTEXT_MODIFY(c) (c)->m_ci->target_class = NULL
 /*
 * call-seq:
 * Fiber.new{...} -> obj
@@ -71,18 +71,18 @@ static mrb_value fiber_init(mrb_state *mrb, mrb_value self)
     mrb_get_args(mrb, "&", &blk);
 
     if (mrb_nil_p(blk)) {
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "tried to create Fiber object without a block");
+        mrb_raise(E_ARGUMENT_ERROR, "tried to create Fiber object without a block");
     }
     p = mrb_proc_ptr(blk);
     if (MRB_PROC_CFUNC_P(p)) {
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "tried to create Fiber from C defined method");
+        mrb_raise(E_ARGUMENT_ERROR, "tried to create Fiber from C defined method");
     }
 
     f->cxt = (mrb_context*)mrb->gc()._malloc(sizeof(mrb_context));
     *f->cxt = mrb_context_zero;
+    c = f->cxt;
 
     /* initialize VM stack */
-    c = f->cxt;
     c->m_stbase = (mrb_value *)mrb->gc()._calloc(FIBER_STACK_INIT_SIZE, sizeof(mrb_value));
     c->stend = c->m_stbase + FIBER_STACK_INIT_SIZE;
     c->m_stack = c->m_stbase;
@@ -103,23 +103,23 @@ static mrb_value fiber_init(mrb_state *mrb, mrb_value self)
     ci->nregs = p->body.irep->nregs;
     ci[1] = ci[0];
     c->m_ci++;                      /* push dummy callinfo */
+    c->fib = f;
+    c->status = MRB_FIBER_CREATED;
 
     return self;
 }
 
-static struct mrb_context*
-fiber_check(mrb_state *mrb, mrb_value fib)
+static mrb_context* fiber_check(mrb_state *mrb, mrb_value fib)
 {
-    struct RFiber *f = (struct RFiber*)fib.value.p;
+    RFiber *f = (RFiber*)fib.value.p;
 
     if (!f->cxt) {
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "uninitialized Fiber");
+        mrb_raise(E_ARGUMENT_ERROR, "uninitialized Fiber");
     }
     return f->cxt;
 }
 
-static mrb_value
-fiber_result(mrb_state *mrb, mrb_value *a, int len)
+static mrb_value fiber_result(mrb_state *mrb, mrb_value *a, int len)
 {
     if (len == 0)
         return mrb_nil_value();
@@ -127,6 +127,8 @@ fiber_result(mrb_state *mrb, mrb_value *a, int len)
         return a[0];
     return RArray::new_from_values(mrb, len, a);
 }
+
+
 
 /*
  *  call-seq:
@@ -149,26 +151,51 @@ static mrb_value fiber_resume(mrb_state *mrb, mrb_value self)
     mrb_value *a;
     int len;
 
+    if (c->status == MRB_FIBER_RESUMED) {
+        mrb->mrb_raise(E_RUNTIME_ERROR, "double resume");
+    }
+    if (c->status == MRB_FIBER_TERMINATED) {
+        mrb->mrb_raise(E_RUNTIME_ERROR, "resuming dead fiber");
+    }
     mrb_get_args(mrb, "*", &a, &len);
-    if (!c->prev) {               /* first call */
+    mrb->m_ctx->status = MRB_FIBER_RESUMED;
+
+    if (c->status == MRB_FIBER_CREATED) {
         mrb_value *b = c->m_stack+1;
         mrb_value *e = b + len;
 
         while (b<e) {
             *b++ = *a++;
         }
-        c->m_ci->argc = len;
+        c->cibase->argc = len;
         c->prev = mrb->m_ctx;
+        if (c->prev->fib)
+            mrb->gc().mrb_field_write_barrier(c->fib, c->prev->fib);
+        c->status = MRB_FIBER_RUNNING;
         mrb->m_ctx = c;
-
+        MARK_CONTEXT_MODIFY(c);
         return c->m_ci->proc->env->stack[0];
     }
-    if (c->m_ci == c->cibase) {
-        mrb_raise(mrb, E_RUNTIME_ERROR, "resuming dead Fiber");
-    }
-    c->prev = mrb->m_ctx;
+    MARK_CONTEXT_MODIFY(c);
+  c->prev = mrb->m_ctx;
+    if(c->prev->fib)
+        mrb->gc().mrb_field_write_barrier(c->fib, c->prev->fib);
+    c->status = MRB_FIBER_RUNNING;
     mrb->m_ctx = c;
     return fiber_result(mrb, a, len);
+}
+
+/*
+ *  call-seq:
+ *     fiber.alive? -> true or false
+ *
+ *  Returns true if the fiber can still be resumed. After finishing
+ *  execution of the fiber block this method will always return false.
+ */
+static mrb_value fiber_alive_p(mrb_state *mrb, mrb_value self)
+{
+    struct mrb_context *c = fiber_check(mrb, self);
+    return mrb_bool_value(c->status != MRB_FIBER_TERMINATED);
 }
 
 /*
@@ -186,12 +213,15 @@ static mrb_value fiber_yield(mrb_state *mrb, mrb_value self)
     struct mrb_context *c = mrb->m_ctx;
     mrb_value *a;
     int len;
+
     if (!c->prev) {
-        mrb_raise(mrb, E_ARGUMENT_ERROR, "can't yield from root Fiber");
+        mrb->mrb_raise(E_ARGUMENT_ERROR, "can't yield from root fiber");
     }
     mrb_get_args(mrb, "*", &a, &len);
-
+    c->prev->status = MRB_FIBER_RUNNING;
     mrb->m_ctx = c->prev;
+    c->prev = NULL;
+    MARK_CONTEXT_MODIFY(mrb->m_ctx);
     return fiber_result(mrb, a, len);
 }
 
@@ -199,9 +229,10 @@ void
 mrb_mruby_fiber_gem_init(mrb_state* mrb)
 {
     RClass &c = mrb->define_class("Fiber", mrb->object_class)
-        .define_class_method("initialize", fiber_init, MRB_ARGS_NONE())
-        .define_class_method("resume", fiber_resume, MRB_ARGS_ANY())
-        .define_class_method("yield", fiber_yield, MRB_ARGS_ANY());
+            .define_method("initialize", fiber_init, MRB_ARGS_NONE())
+            .define_method("resume", fiber_resume, MRB_ARGS_ANY())
+            .define_method("alive?", fiber_alive_p, MRB_ARGS_NONE())
+            .define_class_method("yield", fiber_yield, MRB_ARGS_ANY());
     MRB_SET_INSTANCE_TT((&c), MRB_TT_FIBER);
 }
 
@@ -209,4 +240,3 @@ void
 mrb_mruby_fiber_gem_final(mrb_state* mrb)
 {
 }
-

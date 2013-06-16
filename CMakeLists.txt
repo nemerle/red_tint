@@ -85,6 +85,7 @@ AddGem(random)
 AddGem(print)
 AddGem(math)
 AddGem(struct)
+AddGem(fiber)
 
 
 #message(GEM_RB_FILES " ${GEM_RB_FILES}")
