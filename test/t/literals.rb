@@ -22,7 +22,7 @@ assert('Literals Numerical', '8.7.6.2') do
   # decimal
   assert_equal 0d999, 999
   assert_equal 0D999, 999
-  # decimal seperator
+  # decimal separator
   assert_equal 10_000_000, 10000000
   assert_equal 1_0, 10
   # integer with exponent
