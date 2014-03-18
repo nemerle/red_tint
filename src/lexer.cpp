@@ -295,7 +295,7 @@ int mrb_parser_state::peek_n(int c, int n)
         list = push(list, (mrb_ast_node*)(intptr_t)c0);
     } while(n--);
     if (this->pb) {
-        this->pb = push(this->pb, (mrb_ast_node*)list);
+        this->pb = append(this->pb, (mrb_ast_node*)list);
     }
     else {
         this->pb = list;

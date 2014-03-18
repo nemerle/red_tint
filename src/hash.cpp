@@ -135,7 +135,9 @@ mrb_hash_set(mrb_state *mrb, mrb_value hash, mrb_value key, mrb_value val) /* mr
     k = kh_get(ht, h, key);
     if (k == kh_end(h)) {
         /* expand */
+        int ai = mrb->gc().arena_save();
         k = kh_put(ht, h, KEY(key));
+        mrb->gc().arena_restore(ai);
     }
 
     kh_value(h, k) = val;
@@ -160,7 +162,9 @@ mrb_hash_dup(mrb_state *mrb, mrb_value hash)
 
         for (k = kh_begin(h); k != kh_end(h); k++) {
             if (kh_exist(h,k)) {
+                int ai = mrb->gc().arena_save();
                 ret_k = kh_put(ht, ret_h, KEY(kh_key(h,k)));
+                mrb->gc().arena_restore(ai);
                 kh_val(ret_h, ret_k) = kh_val(h,k);
             }
         }
@@ -952,17 +956,12 @@ static mrb_value mrb_hash_has_keyWithKey(mrb_value hash, mrb_value key)
 {
     khash_t(ht) *h = RHASH_TBL(hash);
     khiter_t k;
-    mrb_bool result;
 
     if (h) {
         k = kh_get(ht, h, key);
-        result = (k != kh_end(h));
+        return mrb_bool_value(k != kh_end(h));
     }
-    else {
-        result = 0;
-    }
-
-    return mrb_bool_value(result);
+    return mrb_false_value();
 }
 
 /* 15.2.13.4.13 */

@@ -10,6 +10,7 @@
   */
 # include <limits.h>
 #endif
+#include <stdlib.h>
 #include <string.h>
 #include "mruby.h"
 #include "mruby/array.h"
@@ -178,6 +179,17 @@ void* MemManager::_realloc(void *p, size_t len)
 void* MemManager::_malloc(size_t len)
 {
     return _realloc(0, len);
+}
+
+void *MemManager::mrb_malloc_simple(size_t len)
+{
+    void *p2;
+    p2 = m_allocf(m_vm, 0, len, ud);
+    if (!p2 && len > 0 && m_heaps) {
+        mrb_garbage_collect();
+        p2 = m_allocf(m_vm, 0, len, ud);
+    }
+    return p2;
 }
 
 void* MemManager::_calloc(size_t nelem, size_t len)

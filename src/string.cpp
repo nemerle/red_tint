@@ -36,7 +36,7 @@ struct mrb_shared_string {
 #define MRB_STR_NOFREE    2
 
 #define RESIZE_CAPA(s,capacity) do {\
-    s->ptr = (char *)mrb->gc()._realloc(s->ptr, (capacity)+1);\
+    s->m_ptr = (char *)mrb->gc()._realloc(s->m_ptr, (capacity)+1);\
     s->aux.capa = capacity;\
     } while (0)
 static
@@ -112,10 +112,9 @@ mrb_value mrb_str_resize(mrb_state *mrb, mrb_value str, mrb_int len)
     str_modify(mrb, s);
     slen = s->len;
     if (len != slen) {
-        if (slen < len || slen -len > 1024) {
-            s->m_ptr = (char *)mrb->gc()._realloc(s->m_ptr, len+1);
+        if (slen < len || slen - len > 256) {
+            RESIZE_CAPA(s, len);
         }
-        s->aux.capa = len;
         s->len = len;
         s->m_ptr[len] = '\0';   /* sentinel */
     }
@@ -242,16 +241,7 @@ mrb_value mrb_str_new_cstr(mrb_state *mrb, const char *p)
         len = 0;
     }
 
-    RString * s = mrb_obj_alloc_string(mrb);
-    s->m_ptr = (char *)mrb->gc()._malloc(len+1);
-    if (p) {
-        memcpy(s->m_ptr, p, len);
-    }
-    s->m_ptr[len] = 0;
-    s->len = len;
-    s->aux.capa = len;
-
-    return mrb_obj_value(s);
+    return mrb_str_new(mrb,p,len);
 }
 
 mrb_value mrb_str_new_static(mrb_state *mrb, const char *p, size_t len) {
