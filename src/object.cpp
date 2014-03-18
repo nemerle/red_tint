@@ -15,7 +15,7 @@ int mrb_obj_eq(mrb_value v1, mrb_value v2)
     if (mrb_type(v1) != mrb_type(v2)) return false;
     switch (mrb_type(v1)) {
         case MRB_TT_TRUE:
-            return 1;
+            return true;
 
         case MRB_TT_FALSE:
         case MRB_TT_FIXNUM:

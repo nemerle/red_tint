@@ -151,15 +151,7 @@ gettimeofday_time(void)
 
 void* MemManager::_realloc(void *p, size_t len)
 {
-    void *p2;
-
-    p2 = m_allocf(m_vm, p, len, this->ud);
-
-    if (!p2 && len > 0 && m_heaps) {
-        mrb_garbage_collect();
-        p2 = m_allocf(m_vm, p, len, this->ud);
-    }
-
+    void *p2=mrb_realloc_simple(p,len);
     if (!p2 && len) {
         if (out_of_memory) {
             /* mrb_panic(mrb); */
@@ -183,11 +175,17 @@ void* MemManager::_malloc(size_t len)
 
 void *MemManager::mrb_malloc_simple(size_t len)
 {
+    return mrb_realloc_simple(0,len);
+}
+void *MemManager::mrb_realloc_simple(void* p,size_t len)
+{
     void *p2;
-    p2 = m_allocf(m_vm, 0, len, ud);
+
+    p2 = m_allocf(m_vm, p, len, this->ud);
+
     if (!p2 && len > 0 && m_heaps) {
         mrb_garbage_collect();
-        p2 = m_allocf(m_vm, 0, len, ud);
+        p2 = m_allocf(m_vm, p, len, this->ud);
     }
     return p2;
 }

@@ -475,12 +475,16 @@ int mrb_parser_state::parse_string()
                     m_lexer.tokadd('\n');
                 }
                 else {
-                    pushback(c);
-
-                    if(type & STR_FUNC_REGEXP)
+                    if(type & STR_FUNC_REGEXP) {
                         m_lexer.tokadd('\\');
+                        if (c != -1)
+                            m_lexer.tokadd(c);
+                    }
+                    else {
+                        pushback(c);
+                        m_lexer.tokadd(read_escape());
+                    }
 
-                    m_lexer.tokadd(read_escape());
                     if (hinf)
                         hinf->line_head = false;
                 }

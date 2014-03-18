@@ -145,29 +145,20 @@ mrb_range_eq(mrb_state *mrb, mrb_value range)
 {
     RRange *rr;
     RRange *ro;
-    mrb_bool eq_p;
     mrb_value obj = mrb->get_arg<mrb_value>();
-
-    if (mrb_obj_equal(range, obj)) {
-        eq_p = 1;
+    if (mrb_obj_equal(range, obj))
+        return mrb_true_value();
+    if (!mrb_obj_is_instance_of(mrb, obj, mrb_obj_class(mrb, range))) { /* same class? */
+        return mrb_false_value();
     }
-    else if (!mrb_obj_is_instance_of(mrb, obj, mrb_obj_class(mrb, range))) { /* same class? */
-        eq_p = 0;
+    rr = mrb_range_ptr(range);
+    ro = mrb_range_ptr(obj);
+    if (!mrb_obj_equal(rr->edges->beg, ro->edges->beg) ||
+            !mrb_obj_equal(rr->edges->end, ro->edges->end) ||
+            rr->excl != ro->excl) {
+        return mrb_false_value();
     }
-    else {
-        rr = mrb_range_ptr(range);
-        ro = mrb_range_ptr(obj);
-        if (!mrb_obj_equal(rr->edges->beg, ro->edges->beg) ||
-                !mrb_obj_equal(rr->edges->end, ro->edges->end) ||
-                rr->excl != ro->excl) {
-            eq_p = 0;
-        }
-        else {
-            eq_p = 1;
-        }
-    }
-
-    return mrb_bool_value(eq_p);
+    return mrb_true_value();
 }
 
 static int
@@ -376,35 +367,23 @@ static mrb_value
 range_eql(mrb_state *mrb, mrb_value range)
 {
     RRange *r, *o;
-    mrb_bool eql_p;
 
     mrb_value obj = mrb->get_arg<mrb_value>();
-
-    if (mrb_obj_equal(range, obj)) {
-        eql_p = 1;
+    if (mrb_obj_equal(range, obj))
+        return mrb_true_value();
+    if (!mrb_obj_is_kind_of(mrb, obj, RANGE_CLASS)) {
+        return mrb_false_value();
     }
-    else if (!mrb_obj_is_kind_of(mrb, obj, RANGE_CLASS)) {
-        eql_p = 0;
+    if (mrb_type(obj) != MRB_TT_RANGE)
+        return mrb_false_value();
+    r = mrb_range_ptr(range);
+    o = mrb_range_ptr(obj);
+    if (!mrb_eql(mrb, r->edges->beg, o->edges->beg) ||
+            !mrb_eql(mrb, r->edges->end, o->edges->end) ||
+            (r->excl != o->excl)) {
+        return mrb_false_value();
     }
-    else {
-        r = mrb_range_ptr(range);
-        if (mrb_type(obj) != MRB_TT_RANGE) {
-            eql_p = 0;
-        }
-        else {
-            o = mrb_range_ptr(obj);
-            if (!mrb_eql(mrb, r->edges->beg, o->edges->beg) ||
-                    !mrb_eql(mrb, r->edges->end, o->edges->end) ||
-                    (r->excl != o->excl)) {
-                eql_p = 0;
-            }
-            else {
-                eql_p = 1;
-            }
-        }
-    }
-
-    return mrb_bool_value(eql_p);
+    return mrb_true_value();
 }
 
 /* 15.2.14.4.15(x) */

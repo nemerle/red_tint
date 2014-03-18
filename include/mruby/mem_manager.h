@@ -46,6 +46,7 @@ public:
     void    _free(void *p);
     void *  _malloc(size_t len);
     void *  mrb_malloc_simple(size_t);
+    void *  mrb_realloc_simple(void *ptr, size_t len);
     void    unlink_heap_page(heap_page *page);
     void    link_free_heap_page(heap_page *page);
     void    mrb_heap_init();
