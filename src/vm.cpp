@@ -324,7 +324,7 @@ mrb_value mrb_funcall_with_block(mrb_state *mrb, mrb_value self, mrb_sym mid, in
         ci->proc = p;
         ci->stackidx = mrb->m_ctx->m_stack - mrb->m_ctx->m_stbase;
         ci->argc = argc;
-        ci->target_class = p->target_class;
+        ci->target_class = c;
         if (MRB_PROC_CFUNC_P(p)) {
             ci->nregs = argc + 2;
         }
@@ -503,6 +503,7 @@ RProc * mrb_state::prepare_method_missing(RClass *c,mrb_sym mid_,const int &a,in
         value_move(regs+a+2, regs+a+1, ++n);
         regs[a+1] = sym;
     }
+    assert(m);
     return m;
 }
 mrb_value mrb_state::mrb_run(RProc *proc, mrb_value self)
@@ -956,7 +957,7 @@ L_SEND:
             if (n == CALL_MAXARGS) {
                 ci->argc = -1;
             }
-            ci->target_class = m->target_class;
+            ci->target_class = c;
             ci->pc = pc + 1;
 
             /* prepare stack */

@@ -47,6 +47,7 @@ SET(MRUBY_SRC_C
     ../include/mruby/numeric.h
     ../include/mruby/variable.h
     ../include/mruby/proc.h
+    ../include/mruby/range.h
     ../include/mruby/value.h
     ../include/mruby/string.h
     ../include/mruby/node.h

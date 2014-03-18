@@ -1082,6 +1082,9 @@ void codegen_scope::gen_vmassignment(node *tree, int rhs, int val)
             n++;
         }
     }
+    else {
+        pop_sp();
+    }
 }
 
 void codegen_scope::gen_send_intern()
@@ -1358,8 +1361,8 @@ void codegen_scope::visit(SuperNode *node)
     bool val = m_val_stack.back();
     int n = 0, sendv = 0;
 
-    push_();        /* room for receiver */
-    if (node->args()) {
+    push_();         /* room for receiver */
+    if(node->hasParams() && node->args()) {
         mrb_ast_node *args = node->args();
         n = gen_values( args, true);
         if (n < 0) {
@@ -1367,7 +1370,7 @@ void codegen_scope::visit(SuperNode *node)
             push_();
         }
     }
-    if (node->block()) {
+    if (node->hasParams() && node->block()) {
         codegen( node->block(), true);
         pop_sp();
     }
@@ -1810,7 +1813,7 @@ void codegen_scope::visit_DefCommon(DefCommonNode *n,eOpEnum op) {
     pop_sp();
     genop( MKOP_AB(OP_METHOD, m_sp, sym));
     if (val) {
-        genop( MKOP_A(OP_LOADNIL, m_sp));
+        genop( MKOP_ABx(OP_LOADSYM, m_sp, sym));
         push_();
     }
 }

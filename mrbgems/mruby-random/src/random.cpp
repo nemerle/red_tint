@@ -35,9 +35,7 @@ static mt_state *mrb_mt_get_context(mrb_state *mrb,  mrb_value self)
 
     context = mrb_iv_get(self, mrb->intern2(MT_STATE_KEY,MT_STATE_KEY_CSTR_LEN));
 
-    t = (mt_state *)mrb_data_get_ptr(mrb, context, &mt_state_type);
-    if (!t)
-        mrb->mrb_raise(E_RUNTIME_ERROR, "mt_state get from mrb_iv_get failed");
+    t = DATA_GET_PTR(mrb, context, &mt_state_type, mt_state);
 
     return t;
 }
