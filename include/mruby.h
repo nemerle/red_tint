@@ -28,6 +28,9 @@
 #pragma once
 #include <memory>
 #include <cstring>
+#include <stdint.h>
+#include <cstddef>
+
 #include "mrbconf.h"
 #include "mruby/value.h"
 #include "mruby/class.h"

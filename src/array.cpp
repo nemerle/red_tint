@@ -801,8 +801,8 @@ mrb_value RArray::inspect_ary(RArray *list_arr)
 
     //mrb_str_buf_cat(m_vm, arystr, head, sizeof(head));
     strr->str_cat(head,sizeof(head));
-    assert(m_ptr!=0);
     for(i=0; i<m_len; i++) {
+        assert(m_ptr!=0);
         int ai = m_vm->gc().arena_save();
 
         if (i > 0) {

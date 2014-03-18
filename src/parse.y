@@ -3,6 +3,7 @@
 **
 ** See Copyright Notice in mruby.h
 */
+
 %{
 #undef PARSER_DEBUG
 
@@ -138,7 +139,7 @@ typedef unsigned int stack_type;
 
 %token <id>  tIDENTIFIER tFID tGVAR tIVAR tCONSTANT tCVAR tLABEL
 %token <nd>  tINTEGER tFLOAT tCHAR tXSTRING tREGEXP
-%token <sn>  tSTRING tSTRING_MID tSTRING_PART
+%token <sn>  tSTRING tSTRING_PART tSTRING_MID
 %token <nd>  tNTH_REF tBACK_REF
 %token <num> tREGEXP_END
 
@@ -268,9 +269,13 @@ top_stmts	: none      { $$ = p->new_t<BeginNode>(nullptr); }
 
 top_stmt	: stmt
                 | keyword_BEGIN
+		    {
+		      $<locals_ctx>$ = p->local_switch();
+		    }
                   '{' top_compstmt '}'
                     {
                       p->yyerror("BEGIN not supported");
+                      p->local_resume($<locals_ctx>2);
                       $$ = 0;
                     }
                 ;

@@ -911,6 +911,8 @@ mrb_value mrb_instance_new(mrb_state *mrb, mrb_value cv)
     mrb_value obj, blk;
     mrb_value *argv;
     int argc;
+    if (c->tt == MRB_TT_SCLASS)
+        mrb_raise(E_TYPE_ERROR, "can't create instance of singleton class");
 
     if (ttype == 0)
         ttype = MRB_TT_OBJECT;
@@ -1314,8 +1316,12 @@ mrb_value mrb_mod_alias(mrb_state *mrb, mrb_value mod)
 RClass& RClass::undef_method(mrb_sym a)
 {
     static const mrb_value m = {{0},MRB_TT_PROC};
-
-    define_method_vm(a, m);
+    if(!respond_to(a)) {
+         mrb_name_error(m_vm, a, "undefined method '%S' for class '%S'", mrb_sym2str(m_vm, a), mrb_obj_value(c));
+    }
+    else {
+        define_method_vm(a, m);
+    }
     return *this;
 }
 
@@ -1680,11 +1686,8 @@ void mrb_init_class(mrb_state *mrb)
             .define_method("superclass",          mrb_class_superclass,     MRB_ARGS_NONE()) /* 15.2.3.3.4 */
             .define_method("new",                 mrb_instance_new,         MRB_ARGS_ANY())  /* 15.2.3.3.3 */
             .define_method("inherited",           mrb_bob_init,             MRB_ARGS_REQ(1))
-            .undef_method("append_features")
-            .undef_method("extend_object")
             .fin();
-    mod->undef_method("new")
-            .instance_tt(MRB_TT_MODULE)
+    mod->instance_tt(MRB_TT_MODULE)
             .define_method("class_variable_defined?", mrb_mod_cvar_defined,     MRB_ARGS_REQ(1))  /* 15.2.2.4.16 */
             .define_method("class_variable_get",      mrb_mod_cvar_get,         MRB_ARGS_REQ(1))  /* 15.2.2.4.17 */
             .define_method("class_variable_set",      mrb_mod_cvar_set,         MRB_ARGS_REQ(2)) /* 15.2.2.4.18 */
@@ -1716,4 +1719,7 @@ void mrb_init_class(mrb_state *mrb)
             .define_method("===",                     mrb_mod_eqq,              MRB_ARGS_REQ(1))
             .define_class_method("constants",         mrb_mod_s_constants,      MRB_ARGS_ANY())  /* 15.2.2.3.1 */
             .fin();
+    cls->undef_method("append_features")
+        .undef_method("extend_object");
+
 }

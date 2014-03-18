@@ -50,6 +50,7 @@ The value below allows about 60000 recursive calls in the simplest case. */
 #else
 # define DEBUG(x)
 #endif
+
 #define TO_STR(x) TO_STR_(x)
 #define TO_STR_(x) #x
 namespace {
@@ -72,6 +73,7 @@ inline void stack_copy(mrb_value *dst, const mrb_value *src, size_t size)
 void stack_init(mrb_state *mrb)
 {
     mrb_context *c = mrb->m_ctx;
+
     /* assert(mrb->stack == NULL); */
     c->m_stbase = (mrb_value *)mrb->gc()._calloc(STACK_INIT_SIZE, sizeof(mrb_value));
     c->stend = c->m_stbase + STACK_INIT_SIZE;
@@ -1126,6 +1128,7 @@ L_SEND:
             /* A C            R(A) := kdict */
             NEXT;
         }
+
 L_RETURN:
         i = MKOP_AB(OP_RETURN, GETARG_A(i), OP_R_NORMAL);
         /* fall through */
@@ -1310,6 +1313,8 @@ L_RESCUE:
 #define attr_i value.i
 #ifdef MRB_NAN_BOXING
 #define attr_f f
+#elif defined(MRB_WORD_BOXING)
+#define attr_f value.fp->f
 #else
 #define attr_f value.f
 #endif
@@ -1349,10 +1354,26 @@ L_RESCUE:
                 }
                     break;
                 case TYPES2(MRB_TT_FLOAT,MRB_TT_FIXNUM):
+#ifdef MRB_WORD_BOXING
+        {
+          mrb_float x = mrb_float(regs[a]);
+          mrb_int y = mrb_fixnum(regs[a+1]);
+          SET_FLT_VALUE(mrb, regs[a], x + y);
+        }
+#else
                     OP_MATH_BODY(+,attr_f,value.i);
+#endif
                     break;
                 case TYPES2(MRB_TT_FLOAT,MRB_TT_FLOAT):
+#ifdef MRB_WORD_BOXING
+        {
+          mrb_float x = mrb_float(regs[a]);
+          mrb_float y = mrb_float(regs[a+1]);
+          SET_FLT_VALUE(mrb, regs[a], x + y);
+        }
+#else
                     OP_MATH_BODY(+,attr_f,attr_f);
+#endif
                     break;
                 case TYPES2(MRB_TT_STRING,MRB_TT_STRING):
                     regs_a = mrb_str_plus(this, regs_a, regs[a+1]);
@@ -1393,10 +1414,26 @@ L_RESCUE:
                 }
                     break;
                 case TYPES2(MRB_TT_FLOAT,MRB_TT_FIXNUM):
+#ifdef MRB_WORD_BOXING
+        {
+          mrb_float x = mrb_float(regs[a]);
+          mrb_int y = mrb_fixnum(regs[a+1]);
+          SET_FLT_VALUE(mrb, regs[a], x - y);
+        }
+#else
                     OP_MATH_BODY(-,attr_f,value.i);
+#endif
                     break;
                 case TYPES2(MRB_TT_FLOAT,MRB_TT_FLOAT):
+#ifdef MRB_WORD_BOXING
+        {
+          mrb_float x = mrb_float(regs[a]);
+          mrb_float y = mrb_float(regs[a+1]);
+          SET_FLT_VALUE(mrb, regs[a], x - y);
+        }
+#else
                     OP_MATH_BODY(-,attr_f,attr_f);
+#endif
                     break;
                 default:
                     goto L_SEND;
@@ -1436,10 +1473,26 @@ L_RESCUE:
                 }
                     break;
                 case TYPES2(MRB_TT_FLOAT,MRB_TT_FIXNUM):
+#ifdef MRB_WORD_BOXING
+        {
+          mrb_float x = mrb_float(regs[a]);
+          mrb_int y = mrb_fixnum(regs[a+1]);
+          SET_FLT_VALUE(mrb, regs[a], x * y);
+        }
+#else
                     OP_MATH_BODY(*,attr_f,attr_i);
+#endif
                     break;
                 case TYPES2(MRB_TT_FLOAT,MRB_TT_FLOAT):
+#ifdef MRB_WORD_BOXING
+        {
+          mrb_float x = mrb_float(regs[a]);
+          mrb_float y = mrb_float(regs[a+1]);
+          SET_FLT_VALUE(mrb, regs[a], x * y);
+        }
+#else
                     OP_MATH_BODY(*,attr_f,attr_f);
+#endif
                     break;
                 default:
                     goto L_SEND;
@@ -1477,10 +1530,26 @@ L_RESCUE:
                 }
                     break;
                 case TYPES2(MRB_TT_FLOAT,MRB_TT_FIXNUM):
+#ifdef MRB_WORD_BOXING
+        {
+          mrb_float x = mrb_float(regs[a]);
+          mrb_int y = mrb_fixnum(regs[a+1]);
+          SET_FLT_VALUE(mrb, regs[a], x / y);
+        }
+#else
                     OP_MATH_BODY(/,attr_f,attr_i);
+#endif
                     break;
                 case TYPES2(MRB_TT_FLOAT,MRB_TT_FLOAT):
+#ifdef MRB_WORD_BOXING
+        {
+          mrb_float x = mrb_float(regs[a]);
+          mrb_float y = mrb_float(regs[a+1]);
+          SET_FLT_VALUE(mrb, regs[a], x / y);
+        }
+#else
                     OP_MATH_BODY(/,attr_f,attr_f);
+#endif
                     break;
                 default:
                     goto L_SEND;
@@ -1508,7 +1577,14 @@ L_RESCUE:
                 }
                     break;
                 case MRB_TT_FLOAT:
+#ifdef MRB_WORD_BOXING
+        {
+          mrb_float x = mrb_float(regs[a]);
+          SET_FLT_VALUE(mrb, regs[a], x + GETARG_C(i));
+        }
+#else
                     regs[a].attr_f += GETARG_C(i);
+#endif
                     break;
                 default:
                     regs[a+1]=mrb_fixnum_value(GETARG_C(i));
@@ -1540,7 +1616,14 @@ L_RESCUE:
                 }
                     break;
                 case MRB_TT_FLOAT:
+#ifdef MRB_WORD_BOXING
+        {
+          mrb_float x = mrb_float(regs[a]);
+          SET_FLT_VALUE(mrb, regs[a], x - GETARG_C(i));
+        }
+#else
                     regs_a[0].attr_f -= GETARG_C(i);
+#endif
                     break;
                 default:
                     regs_a[1] = mrb_fixnum_value(GETARG_C(i));

@@ -190,10 +190,7 @@ void* MemManager::_calloc(size_t nelem, size_t len)
         if (p) {
             memset(p, 0, size);
         }
-    } else {
-        p = NULL;
     }
-
     return p;
 }
 

@@ -1334,7 +1334,6 @@ mrb_init_numeric(mrb_state *mrb)
             .define_method("to_s",     fix_to_s,          MRB_ARGS_NONE()) /* 15.2.8.3.25 */
             .define_method("inspect",  fix_to_s,          MRB_ARGS_NONE())
             .define_method("divmod",   fix_divmod,        MRB_ARGS_REQ(1)) /* 15.2.8.3.30 (x) */
-            .undef_class_method("new")
             ;
 
     /* Float Class */

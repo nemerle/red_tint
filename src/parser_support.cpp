@@ -16,7 +16,7 @@ void parser_dump(mrb_state *mrb, mrb_ast_node *tree, int offset);
 static void dump_prefix(int offset)
 {
     while (offset--) {
-        puts("  ");
+        putc(' ',stdout); putc(' ',stdout);
     }
 }
 
@@ -28,6 +28,13 @@ static void dump_recur(mrb_state *mrb, mrb_ast_node *tree, int offset)
     }
 }
 
+static void parser_dump(mrb_state *mrb, BeginNode *nd, int offset)
+{
+    printf("NODE_BEGIN:\n");
+
+    for(auto iter = nd->m_entries.begin(); iter!=nd->m_entries.end(); ++iter)
+        parser_dump(mrb,*iter,offset+1);
+}
 #endif
 void parser_dump(mrb_state *mrb, ForNode *fn, int offset) {
     printf("var:\n");
@@ -150,7 +157,7 @@ void parser_dump(mrb_state *mrb, DefCommonNode *dn, int offset) {
     printf("%s\n", mrb_sym2name(mrb, dn->name()));
     {
         const tLocals &n2(dn->ve_locals());
-        if(!n2.empty()) {
+        if(!n2.empty() && (n2.front() || n2.size()>1)) {
             dump_prefix(offset+1);
             printf("local variables:\n");
             dump_prefix(offset+2);
@@ -184,11 +191,9 @@ again:
     mrb_ast_node *orig = tree;
     if(dynamic_cast<UpdatedNode *>(tree)==0)
         tree = tree->right();
+
     switch (n) {
-        case NODE_BEGIN:
-            printf("NODE_BEGIN:\n");
-            dump_recur(mrb, tree, offset+1);
-            break;
+        case NODE_BEGIN: parser_dump(mrb,(BeginNode *)orig,offset); break;
 
         case NODE_RESCUE: parser_dump(mrb,(RescueNode *)orig,offset); break;
 
@@ -268,7 +273,7 @@ block:
             parser_dump(mrb, n->lhs(), offset+2);
             dump_prefix(offset+1);
             printf("body:\n");
-            parser_dump(mrb, n->right(), offset+2);
+            parser_dump(mrb, n->rhs(), offset+2);
         }
             break;
 
@@ -328,7 +333,7 @@ block:
                 dump_prefix(offset+1);
                 printf("args:\n");
                 dump_recur(mrb, ca->m_args, offset+2);
-                if (tree->right()) {
+                if (ca->m_blk) {
                     dump_prefix(offset+1);
                     printf("block:\n");
                     parser_dump(mrb, ca->m_blk, offset+2);
@@ -454,18 +459,17 @@ block:
         }
             break;
 
-        case NODE_OP_ASGN:
+        case NODE_OP_ASGN: {
+            OpAsgnNode *opasgn = static_cast<OpAsgnNode *>(tree);
             printf("NODE_OP_ASGN:\n");
             dump_prefix(offset+1);
             printf("lhs:\n");
-            parser_dump(mrb, tree->left(), offset+2);
-            tree = tree->right();
+            parser_dump(mrb, opasgn->lhs(), offset+2);
             dump_prefix(offset+1);
-            printf("op='%s' (%d)\n", mrb_sym2name(mrb, sym(tree->left())), (int)(intptr_t)tree->left());
-            tree = tree->right();
-            parser_dump(mrb, tree->left(), offset+1);
+            printf("op='%s' (%d)\n", mrb_sym2name(mrb, opasgn->op_sym), opasgn->op_sym);
+            parser_dump(mrb, opasgn->lhs(), offset+1);
             break;
-
+        }
         case NODE_SUPER:
         {
             printf("NODE_SUPER:\n");
@@ -684,32 +688,35 @@ block:
             printf(":\n");
             break;
 
-        case NODE_CLASS:
+        case NODE_CLASS: {
+            ClassNode *cn = static_cast<ClassNode *>(tree);
             printf("NODE_CLASS:\n");
-            if (tree->left()->left() == (mrb_ast_node*)0) {
+            if (cn->receiver()->left() == (mrb_ast_node*)0) {
                 dump_prefix(offset+1);
-                printf(":%s\n", mrb_sym2name(mrb, sym(tree->left()->right())));
+                printf(":%s\n", mrb_sym2name(mrb, sym(cn->receiver()->right())));
             }
-            else if (tree->left()->left() == (mrb_ast_node*)1) {
+            else if (cn->receiver()->left() == (mrb_ast_node*)1) {
                 dump_prefix(offset+1);
-                printf("::%s\n", mrb_sym2name(mrb, sym(tree->left()->right())));
+                printf("::%s\n", mrb_sym2name(mrb, sym(cn->receiver()->right())));
             }
             else {
-                parser_dump(mrb, tree->left()->left(), offset+1);
+                parser_dump(mrb, cn->receiver()->left(), offset+1);
                 dump_prefix(offset+1);
                 printf("::%s\n", mrb_sym2name(mrb, sym(tree->left()->right())));
             }
-            if (tree->right()->left()) {
+            if (cn->super()) {
                 dump_prefix(offset+1);
                 printf("super:\n");
-                parser_dump(mrb, tree->right()->left(), offset+2);
+                parser_dump(mrb, cn->super(), offset+2);
             }
             dump_prefix(offset+1);
             printf("body:\n");
-            parser_dump(mrb, tree->right()->right()->left()->right(), offset+2);
+            parser_dump(mrb, cn->scope()->body(), offset+2);
             break;
+        }
 
-        case NODE_MODULE:
+        case NODE_MODULE: {
+            ModuleNode *cn = static_cast<ModuleNode *>(tree);
             printf("NODE_MODULE:\n");
             if (tree->left()->left() == (mrb_ast_node*)0) {
                 dump_prefix(offset+1);
@@ -728,7 +735,7 @@ block:
             printf("body:\n");
             parser_dump(mrb, tree->right()->left()->right(), offset+2);
             break;
-
+        }
         case NODE_SCLASS:
             printf("NODE_SCLASS:\n");
             parser_dump(mrb, tree->left(), offset+1);
