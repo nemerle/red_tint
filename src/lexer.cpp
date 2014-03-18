@@ -383,14 +383,7 @@ int mrb_parser_state::heredoc_identifier()
     info->allow_indent = indent;
     info->line_head = true;
     info->doc = nullptr;
-    this->heredocs =this->push(this->heredocs, newnode);
-    if (this->parsing_heredoc == nullptr) {
-        mrb_ast_node *n = this->heredocs;
-        while (n->right())
-            n = n->right();
-        this->parsing_heredoc = n;
-    }
-    this->heredoc_starts_nextline = true;
+    heredocs_from_nextline = push(heredocs_from_nextline, newnode);
     m_lstate = EXPR_END;
 
     yylval.nd = newnode;
@@ -444,12 +437,12 @@ int mrb_parser_state::parse_string()
             }
             if (c == -1) {
                 char buf[256];
-                snprintf(buf, sizeof(buf), "can't find string \"%s\" anywhere before EOF", hinf->term);
+                snprintf(buf, sizeof(buf), "can't find heredoc delimiter \"%s\" anywhere before EOF", hinf->term);
                 this->yyerror(buf);
                 return 0;
             }
             yylval.nd = new_str(m_lexer.tok(), m_lexer.toklen());
-            return tSTRING_MID;
+            return tHD_STRING_MID;
         }
         if (c == -1) {
             this->yyerror("unterminated string meets end of file");
@@ -516,8 +509,10 @@ int mrb_parser_state::parse_string()
                 m_lstate = EXPR_BEG;
                 m_cmd_start = true;
                 yylval.sn = new_str(m_lexer.tok(), m_lexer.toklen());
-                if (hinf)
+                if (hinf) {
                     hinf->line_head = false;
+                    return tHD_STRING_PART;
+                }
                 return tSTRING_PART;
             }
             m_lexer.tokadd('#');
@@ -530,6 +525,10 @@ int mrb_parser_state::parse_string()
                     if (c == '\n') {
                         m_lineno++;
                         m_column = 0;
+                        heredoc_treat_nextline();
+                        if (parsing_heredoc != NULL) {
+                            return tHD_LITERAL_DELIM;
+                        }
                     }
                 } while (ISSPACE(c = nextc()));
                 pushback(c);
@@ -561,10 +560,11 @@ int mrb_parser_state::parse_string()
         int f = 0;
         int c;
         char *s = parser_strndup(m_lexer.tok(), m_lexer.toklen());
-        char flag[4] = { '\0' };
-
+        char flags[3];
+        char *flag = flags;
+        char *dup;
         newtok();
-        while (c = nextc(), ISALPHA(c)) {
+        while (c = nextc(), c != -1 && ISALPHA(c)) {
             switch (c) {
                 case 'i': f |= 1; break;
                 case 'x': f |= 2; break;
@@ -584,7 +584,16 @@ int mrb_parser_state::parse_string()
         if (f & 1) strcat(flag, "i");
         if (f & 2) strcat(flag, "x");
         if (f & 4) strcat(flag, "m");
-        yylval.nd = new_t<RegxNode>(s, parser_strdup(flag));
+        if (f != 0) {
+            if (f & 1) *flag++ = 'i';
+            if (f & 2) *flag++ = 'x';
+            if (f & 4) *flag++ = 'm';
+            dup = strndup(flags, (size_t)(flag - flags));
+        }
+        else {
+            dup = nullptr;
+        }
+        yylval.nd = new_t<RegxNode>(s, dup);
 
         return tREGEXP;
     }
@@ -603,7 +612,7 @@ int mrb_parser_state::parser_yylex()
 
     if (m_lex_strterm) {
         if (is_strterm_type(STR_FUNC_HEREDOC)) {
-            if ((parsing_heredoc != NULL) && (! heredoc_starts_nextline))
+            if (parsing_heredoc != NULL)
                 return parse_string();
         }
         else
@@ -629,11 +638,7 @@ retry:
             this->skip('\n');
             /* fall through */
         case '\n':
-            heredoc_starts_nextline = false;
-            if (parsing_heredoc != NULL) {
-                m_lex_strterm = new_strterm(parsing_heredoc_inf()->type, 0, 0);
-                goto normal_newline;
-            }
+            heredoc_treat_nextline();
             switch (m_lstate) {
                 case EXPR_BEG:
                 case EXPR_FNAME:
@@ -642,9 +647,15 @@ retry:
                 case EXPR_VALUE:
                     m_lineno++;
                     m_column = 0;
+                    if (parsing_heredoc != NULL) {
+                        return parse_string();
+                    }
                     goto retry;
                 default:
                     break;
+            }
+            if (parsing_heredoc != NULL) {
+                return '\n';
             }
             while ((c = nextc())) {
                 switch (c) {

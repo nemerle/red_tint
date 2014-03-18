@@ -19,7 +19,7 @@ void mrb_print_backtrace(mrb_state *mrb)
     int i, line;
 
     fputs("trace:\n", stderr);
-    ciidx = mrb_fixnum(mrb->m_exc->iv_get(mrb->intern_cstr("ciidx")));
+    ciidx = mrb_fixnum(mrb->m_exc->iv_get(mrb->intern2("ciidx",5)));
     if (ciidx >= mrb->m_ctx->ciend - mrb->m_ctx->cibase)
         ciidx = 10; /* ciidx is broken... */
 
@@ -42,7 +42,7 @@ void mrb_print_backtrace(mrb_state *mrb)
                     pc = mrb->m_ctx->cibase[i+1].pc;
                 }
                 else {
-                    pc = (mrb_code*)mrb_voidp(mrb->m_exc->iv_get(mrb->intern_cstr("lastpc")));
+                    pc = (mrb_code*)mrb_voidp(mrb->m_exc->iv_get(mrb->intern2("lastpc",6)));
                 }
                 if (irep->iseq <= pc && pc < irep->iseq + irep->ilen) {
                     line = irep->lines[pc - irep->iseq - 1];

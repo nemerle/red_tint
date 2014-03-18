@@ -112,7 +112,7 @@ void* mrb_pool::mrb_pool_alloc(size_t len)
     return page->last;
 }
 
-int mrb_pool::mrb_pool_can_realloc(void *p, size_t len)
+mrb_bool mrb_pool::mrb_pool_can_realloc(void *p, size_t len)
 {
 
     if (!this)
@@ -173,7 +173,7 @@ main()
     pool = mrb_pool_open(0);
     p = mrb_pool_alloc(pool, len);
     for (i=1; i<20; i++) {
-        printf("%p (len=%d) %d\n", p, len, mrb_pool_can_realloc(pool, p, len*2));
+        printf("%p (len=%d) %ud\n", p, len, mrb_pool_can_realloc(pool, p, len*2));
         p = mrb_pool_realloc(pool, p, len, len*2);
         len *= 2;
     }

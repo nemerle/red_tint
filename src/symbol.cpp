@@ -456,5 +456,5 @@ void mrb_init_symbol(mrb_state *mrb)
         .define_method("inspect",         sym_inspect,             MRB_ARGS_NONE())        /* 15.2.11.3.5(x)  */
         .define_method("<=>",             sym_cmp,                 MRB_ARGS_REQ(1))
             ;
-    mrb->init_sym = mrb->intern_cstr("initialize");
+    mrb->init_sym = mrb->intern2("initialize",10);
 }

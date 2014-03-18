@@ -171,15 +171,17 @@ static mrb_value fiber_resume(mrb_state *mrb, mrb_value self)
         c->prev = mrb->m_ctx;
         if (c->prev->fib)
             mrb->gc().mrb_field_write_barrier(c->fib, c->prev->fib);
+        mrb->gc().mrb_write_barrier(c->fib);
         c->status = MRB_FIBER_RUNNING;
         mrb->m_ctx = c;
         MARK_CONTEXT_MODIFY(c);
         return c->m_ci->proc->env->stack[0];
     }
     MARK_CONTEXT_MODIFY(c);
-  c->prev = mrb->m_ctx;
+    c->prev = mrb->m_ctx;
     if(c->prev->fib)
         mrb->gc().mrb_field_write_barrier(c->fib, c->prev->fib);
+    mrb->gc().mrb_write_barrier(c->fib);
     c->status = MRB_FIBER_RUNNING;
     mrb->m_ctx = c;
     return fiber_result(mrb, a, len);

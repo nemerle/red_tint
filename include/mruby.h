@@ -257,7 +257,7 @@ typedef mrb_value (*mrb_func_t)(mrb_state *mrb, mrb_value);
 mrb_value mrb_singleton_class(mrb_state*, mrb_value);
 mrb_value mrb_instance_new(mrb_state *mrb, mrb_value cv);
 RClass * mrb_module_new(mrb_state *mrb);
-int mrb_class_defined(mrb_state *mrb, const char *name);
+//int mrb_class_defined(mrb_state *mrb, const char *name);
 
 mrb_value mrb_obj_dup(mrb_state *mrb, mrb_value obj);
 mrb_value mrb_check_to_integer(mrb_state *mrb, const mrb_value &val, const char *method);
@@ -329,11 +329,11 @@ int mrb_eql(mrb_state *mrb, mrb_value obj1, mrb_value obj2);
 } while (0)
 //void mrb_write_barrier(mrb_state *, struct RBasic*);
 
-mrb_value mrb_check_convert_type(mrb_state *mrb, const mrb_value &val, mrb_int type, const char *tname, const char *method);
+mrb_value mrb_check_convert_type(mrb_state *mrb, const mrb_value &val, mrb_vtype type, const char *tname, const char *method);
 mrb_value mrb_any_to_s(mrb_state *mrb, mrb_value obj);
 const char * mrb_obj_classname(mrb_state *mrb, mrb_value obj);
 RClass* mrb_obj_class(mrb_state *mrb, mrb_value obj);
-mrb_value mrb_convert_type(mrb_state *mrb, const mrb_value &val, mrb_int type, const char *tname, const char *method);
+mrb_value mrb_convert_type(mrb_state *mrb, const mrb_value &val, mrb_vtype type, const char *tname, const char *method);
 int mrb_obj_is_kind_of(mrb_state *mrb, mrb_value obj, RClass *c);
 mrb_value mrb_obj_inspect(mrb_state *mrb, mrb_value self);
 mrb_value mrb_obj_clone(mrb_state *mrb, mrb_value self);
@@ -394,9 +394,15 @@ public:
     tPage *page_alloc(size_t len);
     void mrb_pool_close();
     void *mrb_pool_alloc(size_t len);
-    int mrb_pool_can_realloc(void *p, size_t len);
+    mrb_bool mrb_pool_can_realloc(void *p, size_t len);
     void *mrb_pool_realloc(void *p, size_t oldlen, size_t newlen);
 };
 // protect given object from GC, used to access mruby values in the external context without fear
 void mrb_lock(mrb_state *mrb, mrb_value obj);
 void mrb_unlock(mrb_state *mrb, mrb_value obj);
+#ifdef MRB_DEBUG
+#include <assert.h>
+#define mrb_assert(p) assert(p)
+#else
+#define mrb_assert(p) ((void)0)
+#endif

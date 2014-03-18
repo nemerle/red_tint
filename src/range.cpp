@@ -153,8 +153,8 @@ mrb_range_eq(mrb_state *mrb, mrb_value range)
     }
     rr = mrb_range_ptr(range);
     ro = mrb_range_ptr(obj);
-    if (!mrb_obj_equal(rr->edges->beg, ro->edges->beg) ||
-            !mrb_obj_equal(rr->edges->end, ro->edges->end) ||
+    if (mrb_type(mrb->funcall(rr->edges->beg, "==", 1, ro->edges->beg))!=MRB_TT_TRUE ||
+            mrb_type(mrb->funcall(rr->edges->end, "==", 1, ro->edges->end))!=MRB_TT_TRUE ||
             rr->excl != ro->excl) {
         return mrb_false_value();
     }
@@ -267,10 +267,11 @@ mrb_range_beg_len(mrb_state *mrb, mrb_value range, mrb_int *begp, mrb_int *lenp,
 
     if (beg < 0) {
         beg += len;
-        if (beg < 0) goto out_of_range;
+        if (beg < 0)
+            return false;
     }
 
-    if (beg > len) goto out_of_range;
+    if (beg > len) return false;
     if (end > len) end = len;
 
     if (end < 0) end += len;
@@ -281,9 +282,6 @@ mrb_range_beg_len(mrb_state *mrb, mrb_value range, mrb_int *begp, mrb_int *lenp,
     *begp = beg;
     *lenp = len;
     return true;
-
-out_of_range:
-    return false;
 }
 
 /* 15.2.14.4.12(x) */
@@ -309,28 +307,7 @@ range_to_s(mrb_state *mrb, mrb_value range)
     return str;
 }
 
-static mrb_value
-inspect_range(mrb_state *mrb, mrb_value range, int recur)
-{
-    mrb_value str, str2;
-    struct RRange *r = mrb_range_ptr(range);
 
-    if (recur) {
-        static const char s[2][14] = { "(... ... ...)", "(... .. ...)" };
-        static const int n[] = { 13, 12 };
-        int idx;
-
-        idx = (r->excl) ? 0 : 1;
-        return mrb_str_new(mrb, s[idx], n[idx]);
-    }
-    str  = mrb_inspect(mrb, r->edges->beg);
-    str2 = mrb_inspect(mrb, r->edges->end);
-    str  = mrb_str_dup(mrb, str);
-    mrb_str_cat(mrb, str, "...", r->excl ? 3 : 2);
-    mrb_str_append(mrb, str, str2);
-
-    return str;
-}
 
 /* 15.2.14.4.13(x) */
 /*
@@ -345,7 +322,16 @@ inspect_range(mrb_state *mrb, mrb_value range, int recur)
 static mrb_value
 range_inspect(mrb_state *mrb, mrb_value range)
 {
-    return inspect_range(mrb, range, 0);
+    mrb_value str, str2;
+    RRange *r = mrb_range_ptr(range);
+
+    str  = mrb_inspect(mrb, r->edges->beg);
+    str2 = mrb_inspect(mrb, r->edges->end);
+    str  = mrb_str_dup(mrb, str);
+    mrb_str_cat(mrb, str, "...", r->excl ? 3 : 2);
+    mrb_str_append(mrb, str, str2);
+
+    return str;
 }
 
 /* 15.2.14.4.14(x) */

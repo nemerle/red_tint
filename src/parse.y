@@ -66,7 +66,7 @@ typedef unsigned int stack_type;
 
 %}
 
-%pure_parser
+%pure-parser
 %parse-param {mrb_parser_state *p}
 %lex-param {mrb_parser_state *p}
 
@@ -197,7 +197,8 @@ typedef unsigned int stack_type;
 %token tSYMBEG tREGEXP_BEG tWORDS_BEG tSYMBOLS_BEG
 %token tSTRING_BEG tXSTRING_BEG tSTRING_DVAR tLAMBEG
 %token <nd> tHEREDOC_BEG  /* <<, <<- */
-%token tHEREDOC_END tLITERAL_DELIM
+%token tHEREDOC_END tLITERAL_DELIM tHD_LITERAL_DELIM
+%token <nd> tHD_STRING_PART tHD_STRING_MID
 
 /*
  *	precedence table
@@ -269,9 +270,9 @@ top_stmts	: none      { $$ = p->new_t<BeginNode>(nullptr); }
 
 top_stmt	: stmt
                 | keyword_BEGIN
-		    {
-		      $<locals_ctx>$ = p->local_switch();
-		    }
+            {
+              $<locals_ctx>$ = p->local_switch();
+            }
                   '{' top_compstmt '}'
                     {
                       p->yyerror("BEGIN not supported");
@@ -991,37 +992,37 @@ opt_call_args	: none
                 | call_args
                 | args ','
                     {
-                      $$ = p->new_t<CommandArgs>($1);
+                      $$ = p->new_simple<CommandArgs>($1);
                     }
                 | args ',' assocs ','
                     {
-                      $$ = p->new_t<CommandArgs>(p->push($1, p->new_t<HashNode>($3)) );
+                      $$ = p->new_simple<CommandArgs>(p->push($1, p->new_t<HashNode>($3)) );
                     }
                 | assocs ','
                     {
-                      $$ =p->new_t<CommandArgs>(p->list1(p->new_t<HashNode>($1)) );
+                      $$ =p->new_simple<CommandArgs>(p->list1(p->new_t<HashNode>($1)) );
                     }
                 ;
 
 call_args	: command
                     {
-                      $$ = p->new_t<CommandArgs>(p->list1($1) );
+                      $$ = p->new_simple<CommandArgs>(p->list1($1) );
                     }
                 | args opt_block_arg
                     {
-                      $$ = p->new_t<CommandArgs>($1, $2);
+                      $$ = p->new_simple<CommandArgs>($1, $2);
                     }
                 | assocs opt_block_arg
                     {
-                      $$ = p->new_t<CommandArgs>(p->list1(p->new_t<HashNode>($1)), $2);
+                      $$ = p->new_simple<CommandArgs>(p->list1(p->new_t<HashNode>($1)), $2);
                     }
                 | args ',' assocs opt_block_arg
                     {
-                      $$ = p->new_t<CommandArgs>(p->push($1, p->new_t<HashNode>($3)), $4);
+                      $$ = p->new_simple<CommandArgs>(p->push($1, p->new_t<HashNode>($3)), $4);
                     }
                 | block_arg
                     {
-                      $$ = p->new_t<CommandArgs>(nullptr, $1);
+                      $$ = p->new_simple<CommandArgs>(nullptr, $1);
                     }
                 ;
 
@@ -1068,6 +1069,14 @@ args		: arg_value
                     {
                       $$ = p->push($1, p->new_t<SplatNode>($4));
                     }
+                | args ',' heredoc_bodies arg_value
+                  {
+                      $$ = p->push($1, $4);
+                  }
+                | args ',' heredoc_bodies tSTAR arg_value
+                  {
+                      $$ = p->push($1, p->new_t<SplatNode>($5));
+                  }
                 ;
 
 mrhs		: args ',' arg_value
@@ -1160,7 +1169,7 @@ primary		: literal
                     }
                 | operation brace_block
                     {
-                      $$ = p->new_t<FCallNode>(p->new_t<SelfNode>(),$1,p->new_t<CommandArgs>(nullptr, $2));
+                      $$ = p->new_t<FCallNode>(p->new_t<SelfNode>(),$1,p->new_simple<CommandArgs>(nullptr, $2));
                     }
                 | method_call
                 | method_call brace_block
@@ -1727,6 +1736,7 @@ string_interp	: tSTRING_MID { $$ = p->list1($1); }
                       $$ = p->str_list2($1, $3);
                     }
                 | tLITERAL_DELIM  { $$ = p->list1(p->new_t<LiteralDelimNode>()); }
+                | tHD_LITERAL_DELIM heredoc_bodies { $$ = p->list1(p->new_t<LiteralDelimNode>()); }
                 ;
 
 xstring		: tXSTRING_BEG tXSTRING                 { $$ = $2; }
@@ -1740,7 +1750,7 @@ regexp		: tREGEXP_BEG tREGEXP                   { $$ = $2; }
 heredoc		: tHEREDOC_BEG
                 ;
 
-opt_heredoc_bodies : none
+opt_heredoc_bodies : /* none */
                    | heredoc_bodies
                    ;
 
@@ -1750,13 +1760,37 @@ heredoc_bodies	: heredoc_body
 
 heredoc_body	: tHEREDOC_END
                     {
-                      p->parsing_heredoc_inf()->doc = p->list1(p->new_str("", 0));
+                      auto  inf = p->parsing_heredoc_inf();
+                      inf->doc = p->push(inf->doc, p->new_str("", 0));
                       p->heredoc_end();
                     }
-                | string_rep tHEREDOC_END
+                | heredoc_string_rep tHEREDOC_END
                     {
-                      p->parsing_heredoc_inf()->doc = $1;
                       p->heredoc_end();
+                    }
+                ;
+
+heredoc_string_rep : heredoc_string_interp
+                   | heredoc_string_rep heredoc_string_interp
+                   ;
+
+heredoc_string_interp : tHD_STRING_MID
+                    {
+                      auto  inf = p->parsing_heredoc_inf();
+                      inf->doc = p->push(inf->doc, $1);
+                      p->heredoc_treat_nextline();
+                    }
+                | tHD_STRING_PART
+                    {
+                      $<nd>$ = p->m_lex_strterm;
+                      p->m_lex_strterm = NULL;
+                    }
+                  compstmt
+                  '}'
+                    {
+                      auto  inf = p->parsing_heredoc_inf();
+                      p->m_lex_strterm = $<nd>2;
+                      inf->doc = p->push(p->push(inf->doc, $1), $3);
                     }
                 ;
 

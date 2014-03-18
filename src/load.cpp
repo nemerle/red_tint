@@ -460,7 +460,7 @@ mrb_read_irep_file(mrb_state *mrb, FILE* fp)
     /* You don't need use SIZE_ERROR as block_size is enough small. */
     buf = (uint8_t *)mrb->gc()._malloc(block_size);
     for (i = 0; i < block_fallback_count; i++,block_size >>= 1){
-        buf =(uint8_t *)mrb->gc()._malloc( block_size);
+        buf =(uint8_t *)mrb->gc().mrb_malloc_simple( block_size);
         if (buf) break;
     }
     if (!buf) {

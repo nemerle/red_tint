@@ -167,8 +167,8 @@ void mrb_init_proc(mrb_state *mrb)
     mrb->proc_class->define_method("initialize", mrb_proc_initialize, MRB_ARGS_NONE())
             .define_method("initialize_copy", mrb_proc_init_copy, MRB_ARGS_REQ(1))
             .define_method("arity", mrb_proc_arity, MRB_ARGS_NONE())
-            .define_method_raw(mrb_intern(mrb, "call"), m)
-            .define_method_raw(mrb_intern(mrb, "[]"), m);
+            .define_method_raw(mrb->intern2("call",4), m)
+            .define_method_raw(mrb->intern2("[]",2), m);
 
     mrb->kernel_module->define_class_method("lambda", proc_lambda, MRB_ARGS_NONE())        /* 15.3.1.2.6  */
             .define_method("lambda", proc_lambda, MRB_ARGS_NONE());   /* 15.3.1.3.27 */

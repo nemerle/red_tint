@@ -64,7 +64,7 @@ struct codegen_scope : public NodeVisitor {
     int m_icapa = 0;
 
     mrb_irep *m_irep = nullptr;
-    int m_pcapa = 0;
+    size_t m_pcapa = 0;
     int m_scapa = 0;
 
     int m_nlocals=0;
@@ -1495,8 +1495,8 @@ void codegen_scope::visit(MAsgnNode *node) {
         // variable rhs
         codegen( t, true);
         gen_vmassignment(node->lhs(), rhs, val);
-        if (!val)
-            pop_sp();
+//        if (!val)
+//            pop_sp();
     }
 }
 void codegen_scope::visit(AliasNode *n) {
@@ -2383,6 +2383,7 @@ void codegen_scope::codegen(node *tree, bool val)
         return;
     m_val_stack.push_back(val);
     m_lineno = tree->lineno;
+    m_filename = tree->filename;
     tree->accept(this);
     m_val_stack.pop_back();
 }

@@ -41,6 +41,7 @@ SET(MRUBY_SRC_C
     ../include/mruby/mem_manager.h
     ../include/mruby/data.h
     ../include/mruby/dump.h
+    ../include/mruby/khash.h
     ../include/mruby/hash.h
     ../include/mruby/irep.h
     ../include/mruby/numeric.h

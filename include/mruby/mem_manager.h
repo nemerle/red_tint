@@ -24,7 +24,7 @@ struct MemManager {
     };
     friend struct mrb_state;
 public:
-    void mrb_garbage_collect();
+    void mrb_full_gc();
     void mrb_incremental_gc();
     void change_gen_gc_mode(mrb_int enable);
 
@@ -67,8 +67,10 @@ public:
     int     step_ratio() const { return gc_step_ratio; }
     void    step_ratio(int value) { gc_step_ratio = value; }
     bool    generational_gc_mode() const { return is_generational_gc_mode;}
+    mrb_state *vm()const {return m_vm;}
 protected:
-    void    mark_context(struct mrb_context *ctx);
+    void    mark_context_stack(mrb_context *ctx);
+    void    mark_context(mrb_context *ctx);
     void    root_scan_phase();
     size_t  incremental_sweep_phase(size_t limit);
     void    prepare_incremental_sweep();
@@ -91,7 +93,8 @@ protected:
     void link_heap_page(heap_page *page);
     void clear_all_old();
     size_t incremental_gc(size_t limit);
-    void advance_phase(gc_state to_state);
+    void incremental_gc_until(gc_state to_state);
+    void gc_mark_gray_list();
 
     mrb_allocf m_allocf;
     void *ud; /* auxiliary data */
@@ -106,7 +109,7 @@ protected:
     gc_state    m_gc_state; /* state of gc */
     int         current_white_part; /* make white object by white_part */
     RBasic *    m_gray_list; /* list of gray objects */
-    RBasic *    variable_gray_list; /* list of objects to be traversed atomically */
+    RBasic *    atomic_gray_list; /* list of objects to be traversed atomically */
     size_t      m_gc_live_after_mark;
     size_t      gc_threshold;
     int         gc_interval_ratio;
@@ -117,6 +120,7 @@ protected:
     mrb_bool    out_of_memory:1;
     size_t      m_majorgc_old_threshold;
     struct alloca_header *mems;
+    void incremental_gc_step();
 };
 // helper class to use user passed allocation routine in std containers
 template <class T>

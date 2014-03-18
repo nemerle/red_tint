@@ -83,7 +83,7 @@ static void str_modify(mrb_state *mrb, RString *s)
             if (p) {
                 memcpy(ptr, p, len);
             }
-            ptr[len] = 0;
+            ptr[len] = '\0';
             s->m_ptr = ptr;
             s->aux.capa = len;
             str_decref(mrb, shared);
@@ -366,7 +366,7 @@ void mrb_str_concat(mrb_state *mrb, mrb_value self, mrb_value other)
     }
     memcpy(s1->m_ptr+s1->len, s2->m_ptr, s2->len);
     s1->len = len;
-    s1->m_ptr[len] = 0;
+    s1->m_ptr[len] = '\0';
 }
 
 /*
@@ -2486,7 +2486,6 @@ mrb_init_string(mrb_state *mrb)
             .define_method("*",               mrb_str_times,           MRB_ARGS_REQ(1))              /* 15.2.10.5.1  */
             .define_method("<=>",             mrb_str_cmp_m,           MRB_ARGS_REQ(1))              /* 15.2.10.5.3  */
             .define_method("==",              mrb_str_equal_m,         MRB_ARGS_REQ(1))              /* 15.2.10.5.4  */
-            .define_method("=~",              noregexp,                MRB_ARGS_REQ(1))              /* 15.2.10.5.5  */
             .define_method("[]",              mrb_str_aref_m,          MRB_ARGS_ANY())               /* 15.2.10.5.6  */
             .define_method("capitalize",      mrb_str_capitalize,      MRB_ARGS_NONE())              /* 15.2.10.5.7  */
             .define_method("capitalize!",     mrb_str_capitalize_bang, MRB_ARGS_REQ(1))              /* 15.2.10.5.8  */
@@ -2498,36 +2497,18 @@ mrb_init_string(mrb_state *mrb)
             .define_method("downcase!",       mrb_str_downcase_bang,   MRB_ARGS_NONE())              /* 15.2.10.5.14 */
             .define_method("empty?",          mrb_str_empty_p,         MRB_ARGS_NONE())              /* 15.2.10.5.16 */
             .define_method("eql?",            mrb_str_eql,             MRB_ARGS_REQ(1))              /* 15.2.10.5.17 */
-
-            // NOTE: Regexp not implemented
-            .define_method("gsub",            noregexp,            MRB_ARGS_REQ(1))              /* 15.2.10.5.18 */
-            .define_method("gsub!",           noregexp,       MRB_ARGS_REQ(1))              /* 15.2.10.5.19 */
-
             .define_method("hash",            mrb_str_hash_m,          MRB_ARGS_REQ(1))              /* 15.2.10.5.20 */
             .define_method("include?",        mrb_str_include,         MRB_ARGS_REQ(1))              /* 15.2.10.5.21 */
             .define_method("index",           mrb_str_index_m,         MRB_ARGS_ANY())               /* 15.2.10.5.22 */
             .define_method("initialize",      mrb_str_init,            MRB_ARGS_REQ(1))              /* 15.2.10.5.23 */
             .define_method("initialize_copy", mrb_str_replace,         MRB_ARGS_REQ(1))              /* 15.2.10.5.24 */
             .define_method("intern",          mrb_str_intern,          MRB_ARGS_NONE())              /* 15.2.10.5.25 */
-
-            // NOTE: Regexp not implemented
-            .define_method("match",           noregexp,         MRB_ARGS_REQ(1))              /* 15.2.10.5.27 */
-
             .define_method("replace",         mrb_str_replace,         MRB_ARGS_REQ(1))              /* 15.2.10.5.28 */
             .define_method("reverse",         mrb_str_reverse,         MRB_ARGS_NONE())              /* 15.2.10.5.29 */
             .define_method("reverse!",        mrb_str_reverse_bang,    MRB_ARGS_NONE())              /* 15.2.10.5.30 */
             .define_method("rindex",          mrb_str_rindex_m,        MRB_ARGS_ANY())               /* 15.2.10.5.31 */
-
-            // NOTE: Regexp not implemented
-            .define_method("scan",            noregexp,            MRB_ARGS_REQ(1))              /* 15.2.10.5.32 */
-
             .define_method("slice",           mrb_str_aref_m,          MRB_ARGS_ANY())               /* 15.2.10.5.34 */
             .define_method("split",           mrb_str_split_m,         MRB_ARGS_ANY())               /* 15.2.10.5.35 */
-
-            // NOTE: Regexp not implemented
-            .define_method("sub",             noregexp,             MRB_ARGS_REQ(1))              /* 15.2.10.5.36 */
-            .define_method("sub!",            noregexp,        MRB_ARGS_REQ(1))              /* 15.2.10.5.37 */
-
             .define_method("to_i",            mrb_str_to_i,            MRB_ARGS_ANY())               /* 15.2.10.5.38 */
             .define_method("to_f",            mrb_str_to_f,            MRB_ARGS_NONE())              /* 15.2.10.5.39 */
             .define_method("to_s",            mrb_str_to_s,            MRB_ARGS_NONE())              /* 15.2.10.5.40 */

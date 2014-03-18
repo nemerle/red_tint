@@ -9,8 +9,8 @@
 
 struct mrb_irep {
     uint16_t idx; //FIXME: this overflows when large number of closures is created.
-    uint16_t nlocals;
-    uint16_t nregs;
+    uint16_t nlocals; /* Number of local variables */
+    uint16_t nregs;/* Number of register variables */
     uint8_t flags;
 
     mrb_code *iseq;

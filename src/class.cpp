@@ -71,6 +71,8 @@ static void prepare_singleton_class(RBasic *o)
     }
     else if (o->tt == MRB_TT_SCLASS) {
         c = (RClass*)o;
+        while (c->super->tt == MRB_TT_ICLASS)
+            c = c->super;
         make_metaclass(c->super);
         sc->super = c->super->c;
     }
@@ -95,7 +97,7 @@ RClass* mrb_define_module_id(mrb_state *mrb, mrb_sym name)
 
 RClass* mrb_define_module(mrb_state *mrb, const char *name)
 {
-    return mrb_define_module_id(mrb, mrb_intern(mrb, name));
+    return mrb_define_module_id(mrb, mrb_intern_cstr(mrb, name));
 }
 
 static void setup_class(mrb_state *mrb, mrb_value outer, RClass *c, mrb_sym id)
@@ -140,12 +142,12 @@ RClass* mrb_define_class_id(mrb_state *mrb, mrb_sym name, RClass *super)
 
 RClass* mrb_define_class(mrb_state *mrb, const char *name, RClass *super)
 {
-    RClass *c = mrb_define_class_id(mrb, mrb_intern(mrb, name), super);
+    RClass *c = mrb_define_class_id(mrb, mrb_intern_cstr(mrb, name), super);
     return c;
 }
 RClass& mrb_state::define_class(const char *name, RClass *super)
 {
-    RClass *c = mrb_define_class_id(this, mrb_intern(this, name), super);
+    RClass *c = mrb_define_class_id(this, mrb_intern_cstr(this, name), super);
     return *c;
 }
 
@@ -220,7 +222,7 @@ RClass * RClass::from_sym(mrb_sym id)
  */
 RClass * RClass::define_class_under(const char *name, RClass *super)
 {
-    mrb_sym id = mrb_intern(m_vm, name);
+    mrb_sym id = mrb_intern_cstr(m_vm, name);
 
     if (mrb_const_defined_at(this, id)) {
         RClass * c = this->from_sym(id);
@@ -285,20 +287,22 @@ static mrb_value to_hash(mrb_state *mrb, mrb_value val)
 
   format specifiers:
 
-   o: Object [mrb_value]
-   S: String [mrb_value]
-   A: Array [mrb_value]
-   H: Hash [mrb_value]
-   s: String [char*,int]
-   z: String [char*]
-   a: Array [mrb_value*,mrb_int]
-   f: Float [mrb_float]
-   i: Integer [mrb_int]
-   b: Boolean [mrb_bool]
-   n: Symbol [mrb_sym]
-   &: Block [mrb_value]
-   *: rest argument [mrb_value*,int]
-   |: optional
+    string  mruby type     C type                 note
+    ----------------------------------------------------------------------------------------------
+    o:      Object         [mrb_value]
+    S:      String         [mrb_value]
+    A:      Array          [mrb_value]
+    H:      Hash           [mrb_value]
+    s:      String         [char*,int]            Receive two arguments.
+    z:      String         [char*]                NUL terminated string.
+    a:      Array          [mrb_value*,mrb_int]   Receive two arguments.
+    f:      Float          [mrb_float]
+    i:      Integer        [mrb_int]
+    b:      Boolean        [mrb_bool]
+    n:      Symbol         [mrb_sym]
+    &:      Block          [mrb_value]
+    *:      rest argument  [mrb_value*,int]       Receive the rest of the arguments as an array.
+    |:      optional                              Next argument of '|' and later are optional.
  */
 int mrb_get_args(mrb_state *mrb, const char *format, ...)
 {
@@ -743,7 +747,10 @@ mrb_value mrb_mod_module_eval(mrb_state *mrb, mrb_value mod)
     c = mrb_class_ptr(mod);
     return mrb_yield_internal(mrb, b, 0, 0, mod, c);
 }
-
+mrb_value
+mrb_mod_dummy_visibility(mrb_state *mrb, mrb_value mod) {
+    return mod;
+}
 mrb_value mrb_singleton_class(mrb_state *mrb, mrb_value v)
 {
 
@@ -933,6 +940,7 @@ mrb_value mrb_class_new_class(mrb_state *mrb, mrb_value cv)
         super = mrb_obj_value(mrb->object_class);
     }
     new_class = RClass::create(mrb, mrb_class_ptr(super));
+    mrb->funcall(super, "inherited", 1, mrb_obj_value(new_class));
     return mrb_obj_value(new_class);
 }
 
@@ -993,14 +1001,12 @@ static mrb_value mrb_bob_not(mrb_state *mrb, mrb_value cv)
  */
 static mrb_value mrb_bob_missing(mrb_state *mrb, mrb_value mod)
 {
-    mrb_value name, *a;
+    mrb_sym name;
+    mrb_value *a;
     int alen;
     mrb_value inspect;
 
-    mrb_get_args(mrb, "o*", &name, &a, &alen);
-    if (!mrb_symbol_p(name)) {
-        mrb_raise(E_TYPE_ERROR, "name should be a symbol");
-    }
+    mrb_get_args(mrb, "n*", &name, &a, &alen);
 
     if (mrb_respond_to(mrb,mod,mrb_intern2(mrb,"inspect",7))){
         inspect = mrb->funcall(mod, "inspect", 0);
@@ -1013,7 +1019,7 @@ static mrb_value mrb_bob_missing(mrb_state *mrb, mrb_value mod)
     }
 
     mrb->mrb_raisef(E_NOMETHOD_ERROR, "undefined method '%S' for %S",
-               mrb_sym2str(mrb, mrb_symbol(name)), inspect);
+               mrb_sym2str(mrb, name), inspect);
     /* not reached */
     return mrb_nil_value();
 }
@@ -1305,10 +1311,10 @@ static mrb_value mrb_mod_to_s(mrb_state *mrb, mrb_value klass)
 mrb_value mrb_mod_alias(mrb_state *mrb, mrb_value mod)
 {
     RClass *c = mrb_class_ptr(mod);
-    mrb_value new_value, old_value;
+    mrb_sym new_name, old_name;
 
-    mrb_get_args(mrb, "oo", &new_value, &old_value);
-    c->alias_method(mrb_symbol(new_value), mrb_symbol(old_value));
+    mrb_get_args(mrb, "nn", &new_name, &old_name);
+    c->alias_method(new_name, old_name);
     return mrb_nil_value();
 }
 
@@ -1342,7 +1348,6 @@ void RClass::define_method_id(mrb_sym mid, mrb_func_t func, mrb_aspec aspec)
     int ai = m_vm->gc().arena_save();
 
     RProc *p = mrb_proc_new_cfunc(m_vm, func);
-    p->target_class = this;
     define_method_raw(mid, p);
     m_vm->gc().arena_restore(ai);
 }
@@ -1672,10 +1677,10 @@ void mrb_init_class(mrb_state *mrb)
     obj->define_const("Class",       mrb_obj_value(cls));
 
     /* name each classes */
-    bob->name_class(mrb->intern_cstr("BasicObject"));
-    obj->name_class(mrb->intern_cstr("Object"));
-    mod->name_class(mrb->intern_cstr("Module"));
-    cls->name_class(mrb->intern_cstr("Class"));
+    bob->name_class(mrb->intern2("BasicObject",11));
+    obj->name_class(mrb->intern2("Object",6));
+    mod->name_class(mrb->intern2("Module",6));
+    cls->name_class(mrb->intern2("Class",5));
 
     MRB_SET_INSTANCE_TT(cls, MRB_TT_CLASS);
     bob->define_method("initialize",           mrb_bob_init,             MRB_ARGS_NONE())
@@ -1703,6 +1708,9 @@ void mrb_init_class(mrb_state *mrb)
             .define_method("method_defined?",         mrb_mod_method_defined,   MRB_ARGS_REQ(1)) /* 15.2.2.4.34 */
             .define_method("module_eval",             mrb_mod_module_eval,      MRB_ARGS_ANY())  /* 15.2.2.4.35 */
             .define_method("remove_class_variable",   mrb_mod_remove_cvar,      MRB_ARGS_REQ(1)) /* 15.2.2.4.39 */
+            .define_method("private",                 mrb_mod_dummy_visibility, MRB_ARGS_ANY())  /* 15.2.2.4.36 */
+            .define_method("protected",               mrb_mod_dummy_visibility, MRB_ARGS_ANY())  /* 15.2.2.4.37 */
+            .define_method("public",                  mrb_mod_dummy_visibility, MRB_ARGS_ANY())  /* 15.2.2.4.38 */
             .define_method("remove_method",           mrb_mod_remove_method,    MRB_ARGS_ANY())  /* 15.2.2.4.41 */
             .define_method("to_s",                    mrb_mod_to_s,             MRB_ARGS_NONE())
             .define_method("inspect",                 mrb_mod_to_s,             MRB_ARGS_NONE())

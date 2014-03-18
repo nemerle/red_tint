@@ -64,7 +64,7 @@ iv_put(mrb_state *mrb, iv_tbl *t, mrb_sym sym, mrb_value val)
     while (seg) {
         for (i=0; i<MRB_SEGMENT_SIZE; i++) {
             mrb_sym key = seg->key[i];
-            /* found room in last segment after last_len */
+            /* Found room in last segment after last_len */
             if (!seg->next && i >= t->last_len) {
                 seg->key[i] = sym;
                 seg->val[i] = val;
@@ -257,9 +257,7 @@ iv_free(mrb_state *mrb, iv_tbl *t)
 #define MRB_IVHASH_INIT_SIZE 8
 #endif
 
-//KHASH_DECLARE(iv, mrb_sym, mrb_value, 1)
-//KHASH_DEFINE(iv, mrb_sym, mrb_value, 1, kh_int_hash_func, kh_int_hash_equal)
-
+/* Instance variable table structure */
 struct iv_tbl {
 protected:
     typedef kh_T<mrb_sym, mrb_value,IntHashFunc,IntHashEq> hashtab;
@@ -268,11 +266,30 @@ protected:
 public:
     iv_tbl() {
     }
+    /**
+     * Set the value for the symbol in the instance variable table.
+     *
+     *   \arg mrb
+     *   \arg t     the instance variable table to be set in.
+     *   \arg sym   the symbol to be used as the key.
+     *   \arg val   the value to be set.
+     */
     void iv_put(mrb_sym sym, const mrb_value &val)
     {
         khiter_t k = h->put(sym);
         h->value(k) = val;
     }
+    /**
+     * Get a value for a symbol from the instance the variable table.
+     *
+     * Parameters
+     *   \arg mrb
+     *   \arg t     the variable table to be searched.
+     *   \arg sym   the symbol to be used as the key.
+     *   \arg vp    the value pointer. Recieves the value if if the specified symbol contains
+     *         in the instance variable table.
+     * \returns true if the specfiyed symbol contains in the instance variable table.
+     */
     bool iv_get(mrb_sym sym, mrb_value &vp)
     {
         khiter_t k = h->get(sym);
@@ -290,6 +307,16 @@ public:
         }
         return false;
     }
+    /**
+     * Deletes the value for the symbol from the instance variable table.
+     *
+     * Parameters
+     *   \arg t    the variable table to be searched.
+     *   \arg sym  the symbol to be used as the key.
+     *   \arg vp   the value pointer. Recieves the value if the specified symbol contains
+     *        in the instance varible table.
+     * \returns true if the specfied symbol contains in the instance variable table.
+     */
     bool iv_del(mrb_sym sym, mrb_value *vp)
     {
         if(!h)
@@ -325,6 +352,13 @@ public:
         }
         return true;
     }
+    /**
+     * Creates the instance variable table.
+     *
+     * Parameters
+     *   mrb
+     * \returns the instance variable table.
+     */
     static iv_tbl* iv_new(mrb_state *mrb)
     {
         iv_tbl * res = new(mrb->gc()._malloc(sizeof(iv_tbl))) iv_tbl;

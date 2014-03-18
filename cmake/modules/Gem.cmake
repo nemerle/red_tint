@@ -1,5 +1,5 @@
 function(CONCAT_FILES _filename)
-    file(REMOVE ${_filename})
+    file(WRITE ${_filename} "")
     foreach(_current_FILE ${ARGN})
         file(READ ${_current_FILE} _contents)
         file(APPEND ${_filename} "${_contents}\n")

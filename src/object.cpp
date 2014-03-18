@@ -162,9 +162,6 @@ static mrb_value true_to_s(mrb_state *mrb, mrb_value obj)
 
 static mrb_value true_or(mrb_state *mrb, mrb_value obj)
 {
-    mrb_bool obj2;
-
-    mrb_get_args(mrb, "b", &obj2);
     return mrb_true_value();
 }
 
@@ -192,9 +189,6 @@ static mrb_value true_or(mrb_state *mrb, mrb_value obj)
 
 static mrb_value false_and(mrb_state *mrb, mrb_value obj)
 {
-    mrb_bool obj2;
-
-    mrb_get_args(mrb, "b", &obj2);
     return mrb_false_value();
 }
 
@@ -284,7 +278,7 @@ void mrb_init_object(mrb_state *mrb)
 
 static mrb_value convert_type(mrb_state *mrb, const mrb_value &val, const char *tname, const char *method, bool raise)
 {
-    mrb_sym m = mrb_intern(mrb, method);
+    mrb_sym m = mrb_intern_cstr(mrb, method);
     if (mrb_respond_to(mrb, val, m))
         return mrb_funcall_argv(mrb, val, m, 0, 0);
 
@@ -304,7 +298,7 @@ mrb_value mrb_check_to_integer(mrb_state *mrb, mrb_value val, const char *method
     return v;
 }
 
-mrb_value mrb_convert_type(mrb_state *mrb, const mrb_value &val, mrb_int type, const char *tname, const char *method)
+mrb_value mrb_convert_type(mrb_state *mrb, const mrb_value &val, mrb_vtype type, const char *tname, const char *method)
 {
     if (mrb_type(val) == type)
         return val;
@@ -317,7 +311,7 @@ mrb_value mrb_convert_type(mrb_state *mrb, const mrb_value &val, mrb_int type, c
 }
 
 mrb_value
-mrb_check_convert_type(mrb_state *mrb, const mrb_value &val, mrb_int type, const char *tname, const char *method)
+mrb_check_convert_type(mrb_state *mrb, const mrb_value &val, mrb_vtype type, const char *tname, const char *method)
 {
     if (mrb_type(val) == type && type != MRB_TT_DATA)
         return val;

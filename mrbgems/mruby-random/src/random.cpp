@@ -12,9 +12,12 @@
 
 #include <time.h>
 
-#define GLOBAL_RAND_SEED_KEY    "$mrb_g_rand_seed"
-#define INSTANCE_RAND_SEED_KEY  "$mrb_i_rand_seed"
+#define GLOBAL_RAND_SEED_KEY          "$mrb_g_rand_seed"
+#define GLOBAL_RAND_SEED_KEY_CSTR_LEN 16
+#define INSTANCE_RAND_SEED_KEY          "$mrb_i_rand_seed"
+#define INSTANCE_RAND_SEED_KEY_CSTR_LEN 16
 #define MT_STATE_KEY            "$mrb_i_mt_state"
+#define MT_STATE_KEY_CSTR_LEN 15
 
 static void mt_state_free(mrb_state *mrb, void *p)
 {
@@ -30,7 +33,7 @@ static mt_state *mrb_mt_get_context(mrb_state *mrb,  mrb_value self)
     mt_state *t;
     mrb_value context;
 
-    context = mrb_iv_get(self, mrb_intern(mrb, MT_STATE_KEY));
+    context = mrb_iv_get(self, mrb->intern2(MT_STATE_KEY,MT_STATE_KEY_CSTR_LEN));
 
     t = (mt_state *)mrb_data_get_ptr(mrb, context, &mt_state_type);
     if (!t)
@@ -84,20 +87,20 @@ static mrb_value mrb_random_mt_g_rand(mrb_state *mrb, mrb_value max)
 static void mt_srand(mt_state *t, unsigned long seed)
 {
     mrb_random_init_genrand(t, seed);
-}  
+}
 
 static unsigned long mt_rand(mt_state *t)
 {
     return mrb_random_genrand_int32(t);
-}  
+}
 
 static double mt_rand_real(mt_state *t)
 {
     return mrb_random_genrand_real1(t);
-}  
+}
 
 static mrb_value mrb_random_mt_srand(mrb_state *mrb, mt_state *t, mrb_value seed)
-{ 
+{
     if (mrb_nil_p(seed)) {
         seed = mrb_fixnum_value(time(NULL) + mt_rand(t));
         if (mrb_fixnum(seed) < 0) {
@@ -111,7 +114,7 @@ static mrb_value mrb_random_mt_srand(mrb_state *mrb, mt_state *t, mrb_value seed
 }
 
 static mrb_value mrb_random_mt_rand(mrb_state *mrb, mt_state *t, mrb_value max)
-{ 
+{
     mrb_value value;
 
     if (mrb_fixnum(max) == 0) {
@@ -146,7 +149,7 @@ static mrb_value mrb_random_g_rand(mrb_state *mrb, mrb_value self)
     mrb_value seed;
 
     max = get_opt(mrb);
-    seed = mrb_gv_get(mrb, mrb_intern(mrb, GLOBAL_RAND_SEED_KEY));
+    seed = mrb_gv_get(mrb, mrb->intern2(GLOBAL_RAND_SEED_KEY,GLOBAL_RAND_SEED_KEY_CSTR_LEN));
     if (mrb_nil_p(seed)) {
         mrb_random_mt_g_srand(mrb, mrb_nil_value());
     }
@@ -160,8 +163,9 @@ static mrb_value mrb_random_g_srand(mrb_state *mrb, mrb_value self)
 
     seed = get_opt(mrb);
     seed = mrb_random_mt_g_srand(mrb, seed);
-    old_seed = mrb_gv_get(mrb, mrb_intern(mrb, GLOBAL_RAND_SEED_KEY));
-    mrb_gv_set(mrb, mrb_intern(mrb, GLOBAL_RAND_SEED_KEY), seed);
+    mrb_sym glob_randseed=mrb->intern2(GLOBAL_RAND_SEED_KEY,GLOBAL_RAND_SEED_KEY_CSTR_LEN);
+    old_seed = mrb_gv_get(mrb,glob_randseed);
+    mrb_gv_set(mrb, glob_randseed, seed);
     return old_seed;
 }
 
@@ -175,8 +179,8 @@ static mrb_value mrb_random_init(mrb_state *mrb, mrb_value self)
 
     seed = get_opt(mrb);
     seed = mrb_random_mt_srand(mrb, t, seed);
-    mrb_iv_set(mrb, self, mrb_intern(mrb, INSTANCE_RAND_SEED_KEY), seed);
-    mrb_iv_set(mrb, self, mrb_intern(mrb, MT_STATE_KEY),
+    mrb_iv_set(mrb, self, mrb->intern2(INSTANCE_RAND_SEED_KEY,INSTANCE_RAND_SEED_KEY_CSTR_LEN), seed);
+    mrb_iv_set(mrb, self, mrb->intern2(MT_STATE_KEY,MT_STATE_KEY_CSTR_LEN),
                mrb_obj_value(Data_Wrap_Struct(mrb, mrb->object_class, &mt_state_type, (void*) t)));
     return self;
 }
@@ -188,7 +192,7 @@ static mrb_value mrb_random_rand(mrb_state *mrb, mrb_value self)
     mt_state *t = mrb_mt_get_context(mrb, self);
 
     max = get_opt(mrb);
-    seed = mrb_iv_get(self, mrb_intern(mrb, INSTANCE_RAND_SEED_KEY));
+    seed = mrb_iv_get(self, mrb->intern2(INSTANCE_RAND_SEED_KEY,INSTANCE_RAND_SEED_KEY_CSTR_LEN));
     if (mrb_nil_p(seed)) {
         mrb_random_mt_srand(mrb, t, mrb_nil_value());
     }
@@ -203,8 +207,9 @@ static mrb_value mrb_random_srand(mrb_state *mrb, mrb_value self)
 
     seed = get_opt(mrb);
     seed = mrb_random_mt_srand(mrb, t, seed);
-    old_seed = mrb_iv_get(self, mrb_intern(mrb, INSTANCE_RAND_SEED_KEY));
-    mrb_iv_set(mrb, self, mrb_intern(mrb, INSTANCE_RAND_SEED_KEY), seed);
+    mrb_sym sym_seed_key = mrb->intern2(INSTANCE_RAND_SEED_KEY,INSTANCE_RAND_SEED_KEY_CSTR_LEN);
+    old_seed = mrb_iv_get(self, sym_seed_key);
+    mrb_iv_set(mrb, self, sym_seed_key, seed);
     return old_seed;
 }
 

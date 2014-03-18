@@ -780,9 +780,12 @@ block:
     }
 #endif
 }
+
 static mrb_value
 load_exec(mrb_state *mrb, mrb_parser_state *p, mrbc_context *c)
 {
+    RClass *target = mrb->object_class;
+    RProc *proc;
     int n;
     mrb_value v;
 
@@ -816,8 +819,16 @@ load_exec(mrb_state *mrb, mrb_parser_state *p, mrbc_context *c)
     if (c) {
         if (c->dump_result) mrb->codedump_all(n);
         if (c->no_exec) return mrb_fixnum_value(n);
+        if (c->target_class) {
+            target = c->target_class;
+        }
     }
-    v = mrb->mrb_run(mrb_proc_new(mrb, mrb->m_irep[n]), mrb_top_self(mrb));
+    proc = mrb_proc_new(mrb, mrb->m_irep[n]);
+    proc->target_class = target;
+    if (mrb->m_ctx->m_ci) {
+        mrb->m_ctx->m_ci->target_class = target;
+    }
+    v = mrb->mrb_run(proc, mrb_top_self(mrb));
     if (mrb->m_exc) return mrb_nil_value();
     return v;
 }
@@ -894,7 +905,8 @@ mrb_parser_new(mrb_state *mrb)
 #endif
 
     p->m_lex_strterm = nullptr;
-    p->heredocs = p->parsing_heredoc = NULL;
+    p->all_heredocs = p->parsing_heredoc = NULL;
+    p->lex_strterm_before_heredoc = NULL;
 
     return p;
 }
@@ -925,7 +937,6 @@ const char* mrbc_filename(mrb_state *mrb, mrbc_context *c, const char *s)
 
         memcpy(p, s, len + 1);
         c->filename = p;
-        c->lineno = 1;
     }
     return c->filename;
 }

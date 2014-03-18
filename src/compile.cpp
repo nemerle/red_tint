@@ -45,7 +45,7 @@ mrb_ast_node* mrb_parser_state::cons(mrb_ast_node *car, mrb_ast_node *cdr)
     else {
         c = new_t<mrb_ast_list_like_node>();
     }
-    c->init(car,cdr,m_lineno);
+    c->init(car,cdr,m_lineno,m_filename);
     return c;
 }
 mrb_ast_node* mrb_parser_state::append(mrb_ast_node *a, mrb_ast_node *b)
@@ -104,7 +104,7 @@ size_t mrb_parser_state::local_switch()
 {
     size_t res = m_contexts.size();
     m_contexts.push_back(m_locals_stack);
-    m_locals_stack = new_t<tLocalsStack>();
+    m_locals_stack = new_simple<tLocalsStack>();
     m_locals_stack->push_back(tLocals());
     return res;
 }
@@ -126,7 +126,7 @@ void mrb_parser_state::local_unnest()
 }
 void mrb_parser_state::init_locals() {
     if (!m_locals_stack)
-        m_locals_stack = new_t<tLocalsStack>();
+        m_locals_stack = new_simple<tLocalsStack>();
     if (m_locals_stack->empty())
         m_locals_stack->push_back(tLocals());
 }
@@ -144,7 +144,7 @@ bool mrb_parser_state::local_var_p(mrb_sym sym_)
 // (:heredoc . a)
 mrb_ast_node* mrb_parser_state::new_heredoc()
 {
-    mrb_parser_heredoc_info *inf = new_t<mrb_parser_heredoc_info>();
+    mrb_parser_heredoc_info *inf = new_simple<mrb_parser_heredoc_info>();
     return new_t<HeredocNode>(inf);
 }
 void mrb_parser_state::assignable(mrb_ast_node *lhs)
@@ -193,6 +193,47 @@ mrb_parser_heredoc_info * mrb_parser_state::parsing_heredoc_inf()
     /* assert(nd->car->car == NODE_HEREDOC); */
     return ((HeredocNode*)nd->left())->contents();
 }
+void
+mrb_parser_state::heredoc_treat_nextline()
+{
+    if (this->heredocs_from_nextline == NULL)
+        return;
+    if (this->parsing_heredoc == NULL) {
+        mrb_ast_node *n;
+        this->parsing_heredoc = this->heredocs_from_nextline;
+        this->lex_strterm_before_heredoc = m_lex_strterm;
+        this->m_lex_strterm = new_strterm(parsing_heredoc_inf()->type, 0, 0);
+        n = this->all_heredocs;
+        if (n) {
+            while (n->right())
+                n = n->right();
+            n->right(this->parsing_heredoc);
+        } else {
+            this->all_heredocs = this->parsing_heredoc;
+        }
+    } else {
+        mrb_ast_node *n, *m;
+        m = this->heredocs_from_nextline;
+        while (m->right())
+            m = m->right();
+        n = this->all_heredocs;
+        mrb_assert(n != NULL);
+        if (n == this->parsing_heredoc) {
+            m->right(n);
+            this->all_heredocs = this->heredocs_from_nextline;
+            this->parsing_heredoc = this->heredocs_from_nextline;
+        } else {
+            while (n->right() != this->parsing_heredoc) {
+                n = n->right();
+                mrb_assert(n != NULL);
+            }
+            m->right(n->right());
+            n->right(this->heredocs_from_nextline);
+            this->parsing_heredoc = this->heredocs_from_nextline;
+        }
+    }
+    this->heredocs_from_nextline = NULL;
+}
 
 void mrb_parser_state::heredoc_end()
 {
@@ -201,6 +242,8 @@ void mrb_parser_state::heredoc_end()
         m_lstate = EXPR_BEG;
         m_cmd_start = true;
         end_strterm();
+        m_lex_strterm = lex_strterm_before_heredoc;
+        lex_strterm_before_heredoc = NULL;
         heredoc_end_now = true;
     } else {
         /* next heredoc */
@@ -298,7 +341,7 @@ void mrb_parser_state::call_with_block( mrb_ast_node *a, mrb_ast_node *b) {
         args_obj = &cn->m_cmd_args;
     }
     if (!*args_obj) {
-        *args_obj = new_t<CommandArgs>(nullptr,b);
+        *args_obj = new_simple<CommandArgs>(nullptr,b);
     }
     else {
         args_with_block((*args_obj), b);
@@ -311,6 +354,7 @@ mrb_ast_node *mrb_parser_state::cond(mrb_ast_node *n) {
 mrb_ast_node * mrb_parser_state::ret_args(CommandArgs *n) {
     if (n->block()) {
         yyerror("block argument should not be given");
+        return nullptr;
     }
     if (!n->m_args->right()) // is single arg ?
         return n->m_args->left();

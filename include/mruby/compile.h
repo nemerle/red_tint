@@ -23,6 +23,7 @@ struct mrbc_context {
     short lineno;
     int (*partial_hook)(mrb_parser_state*);
     void *partial_data;
+    RClass *target_class;
     mrb_bool capture_errors:1;
     mrb_bool dump_result:1;
     mrb_bool no_exec:1;
@@ -128,9 +129,10 @@ struct mrb_parser_state {
     bool m_cmd_start;
 
     mrb_ast_node *pb;
-    mrb_ast_node *heredocs;	/* list of mrb_parser_heredoc_info* */
+    mrb_ast_node *all_heredocs;	/* list of mrb_parser_heredoc_info* */
+    mrb_ast_node *heredocs_from_nextline;
     mrb_ast_node *parsing_heredoc;
-    mrb_bool heredoc_starts_nextline:1;
+    mrb_ast_node *lex_strterm_before_heredoc;
     mrb_bool heredoc_end_now:1; /* for mirb */
 
     void *ylval;
@@ -161,7 +163,7 @@ struct mrb_parser_state {
     }
     // (:call a op b)
     mrb_ast_node* call_bin_op(mrb_ast_node *recv, const char *m, mrb_ast_node *arg1) {
-        return new_call(recv, intern(m), new_t<CommandArgs>(list1(arg1),nullptr));
+        return new_call(recv, intern(m), new_simple<CommandArgs>(list1(arg1),nullptr));
     }
 
     jmp_buf jmp;
@@ -230,7 +232,7 @@ public:
                         return m_locals_stack->back();
                     }
     ArgsStore *     new_args(mrb_ast_node *m, mrb_ast_node *opt, mrb_sym rest, mrb_ast_node *m2, mrb_sym blk) {
-                        return new_t<ArgsStore>(m,opt,rest,m2,blk);
+                        return new_simple<ArgsStore>(m,opt,rest,m2,blk);
                     }
 
     BlockNode *     new_block(ArgsStore *arg, mrb_ast_node *body)
@@ -267,8 +269,15 @@ public:
     int             paren_nest();
                     template<typename T, typename... Args >
     T *             new_t(Args... args) {
-                        return new(parser_palloc(sizeof(T))) T(args...);
+                        T *res = new(parser_palloc(sizeof(T))) T(args...);
+                        res->locationInit(this->m_lineno,this->m_filename);
+                        return res;
                     }
+                    template<typename T, typename... Args >
+    T *             new_simple(Args... args) {
+                        return new(parser_palloc(sizeof(T))) T(args...);
+    }
+    void heredoc_treat_nextline();
 };
 /* utility functions */
 #ifdef ENABLE_STDIO

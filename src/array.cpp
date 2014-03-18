@@ -17,7 +17,7 @@
 #define ARY_DEFAULT_LEN   4
 #define ARY_SHRINK_RATIO  5 /* must be larger than 2 */
 #define ARY_C_MAX_SIZE (SIZE_MAX / sizeof(mrb_value))
-#define ARY_MAX_SIZE ((ARY_C_MAX_SIZE < (size_t)MRB_INT_MAX) ? (mrb_int)ARY_C_MAX_SIZE : MRB_INT_MAX)
+#define ARY_MAX_SIZE ((ARY_C_MAX_SIZE < (size_t)MRB_INT_MAX) ? (mrb_int)ARY_C_MAX_SIZE : MRB_INT_MAX-1)
 #define ARY_SHIFT_SHARED_MIN 10
 size_t gAllocatedSize=0;
 RArray* RArray::ary_new_capa(mrb_state *mrb, size_t capa)
@@ -335,11 +335,11 @@ void RArray::reverse_bang()
     mrb_value *p1 = m_ptr;
     mrb_value *p2 = m_ptr + m_len - 1;
 
-        while(p1 < p2) {
-            mrb_value tmp = *p1;
-            *p1++ = *p2;
-            *p2-- = tmp;
-        }
+    while(p1 < p2) {
+        mrb_value tmp = *p1;
+        *p1++ = *p2;
+        *p2-- = tmp;
+    }
 }
 
 mrb_value RArray::reverse()
@@ -672,8 +672,8 @@ mrb_value RArray::first()
 
     if (mrb_get_args(m_vm, "|i", &_size) == 0) {
         return (m_len > 0)? m_ptr[0]: mrb_nil_value();
-    }
-    if (_size < 0) {
+        }
+        if (_size < 0) {
         m_vm->mrb_raise(A_ARGUMENT_ERROR(m_vm), "negative array size");
     }
 
@@ -698,23 +698,23 @@ mrb_value RArray::last()
     if (_len == 0)
         return (m_len > 0)? m_ptr[m_len - 1]: mrb_nil_value();
 
-    /* len == 1 */
-    _size = mrb_fixnum(*vals);
-    if (_size < 0) {
-        m_vm->mrb_raise(A_ARGUMENT_ERROR(m_vm), "negative array size");
-    }
-    if (_size > m_len)
-        _size = m_len;
-    if ((this->flags & MRB_ARY_SHARED) || (_size > ARY_DEFAULT_LEN)) {
-        return ary_subseq(m_len - _size, _size);
-    }
-    assert((_size>=0) && _size <= ARY_DEFAULT_LEN);
-    return RArray::new_from_values(m_vm, _size, m_ptr + (m_len - _size));
-}
+            /* len == 1 */
+            _size = mrb_fixnum(*vals);
+            if (_size < 0) {
+                m_vm->mrb_raise(A_ARGUMENT_ERROR(m_vm), "negative array size");
+            }
+            if (_size > m_len)
+                _size = m_len;
+            if ((this->flags & MRB_ARY_SHARED) || (_size > ARY_DEFAULT_LEN)) {
+                return ary_subseq(m_len - _size, _size);
+            }
+            assert((_size>=0) && _size <= ARY_DEFAULT_LEN);
+            return RArray::new_from_values(m_vm, _size, m_ptr + (m_len - _size));
+        }
 
-mrb_value RArray::index_m()
-{
-    mrb_value obj(m_vm->get_arg<mrb_value>());
+        mrb_value RArray::index_m()
+        {
+        mrb_value obj(m_vm->get_arg<mrb_value>());
     for (mrb_int i = 0; i < m_len; i++) {
         if (mrb_equal(m_vm, m_ptr[i], obj)) {
             return mrb_fixnum_value(i);
@@ -743,7 +743,7 @@ mrb_value RArray::splat(mrb_state *mrb, const mrb_value &v)
     RArray *a = mrb_ary_ptr(ary);
     a->m_ptr[a->m_len++] = v;
     return ary;
-//    return RArray::new_from_values(mrb, 1, &v);
+    //    return RArray::new_from_values(mrb, 1, &v);
 }
 
 mrb_value RArray::size()
@@ -934,32 +934,29 @@ mrb_value RArray::join_m()
 
 mrb_value RArray::mrb_ary_equal()
 {
-    mrb_bool equal_p = false;
     mrb_value ary2(m_vm->get_arg<mrb_value>());
 
-    if ( this == ary2.value.p) {  //was mrb_obj_equal(m_vm, ary1, ary2)
-        return mrb_bool_value(true);
+    if ( this == ary2.value.p) {
+        return mrb_true_value();
     }
     if (mrb_special_const_p(ary2)) {
-        return mrb_bool_value(false);
+        return mrb_false_value();
     }
     if (!mrb_is_a_array(ary2)) {
         if (mrb_respond_to(m_vm, ary2, mrb_intern2(m_vm, "to_ary", 6))) {
             return mrb_bool_value(mrb_equal(m_vm, ary2, mrb_obj_value(this)));
         }
-        }
-    else if (m_len == RARRAY_LEN(ary2)) {
-        equal_p = true;
-        RArray *other = RARRAY(ary2);
-        for (mrb_int i=0; i<m_len; i++) {
-            if (!mrb_equal(m_vm, m_ptr[i], other->m_ptr[i])) {
-                equal_p = false;
-                break;
-            }
+        return mrb_false_value();
+    }
+    if (m_len != RARRAY_LEN(ary2))
+        return mrb_false_value();
+    RArray *other = RARRAY(ary2);
+    for (mrb_int i=0; i<m_len; i++) {
+        if (!mrb_equal(m_vm, m_ptr[i], other->m_ptr[i])) {
+            return mrb_false_value();
         }
     }
-
-    return mrb_bool_value(equal_p);
+    return mrb_true_value();
 }
 
 /* 15.2.12.5.34 (x) */
@@ -976,24 +973,22 @@ mrb_value RArray::mrb_ary_eql()
     mrb_value ary2(m_vm->get_arg<mrb_value>());
 
     if ( this == ary2.value.p) {  //was mrb_obj_equal(m_vm, ary1, ary2)
-        return mrb_bool_value(true);
+        return mrb_true_value();
     }
     if (!mrb_is_a_array(ary2)) {
-        return mrb_bool_value(false);
+        return mrb_false_value();
     }
     RArray *ary_2p = RARRAY(ary2);
     if (m_len != ary_2p->m_len)
-        return mrb_bool_value(false);
+        return mrb_false_value();
 
-    mrb_bool eql_p = true;
     for (mrb_int i=m_len-1; i>=0; --i) {
         if (!mrb_eql(m_vm, m_ptr[i], ary_2p->m_ptr[i])) {
-            eql_p = false;
-            break;
+            return mrb_false_value();
         }
     }
 
-    return mrb_bool_value(eql_p);
+    return mrb_true_value();
 }
 namespace {
 #define FORWARD_TO_INSTANCE(name)\

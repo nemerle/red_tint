@@ -37,13 +37,12 @@ bool is_code_block_open(mrb_parser_state *parser)
 {
     int code_block_open = false;
 
-
     /* check for heredoc */
-    if (parser->heredoc_starts_nextline) return true;
+    if (parser->parsing_heredoc != NULL) return true;
     if (parser->heredoc_end_now) {
         parser->heredoc_end_now = false;
         return false;
-    }
+      }
 
     /* check if parser error are available */
     if (0 < parser->nerr) {
@@ -344,7 +343,7 @@ main(int argc, char **argv)
                 else {
                     /* no */
                     printf(" => ");
-                    if (!mrb_respond_to(mrb,result,mrb_intern(mrb,"inspect"))){
+                    if (!mrb_respond_to(mrb,result,mrb->intern2("inspect",7))){
                         result = mrb_any_to_s(mrb,result);
                     }
                     p(mrb, result);

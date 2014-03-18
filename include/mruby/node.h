@@ -31,7 +31,7 @@ enum node_type : uint8_t {
     NODE_ENSURE,
     NODE_AND,
     NODE_OR,
-//  NODE_NOT,
+    //  NODE_NOT,
     NODE_MASGN,
     NODE_ASGN,
     NODE_OP_ASGN,
@@ -40,12 +40,12 @@ enum node_type : uint8_t {
     NODE_SUPER,
     NODE_ZSUPER,
     NODE_ARRAY,
-//    NODE_ZARRAY,
+    //    NODE_ZARRAY,
     NODE_HASH,
     NODE_RETURN,
     NODE_YIELD,
     NODE_LVAR,
-//    NODE_DVAR,
+    //    NODE_DVAR,
     NODE_GVAR,
     NODE_IVAR,
     NODE_CONST,
@@ -88,49 +88,54 @@ enum node_type : uint8_t {
     NODE_LITERAL_DELIM,
     NODE_WORDS,
     NODE_SYMBOLS,
-//    NODE_WHEN,
-//    NODE_METHOD,
-//    NODE_FBODY,
-//    NODE_CFUNC,
-//    NODE_OPT_N,
-//    NODE_ITER,
-//    NODE_CDECL,
-//    NODE_CVASGN,
-//    NODE_CVDECL,
-//    NODE_VCALL,
-//    NODE_MATCH2,
-//    NODE_MATCH3,
-//    NODE_DREGX_ONCE,
-//    NODE_LIST,
-//    NODE_ARGSCAT,
-//    NODE_ARGSPUSH,
-//    NODE_TO_ARY,
-//    NODE_SVALUE,
-//    NODE_CREF,
-//    NODE_FLIP2,
-//    NODE_FLIP3,
-//    NODE_ATTRSET,
-//    NODE_DEFINED,
-//    NODE_NEWLINE,
-//    NODE_ALLOCA,
-//    NODE_DMETHOD,
-//    NODE_BMETHOD,
-//    NODE_MEMO,
-//    NODE_IFUNC,
-//    NODE_ATTRASGN,
+    //    NODE_WHEN,
+    //    NODE_METHOD,
+    //    NODE_FBODY,
+    //    NODE_CFUNC,
+    //    NODE_OPT_N,
+    //    NODE_ITER,
+    //    NODE_CDECL,
+    //    NODE_CVASGN,
+    //    NODE_CVDECL,
+    //    NODE_VCALL,
+    //    NODE_MATCH2,
+    //    NODE_MATCH3,
+    //    NODE_DREGX_ONCE,
+    //    NODE_LIST,
+    //    NODE_ARGSCAT,
+    //    NODE_ARGSPUSH,
+    //    NODE_TO_ARY,
+    //    NODE_SVALUE,
+    //    NODE_CREF,
+    //    NODE_FLIP2,
+    //    NODE_FLIP3,
+    //    NODE_ATTRSET,
+    //    NODE_DEFINED,
+    //    NODE_NEWLINE,
+    //    NODE_ALLOCA,
+    //    NODE_DMETHOD,
+    //    NODE_BMETHOD,
+    //    NODE_MEMO,
+    //    NODE_IFUNC,
+    //    NODE_ATTRASGN,
     NODE_LAST
 };
 typedef std::vector<mrb_sym> tLocals;
 /* AST node structure */
 struct mrb_ast_node {
     short lineno;
+    const char *filename;
     virtual node_type getType() const=0;
     virtual mrb_ast_node *left() const=0;
     virtual void left(mrb_ast_node *v)=0;
     virtual mrb_ast_node *right() const=0;
     virtual void right(mrb_ast_node *v)=0;
-    virtual void init(mrb_ast_node *a,mrb_ast_node *b,short lin) =0;
+    virtual void init(mrb_ast_node *a,mrb_ast_node *b,short lin,const char *f) =0;
     virtual void accept(NodeVisitor *v) { assert(false); }
+    void locationInit(short lin,const char *f) {
+        lineno = lin;
+        filename = f;
+    }
 };
 struct mrb_ast_list_like_node : public mrb_ast_node {
     virtual node_type getType() const;
@@ -140,10 +145,10 @@ struct mrb_ast_list_like_node : public mrb_ast_node {
     }
     virtual mrb_ast_node *right() const {return m_cdr; }
     virtual void right(mrb_ast_node *v) { m_cdr=v; }
-    virtual void init(mrb_ast_node *a,mrb_ast_node *b,short lin) {
+    virtual void init(mrb_ast_node *a,mrb_ast_node *b,short lin,const char *f) override {
         m_car = a;
         m_cdr = b;
-        lineno = lin;
+        locationInit(lin,f);
     }
 protected:
     mrb_ast_node *m_car, *m_cdr;
@@ -154,33 +159,34 @@ struct UpdatedNode : public mrb_ast_node {
     mrb_ast_node *right() const { assert(false); return nullptr; }
     void right(mrb_ast_node *v) { assert(false); }
     virtual void accept(NodeVisitor *v) = 0;
-
-    virtual void init(mrb_ast_node *a,mrb_ast_node *b,short lin) {
+    virtual void init(mrb_ast_node *a,mrb_ast_node *b,short lin,const char *f) override {
         assert(false);
     }
 };
 struct ArgsStore {
-                        ArgsStore(mrb_ast_node *m, mrb_ast_node *opt, mrb_sym rest, mrb_ast_node *m2, mrb_sym blk) {
-                            m_mandatory = m;
-                            m_opt = opt;
-                            m_rest = rest;
-                            m_post_mandatory = m2;
-                            m_blk = blk;
-                        }
-        mrb_ast_node *m_mandatory;
-        mrb_ast_node *m_opt;
-        mrb_sym m_rest;
-        mrb_ast_node *m_post_mandatory;
-        mrb_sym m_blk;
+    ArgsStore(mrb_ast_node *m, mrb_ast_node *opt, mrb_sym rest, mrb_ast_node *m2, mrb_sym blk) {
+        m_mandatory = m;
+        m_opt = opt;
+        m_rest = rest;
+        m_post_mandatory = m2;
+        m_blk = blk;
+    }
+    mrb_ast_node *m_mandatory;
+    mrb_ast_node *m_opt;
+    mrb_sym m_rest;
+    mrb_ast_node *m_post_mandatory;
+    mrb_sym m_blk;
 };
 struct CommandArgs {
-                        CommandArgs(mrb_ast_node *args, mrb_ast_node *blk=nullptr) {
-                            m_args = args;
-                            m_blk = blk;
-                        }
-        mrb_ast_node *  block() const { return m_blk; }
-        mrb_ast_node *  m_args;
-        mrb_ast_node *  m_blk;
+    CommandArgs(mrb_ast_node *args, mrb_ast_node *blk=nullptr) {
+        m_args = args;
+        m_blk = blk;
+    }
+
+    void accept(NodeVisitor *v) { assert(!"NOT A NODE"); }
+    mrb_ast_node *  block() const { return m_blk; }
+    mrb_ast_node *  m_args;
+    mrb_ast_node *  m_blk;
 };
 
 struct SymContainerNode : public UpdatedNode {
@@ -189,49 +195,49 @@ struct SymContainerNode : public UpdatedNode {
     mrb_sym m_sym;
 };
 struct Colon3Node : public SymContainerNode {
-                        Colon3Node(mrb_sym v)  : SymContainerNode(v) {}
-        void            accept(NodeVisitor *v) { v->visit(this); }
-        node_type       getType() const { return NODE_COLON3; }
+    Colon3Node(mrb_sym v)  : SymContainerNode(v) {}
+    void            accept(NodeVisitor *v) { v->visit(this); }
+    node_type       getType() const { return NODE_COLON3; }
 };
 struct Colon2Node : public UpdatedNode {
-                        Colon2Node(mrb_ast_node *n,mrb_sym v)  :m_sym(v), m_val(n) {}
-        node_type       getType() const { return NODE_COLON2; }
-        void            accept(NodeVisitor *v) { v->visit(this); }
-        mrb_sym         m_sym;
-        mrb_ast_node *  m_val;
+    Colon2Node(mrb_ast_node *n,mrb_sym v)  :m_sym(v), m_val(n) {}
+    node_type       getType() const { return NODE_COLON2; }
+    void            accept(NodeVisitor *v) { v->visit(this); }
+    mrb_sym         m_sym;
+    mrb_ast_node *  m_val;
 };
 
 struct GVarNode : public SymContainerNode {
-                        GVarNode(mrb_sym v)  : SymContainerNode(v) {}
-        node_type       getType() const { return NODE_GVAR; }
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    GVarNode(mrb_sym v)  : SymContainerNode(v) {}
+    node_type       getType() const { return NODE_GVAR; }
+    void            accept(NodeVisitor *v) { v->visit(this); }
 };
 struct IVarNode : public SymContainerNode {
-                        IVarNode(mrb_sym v)  : SymContainerNode(v) {}
-        node_type       getType() const { return NODE_IVAR; }
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    IVarNode(mrb_sym v)  : SymContainerNode(v) {}
+    node_type       getType() const { return NODE_IVAR; }
+    void            accept(NodeVisitor *v) { v->visit(this); }
 };
 struct LVarNode : public SymContainerNode {
-                        LVarNode(mrb_sym v)  : SymContainerNode(v) {}
-        node_type       getType() const { return NODE_LVAR; }
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    LVarNode(mrb_sym v)  : SymContainerNode(v) {}
+    node_type       getType() const { return NODE_LVAR; }
+    void            accept(NodeVisitor *v) { v->visit(this); }
 };
 struct CVarNode : public SymContainerNode {
-                        CVarNode(mrb_sym v)  : SymContainerNode(v) {}
-        node_type       getType() const { return NODE_CVAR; }
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    CVarNode(mrb_sym v)  : SymContainerNode(v) {}
+    node_type       getType() const { return NODE_CVAR; }
+    void            accept(NodeVisitor *v) { v->visit(this); }
 };
 struct ConstNode : public SymContainerNode {
-                    ConstNode(mrb_sym v)  : SymContainerNode(v) {}
-        node_type   getType() const { return NODE_CONST; }
-        void        accept(NodeVisitor *v) { v->visit(this); }
+    ConstNode(mrb_sym v)  : SymContainerNode(v) {}
+    node_type   getType() const { return NODE_CONST; }
+    void        accept(NodeVisitor *v) { v->visit(this); }
 };
 struct UndefNode : public UpdatedNode {
-                    UndefNode(mrb_sym v)   { m_syms.push_back(v);}
-        node_type   getType() const { return NODE_UNDEF; }
-        void        push_back(mrb_sym v) { m_syms.push_back(v);}
-        std::vector<mrb_sym> m_syms;
-        void        accept(NodeVisitor *v) { v->visit(this); }
+    UndefNode(mrb_sym v)   { m_syms.push_back(v);}
+    node_type   getType() const { return NODE_UNDEF; }
+    void        push_back(mrb_sym v) { m_syms.push_back(v);}
+    std::vector<mrb_sym> m_syms;
+    void        accept(NodeVisitor *v) { v->visit(this); }
 };
 struct SymNode : public SymContainerNode {
     SymNode(mrb_sym v)  : SymContainerNode(v) {}
@@ -273,14 +279,14 @@ struct RetryNode : public UpdatedNode {
     void accept(NodeVisitor *v) { v->visit(this); }
 };
 struct LiteralDelimNode : public UpdatedNode {
-        node_type   getType() const { return NODE_LITERAL_DELIM; }
-        void        accept(NodeVisitor *v) { v->visit(this); }
+    node_type   getType() const { return NODE_LITERAL_DELIM; }
+    void        accept(NodeVisitor *v) { v->visit(this); }
 };
 struct BackRefNode : public UpdatedNode {
-                    BackRefNode(int v)  : m_ref(v) {}
-        node_type   getType() const { return NODE_BACK_REF; }
-        void        accept(NodeVisitor *v) { v->visit(this); }
-        int         m_ref;
+    BackRefNode(int v)  : m_ref(v) {}
+    node_type   getType() const { return NODE_BACK_REF; }
+    void        accept(NodeVisitor *v) { v->visit(this); }
+    int         m_ref;
 };
 struct NthRefNode : public UpdatedNode {
     NthRefNode(int v)  : m_ref(v) {}
@@ -314,11 +320,11 @@ struct XstrNode : public StrCommonNode {
     void accept(NodeVisitor *v) { v->visit(this); }
 };
 struct RegxNode : public UpdatedNode {
-                        RegxNode(const char *_exp,const char *_str) : m_expr(_exp),m_str(_str) {}
-        node_type       getType() const { return NODE_REGX; }
-        void            accept(NodeVisitor *v) { v->visit(this); }
-        const char *    m_expr;
-        const char *    m_str;
+    RegxNode(const char *_exp,const char *_str) : m_expr(_exp),m_str(_str) {}
+    node_type       getType() const { return NODE_REGX; }
+    void            accept(NodeVisitor *v) { v->visit(this); }
+    const char *    m_expr;
+    const char *    m_str;
 };
 struct DregxNode : public UpdatedNode {
     DregxNode(mrb_ast_node *a,mrb_ast_node *b) : m_a(a),m_b(b) {}
@@ -457,14 +463,14 @@ struct BinaryNode : public UpdatedNode {
     mrb_ast_node *m_rhs;
 };
 struct ScopeNode : public UpdatedNode {
-                        ScopeNode(const tLocals &l,mrb_ast_node *b) : m_locals(l),m_body(b) {}
-                        ScopeNode(mrb_ast_node *b) : m_body(b) {}
-virtual node_type       getType() const { return NODE_SCOPE; }
-        tLocals &       locals() {return m_locals;}
-        mrb_ast_node *  body() {return m_body;}
-        tLocals         m_locals;
-        mrb_ast_node *  m_body;
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    ScopeNode(const tLocals &l,mrb_ast_node *b) : m_locals(l),m_body(b) {}
+    ScopeNode(mrb_ast_node *b) : m_body(b) {}
+    virtual node_type       getType() const { return NODE_SCOPE; }
+    tLocals &       locals() {return m_locals;}
+    mrb_ast_node *  body() {return m_body;}
+    tLocals         m_locals;
+    mrb_ast_node *  m_body;
+    void            accept(NodeVisitor *v) { v->visit(this); }
 };
 
 struct MAsgnNode : public BinaryNode {
@@ -493,191 +499,191 @@ struct Dot3Node : public BinaryNode {
     void            accept(NodeVisitor *v) { v->visit(this); }
 };
 struct AndNode : public BinaryNode {
-                        AndNode(mrb_ast_node *l,mrb_ast_node *r) : BinaryNode(l,r) {}
-virtual node_type       getType() const { return NODE_AND; }
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    AndNode(mrb_ast_node *l,mrb_ast_node *r) : BinaryNode(l,r) {}
+    virtual node_type       getType() const { return NODE_AND; }
+    void            accept(NodeVisitor *v) { v->visit(this); }
 };
 struct OrNode : public BinaryNode {
-                        OrNode(mrb_ast_node *l,mrb_ast_node *r) : BinaryNode(l,r) {}
-        node_type       getType() const { return NODE_OR; }
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    OrNode(mrb_ast_node *l,mrb_ast_node *r) : BinaryNode(l,r) {}
+    node_type       getType() const { return NODE_OR; }
+    void            accept(NodeVisitor *v) { v->visit(this); }
 };
 struct AsgnNode : public BinaryNode {
-                        AsgnNode(mrb_ast_node *l,mrb_ast_node *r) : BinaryNode(l,r) { }
-        node_type       getType() const { return NODE_ASGN; }
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    AsgnNode(mrb_ast_node *l,mrb_ast_node *r) : BinaryNode(l,r) { }
+    node_type       getType() const { return NODE_ASGN; }
+    void            accept(NodeVisitor *v) { v->visit(this); }
 };
 struct OpAsgnNode : public BinaryNode {
-                        OpAsgnNode(mrb_ast_node *l,mrb_sym op,mrb_ast_node *r) :
-                            BinaryNode(l,r),op_sym(op) { }
-        node_type       getType() const { return NODE_OP_ASGN; }
-        void            accept(NodeVisitor *v) { v->visit(this); }
-        mrb_sym         op_sym;
+    OpAsgnNode(mrb_ast_node *l,mrb_sym op,mrb_ast_node *r) :
+        BinaryNode(l,r),op_sym(op) { }
+    node_type       getType() const { return NODE_OP_ASGN; }
+    void            accept(NodeVisitor *v) { v->visit(this); }
+    mrb_sym         op_sym;
 };
 struct CallCommonNode : public UpdatedNode {
-                        CallCommonNode(mrb_ast_node *a, mrb_sym b, CommandArgs *c) :
-                            m_receiver(a),m_method(b),m_cmd_args(c)
-                        {}
-        mrb_ast_node *  m_receiver;
-        mrb_sym         m_method;
-        CommandArgs *   m_cmd_args;
+    CallCommonNode(mrb_ast_node *a, mrb_sym b, CommandArgs *c) :
+        m_receiver(a),m_method(b),m_cmd_args(c)
+    {}
+    mrb_ast_node *  m_receiver;
+    mrb_sym         m_method;
+    CommandArgs *   m_cmd_args;
 };
 
 struct CallNode : public CallCommonNode {
-                        CallNode(mrb_ast_node *a, mrb_sym b, CommandArgs *c) :
-                            CallCommonNode(a,b,c) {}
-        node_type       getType() const { return NODE_CALL; }
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    CallNode(mrb_ast_node *a, mrb_sym b, CommandArgs *c) :
+        CallCommonNode(a,b,c) {}
+    node_type       getType() const { return NODE_CALL; }
+    void            accept(NodeVisitor *v) { v->visit(this); }
 };
 struct FCallNode : public CallCommonNode {
-                        FCallNode(mrb_ast_node *a, mrb_sym b, CommandArgs *c) : CallCommonNode(a,b,c) {}
-        node_type       getType() const { return NODE_FCALL; }
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    FCallNode(mrb_ast_node *a, mrb_sym b, CommandArgs *c) : CallCommonNode(a,b,c) {}
+    node_type       getType() const { return NODE_FCALL; }
+    void            accept(NodeVisitor *v) { v->visit(this); }
 };
 struct LambdaCommonNode : public UpdatedNode {
-                        LambdaCommonNode(const tLocals &lc,ArgsStore *arg,mrb_ast_node *bd) :
-                            m_locals(lc),m_args(arg),m_body(bd)
-                        {}
-        ArgsStore *     args() { return m_args;}
-        mrb_ast_node *  body() { return m_body;}
-        tLocals         locals() { return m_locals;}
+    LambdaCommonNode(const tLocals &lc,ArgsStore *arg,mrb_ast_node *bd) :
+        m_locals(lc),m_args(arg),m_body(bd)
+    {}
+    ArgsStore *     args() { return m_args;}
+    mrb_ast_node *  body() { return m_body;}
+    tLocals         locals() { return m_locals;}
 protected:
-        tLocals         m_locals;
-        ArgsStore *     m_args;
-        mrb_ast_node *  m_body;
+    tLocals         m_locals;
+    ArgsStore *     m_args;
+    mrb_ast_node *  m_body;
 };
 
 struct BlockNode : public LambdaCommonNode {
-                        BlockNode(const tLocals &lc,ArgsStore *arg,mrb_ast_node *bd) :
-                            LambdaCommonNode(lc,arg,bd) {}
-virtual node_type       getType() const { return NODE_BLOCK; }
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    BlockNode(const tLocals &lc,ArgsStore *arg,mrb_ast_node *bd) :
+        LambdaCommonNode(lc,arg,bd) {}
+    virtual node_type       getType() const { return NODE_BLOCK; }
+    void            accept(NodeVisitor *v) { v->visit(this); }
 };
 struct LambdaNode : public LambdaCommonNode {
-                        LambdaNode(const tLocals &lc,ArgsStore *arg,mrb_ast_node *bd) :
-                            LambdaCommonNode(lc,arg,bd) {}
-virtual node_type       getType() const { return NODE_LAMBDA; }
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    LambdaNode(const tLocals &lc,ArgsStore *arg,mrb_ast_node *bd) :
+        LambdaCommonNode(lc,arg,bd) {}
+    virtual node_type       getType() const { return NODE_LAMBDA; }
+    void            accept(NodeVisitor *v) { v->visit(this); }
 };
 struct IfNode : public UpdatedNode {
-                        IfNode(mrb_ast_node *c,mrb_ast_node *t,mrb_ast_node *f) :
-                            m_cond(c),m_tr(t),m_fl(f)
-                        {}
-virtual node_type       getType() const { return NODE_IF; }
-        void            accept(NodeVisitor *v) { v->visit(this); }
-        mrb_ast_node *  cond() {return m_cond;}
-        mrb_ast_node *  true_body() {return m_tr;}
-        mrb_ast_node *  false_body() {return m_fl;}
+    IfNode(mrb_ast_node *c,mrb_ast_node *t,mrb_ast_node *f) :
+        m_cond(c),m_tr(t),m_fl(f)
+    {}
+    virtual node_type       getType() const { return NODE_IF; }
+    void            accept(NodeVisitor *v) { v->visit(this); }
+    mrb_ast_node *  cond() {return m_cond;}
+    mrb_ast_node *  true_body() {return m_tr;}
+    mrb_ast_node *  false_body() {return m_fl;}
 protected:
-        mrb_ast_node *  m_cond;
-        mrb_ast_node *  m_tr;
-        mrb_ast_node *  m_fl;
+    mrb_ast_node *  m_cond;
+    mrb_ast_node *  m_tr;
+    mrb_ast_node *  m_fl;
 };
 struct CaseNode : public UpdatedNode {
-                        CaseNode(mrb_ast_node *c,mrb_ast_node *t) : m_cond(c),m_cases(t) {}
-virtual node_type       getType() const { return NODE_CASE; }
-        mrb_ast_node *  switched_on() {return m_cond;}
-        mrb_ast_node *  cases() {return m_cases;}
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    CaseNode(mrb_ast_node *c,mrb_ast_node *t) : m_cond(c),m_cases(t) {}
+    virtual node_type       getType() const { return NODE_CASE; }
+    mrb_ast_node *  switched_on() {return m_cond;}
+    mrb_ast_node *  cases() {return m_cases;}
+    void            accept(NodeVisitor *v) { v->visit(this); }
 protected:
-        mrb_ast_node *  m_cond;
-        mrb_ast_node *  m_cases;
+    mrb_ast_node *  m_cond;
+    mrb_ast_node *  m_cases;
 };
 struct RescueNode : public UpdatedNode {
-                        RescueNode(mrb_ast_node *bd,mrb_ast_node *rs,mrb_ast_node *re) :
-                            m_body(bd),m_rescue(rs),m_else(re)
-                        {}
-virtual node_type       getType() const { return NODE_RESCUE; }
-        mrb_ast_node *  body() {return m_body;}
-        mrb_ast_node *  rescue() {return m_rescue;}
-        mrb_ast_node *  r_else() {return m_else;}
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    RescueNode(mrb_ast_node *bd,mrb_ast_node *rs,mrb_ast_node *re) :
+        m_body(bd),m_rescue(rs),m_else(re)
+    {}
+    virtual node_type       getType() const { return NODE_RESCUE; }
+    mrb_ast_node *  body() {return m_body;}
+    mrb_ast_node *  rescue() {return m_rescue;}
+    mrb_ast_node *  r_else() {return m_else;}
+    void            accept(NodeVisitor *v) { v->visit(this); }
 protected:
     mrb_ast_node *m_body;
     mrb_ast_node *m_rescue;
     mrb_ast_node *m_else;
 };
 struct EnsureNode : public UpdatedNode {
-                        EnsureNode(mrb_ast_node *bd,ScopeNode *en) : m_body(bd),m_ensure(en) {}
-virtual node_type       getType() const { return NODE_ENSURE; }
-        mrb_ast_node *  body() {return m_body;}
-        ScopeNode *     ensure() {return m_ensure;}
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    EnsureNode(mrb_ast_node *bd,ScopeNode *en) : m_body(bd),m_ensure(en) {}
+    virtual node_type       getType() const { return NODE_ENSURE; }
+    mrb_ast_node *  body() {return m_body;}
+    ScopeNode *     ensure() {return m_ensure;}
+    void            accept(NodeVisitor *v) { v->visit(this); }
 protected:
-        mrb_ast_node *  m_body;
-        ScopeNode *     m_ensure;
+    mrb_ast_node *  m_body;
+    ScopeNode *     m_ensure;
 };
 struct DefCommonNode : public UpdatedNode {
-        DefCommonNode( mrb_sym n, const tLocals &l,ArgsStore *args, mrb_ast_node *b) :
-            m_name(n),v_locals(l),m_args(args),m_body(b) {}
-        mrb_ast_node *  locals() {return m_locals;}
-        tLocals         ve_locals() {return v_locals;}
-        ArgsStore *     args() {return m_args;}
-        mrb_ast_node *  body() {return m_body;}
-        mrb_sym         name() {return m_name;}
+    DefCommonNode( mrb_sym n, const tLocals &l,ArgsStore *args, mrb_ast_node *b) :
+        m_name(n),v_locals(l),m_args(args),m_body(b) {}
+    mrb_ast_node *  locals() {return m_locals;}
+    tLocals         ve_locals() {return v_locals;}
+    ArgsStore *     args() {return m_args;}
+    mrb_ast_node *  body() {return m_body;}
+    mrb_sym         name() {return m_name;}
 protected:
-        mrb_sym         m_name;
-        mrb_ast_node *  m_locals;
-        tLocals         v_locals;
-        ArgsStore *     m_args;
-        mrb_ast_node *  m_body;
+    mrb_sym         m_name;
+    mrb_ast_node *  m_locals;
+    tLocals         v_locals;
+    ArgsStore *     m_args;
+    mrb_ast_node *  m_body;
 };
 
 struct DefNode : public DefCommonNode {
-        DefNode( mrb_sym n, const tLocals &l,ArgsStore *args, mrb_ast_node *b) :
-            DefCommonNode(n,l,args,b) {}
+    DefNode( mrb_sym n, const tLocals &l,ArgsStore *args, mrb_ast_node *b) :
+        DefCommonNode(n,l,args,b) {}
 
-virtual node_type       getType() const { return NODE_DEF; }
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    virtual node_type       getType() const { return NODE_DEF; }
+    void            accept(NodeVisitor *v) { v->visit(this); }
 };
 struct SdefNode : public DefCommonNode {
-        SdefNode( mrb_ast_node *r,mrb_sym n, const tLocals &l,ArgsStore *args, mrb_ast_node *b) :
-            DefCommonNode(n,l,args,b),m_receiver(r) {}
-virtual node_type       getType() const { return NODE_SDEF; }
-        mrb_ast_node *  receiver() {return m_receiver;}
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    SdefNode( mrb_ast_node *r,mrb_sym n, const tLocals &l,ArgsStore *args, mrb_ast_node *b) :
+        DefCommonNode(n,l,args,b),m_receiver(r) {}
+    virtual node_type       getType() const { return NODE_SDEF; }
+    mrb_ast_node *  receiver() {return m_receiver;}
+    void            accept(NodeVisitor *v) { v->visit(this); }
 protected:
-        mrb_ast_node *  m_receiver;
+    mrb_ast_node *  m_receiver;
 };
 struct ForNode : public UpdatedNode {
-        ForNode( mrb_ast_node *v,mrb_ast_node *obj, mrb_ast_node *b) :
-            m_var(v),m_obj(obj),m_body(b) {}
-virtual node_type       getType() const { return NODE_FOR; }
-        mrb_ast_node *  var() {return m_var;}
-        mrb_ast_node *  object() {return m_obj;}
-        mrb_ast_node *  body() {return m_body;}
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    ForNode( mrb_ast_node *v,mrb_ast_node *obj, mrb_ast_node *b) :
+        m_var(v),m_obj(obj),m_body(b) {}
+    virtual node_type       getType() const { return NODE_FOR; }
+    mrb_ast_node *  var() {return m_var;}
+    mrb_ast_node *  object() {return m_obj;}
+    mrb_ast_node *  body() {return m_body;}
+    void            accept(NodeVisitor *v) { v->visit(this); }
 protected:
-        mrb_ast_node *  m_var;
-        mrb_ast_node *  m_obj;
-        mrb_ast_node *  m_body;
+    mrb_ast_node *  m_var;
+    mrb_ast_node *  m_obj;
+    mrb_ast_node *  m_body;
 };
 
 struct ClassifierNode : public UpdatedNode {
-                        ClassifierNode(mrb_ast_node *ob,ScopeNode *sc) : m_receiver(ob),m_scope(sc) {}
-        ScopeNode *     scope() { return m_scope;}
-        mrb_ast_node *  receiver() { return m_receiver;}
+    ClassifierNode(mrb_ast_node *ob,ScopeNode *sc) : m_receiver(ob),m_scope(sc) {}
+    ScopeNode *     scope() { return m_scope;}
+    mrb_ast_node *  receiver() { return m_receiver;}
 protected:
-        mrb_ast_node *  m_receiver;
-        ScopeNode *     m_scope;
+    mrb_ast_node *  m_receiver;
+    ScopeNode *     m_scope;
 };
 struct SclassNode : public ClassifierNode {
-                        SclassNode(mrb_ast_node *ob,ScopeNode *sc) : ClassifierNode(ob,sc){}
-virtual node_type       getType() const { return NODE_SCLASS; }
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    SclassNode(mrb_ast_node *ob,ScopeNode *sc) : ClassifierNode(ob,sc){}
+    virtual node_type       getType() const { return NODE_SCLASS; }
+    void            accept(NodeVisitor *v) { v->visit(this); }
 };
 
 struct ClassNode : public ClassifierNode {
-                        ClassNode(mrb_ast_node *ob,mrb_ast_node *su,ScopeNode *sc) : ClassifierNode(ob,sc),
-                            m_super(su) {}
-virtual node_type       getType() const { return NODE_CLASS; }
-        mrb_ast_node *  super() { return m_super;}
+    ClassNode(mrb_ast_node *ob,mrb_ast_node *su,ScopeNode *sc) : ClassifierNode(ob,sc),
+        m_super(su) {}
+    virtual node_type       getType() const { return NODE_CLASS; }
+    mrb_ast_node *  super() { return m_super;}
 protected:
-        mrb_ast_node *  m_super;
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    mrb_ast_node *  m_super;
+    void            accept(NodeVisitor *v) { v->visit(this); }
 };
 struct ModuleNode : public ClassifierNode {
-                        ModuleNode(mrb_ast_node *ob,ScopeNode *sc) : ClassifierNode(ob,sc) {}
-virtual node_type       getType() const { return NODE_MODULE; }
-        void            accept(NodeVisitor *v) { v->visit(this); }
+    ModuleNode(mrb_ast_node *ob,ScopeNode *sc) : ClassifierNode(ob,sc) {}
+    virtual node_type       getType() const { return NODE_MODULE; }
+    void            accept(NodeVisitor *v) { v->visit(this); }
 };

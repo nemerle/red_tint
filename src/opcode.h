@@ -50,6 +50,9 @@
 #define MKOP_Abc(op,a,b,c)  (MKOP_A(op,a)|MKARG_bc(b,c))
 
 enum eOpEnum {
+    /*-----------------------------------------------------------------------
+    operation code  operand description
+    ------------------------------------------------------------------------*/
     OP_NOP=0,/*                                                             */
     OP_MOVE,/*      A B     R(A) := R(B)                                    */
     OP_LOADL,/*     A Bx    R(A) := Lit(Bx)                                 */

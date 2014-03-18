@@ -3,6 +3,7 @@
 **
 ** See Copyright Notice in mruby.h
 */
+#include <cassert>
 
 #include "mruby.h"
 #include "mruby/array.h"
@@ -65,16 +66,34 @@ mrb_value mrb_obj_methods(mrb_state *mrb, mrb_bool recur, mrb_value obj, mrb_met
     else
         return mrb_obj_singleton_methods(mrb, recur, obj);
 }
-static void check_iv_name(mrb_state *mrb, mrb_sym id)
+static void
+valid_iv_name(mrb_state *mrb, mrb_sym iv_name_id, const char* s, size_t len)  {
+    if (len < 2 || !(s[0] == '@' && s[1] != '@')) {
+        mrb_name_error(mrb, iv_name_id, "`%S' is not allowed as an instance variable name", mrb_sym2str(mrb, iv_name_id));
+    }
+}
+static void check_iv_name(mrb_state *mrb, mrb_sym iv_name_id)
 {
     size_t len;
 
-    const char *s = mrb_sym2name_len(mrb, id, len);
-    if (len < 2 || !(s[0] == '@' && s[1] != '@')) {
-        mrb_name_error(mrb, id, "`%S' is not allowed as an instance variable name", mrb_sym2str(mrb, id));
-    }
+    const char *s = mrb_sym2name_len(mrb, iv_name_id, len);
+    valid_iv_name(mrb, iv_name_id, s, len);
 }
+static mrb_sym
+get_valid_iv_sym(mrb_state *mrb, mrb_value iv_name)
+{
+    mrb_sym iv_name_id;
+    mrb_assert(mrb_symbol_p(iv_name) || mrb_is_a_string(iv_name));
+    if (mrb_is_a_string(iv_name)) {
+        iv_name_id = mrb_intern_cstr(mrb, RSTRING_PTR(iv_name));
+        valid_iv_name(mrb, iv_name_id, RSTRING_PTR(iv_name), RSTRING_LEN(iv_name));
+    } else { //if(mrb_symbol_p(val))
+        iv_name_id = mrb_symbol(iv_name);
+        check_iv_name(mrb, iv_name_id);
+    }
 
+    return iv_name_id;
+}
 } // End of anonymous namespace
 mrb_bool mrb_obj_basic_to_s_p(mrb_state *mrb, mrb_value obj)
 {
@@ -297,29 +316,29 @@ RClass* mrb_singleton_class_clone(mrb_state *mrb, mrb_value obj)
 
     if (klass->tt != MRB_TT_SCLASS)
         return klass;
-        /* copy singleton(unnamed) class */
-        RClass *clone = mrb->gc().obj_alloc<RClass>(klass->tt, mrb->class_class);
+    /* copy singleton(unnamed) class */
+    RClass *clone = mrb->gc().obj_alloc<RClass>(klass->tt, mrb->class_class);
 
     if ((mrb_type(obj) == MRB_TT_CLASS) || (mrb_type(obj) == MRB_TT_SCLASS)) { /* BUILTIN_TYPE(obj) == T_CLASS */
-            clone->c = clone;
-        }
-        else {
-            clone->c = mrb_singleton_class_clone(mrb, mrb_obj_value(klass));
-        }
+        clone->c = clone;
+    }
+    else {
+        clone->c = mrb_singleton_class_clone(mrb, mrb_obj_value(klass));
+    }
 
-        clone->super = klass->super;
-        if (klass->iv) {
-            mrb_iv_copy(mrb, mrb_obj_value(clone), mrb_obj_value(klass));
+    clone->super = klass->super;
+    if (klass->iv) {
+        mrb_iv_copy(mrb, mrb_obj_value(clone), mrb_obj_value(klass));
         clone->iv_set(mrb_intern2(mrb, "__attached__", 12), obj);
-        }
-        if (klass->mt) {
-            clone->mt = klass->mt->copy(mrb->gc());
-        }
-        else {
-            clone->mt = RClass::kh_mt::init(mrb->gc());
-        }
-        clone->tt = MRB_TT_SCLASS;
-        return clone;
+    }
+    if (klass->mt) {
+        clone->mt = klass->mt->copy(mrb->gc());
+    }
+    else {
+        clone->mt = RClass::kh_mt::init(mrb->gc());
+    }
+    clone->tt = MRB_TT_SCLASS;
+    return clone;
 }
 
 static void init_copy(mrb_state *mrb, mrb_value dest, mrb_value obj)
@@ -585,8 +604,7 @@ static mrb_value obj_is_instance_of(mrb_state *mrb, mrb_value self)
  */
 mrb_value mrb_obj_ivar_defined(mrb_state *mrb, mrb_value self)
 {
-    mrb_sym mid=mrb->get_arg<mrb_sym>();
-    check_iv_name(mrb, mid);
+    mrb_sym mid=get_valid_iv_sym(mrb,mrb->get_arg<mrb_value>());
     mrb_bool defined_p = mrb_obj_iv_defined(mrb, mrb_obj_ptr(self), mid);
 
     return mrb_bool_value(defined_p);
@@ -614,10 +632,8 @@ mrb_value mrb_obj_ivar_defined(mrb_state *mrb, mrb_value self)
  */
 mrb_value mrb_obj_ivar_get(mrb_state *mrb, mrb_value self)
 {
-    mrb_sym id=mrb->get_arg<mrb_sym>();
-
-    check_iv_name(mrb, id);
-    return mrb_iv_get(self, id);
+    mrb_sym iv_name_id=get_valid_iv_sym(mrb,mrb->get_arg<mrb_value>());
+    return mrb_iv_get(self, iv_name_id);
 }
 
 /* 15.3.1.3.22 */
@@ -644,10 +660,9 @@ mrb_value
 mrb_obj_ivar_set(mrb_state *mrb, mrb_value self)
 {
     mrb_sym id;
-    mrb_value val;
-
-    mrb_get_args(mrb, "no", &id, &val);
-    check_iv_name(mrb, id);
+    mrb_value sym, val;
+    mrb_get_args(mrb, "oo", &sym, &val);
+    id = get_valid_iv_sym(mrb, sym);
     mrb_iv_set(mrb, self, id, val);
     return val;
 }
@@ -1041,5 +1056,5 @@ void mrb_init_kernel(mrb_state *mrb)
             .define_method("to_s",                       mrb_any_to_s,                    MRB_ARGS_NONE())    /* 15.3.1.3.46 */
             ;
     mrb->object_class->include_module(mrb->kernel_module);
-    mrb->module_class->alias_method(mrb_intern(mrb, "dup"), mrb_intern(mrb, "clone"));
+    mrb->module_class->alias_method(mrb->intern2("dup",3), mrb->intern2("clone",5));
 }

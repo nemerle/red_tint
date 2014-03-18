@@ -40,7 +40,7 @@ static inline mrb_value struct_ivar_get(mrb_state *mrb, mrb_value c, mrb_sym id)
 
 mrb_value mrb_struct_iv_get(mrb_state *mrb, mrb_value c, const char *name)
 {
-    return struct_ivar_get(mrb, c, mrb_intern(mrb, name));
+    return struct_ivar_get(mrb, c, mrb->intern_cstr(name));
 }
 
 mrb_value mrb_struct_s_members(mrb_state *mrb, mrb_value klass)
