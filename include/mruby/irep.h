@@ -20,7 +20,7 @@ struct mrb_irep {
     /* debug info */
     const char *filename;
     uint16_t *lines;
-
+    struct mrb_irep_debug_info* debug_info;
     size_t ilen, plen, slen;
 };
 

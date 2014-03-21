@@ -48,10 +48,10 @@ static inline void kh_fill_flags(uint8_t *p, uint8_t c, size_t len)
 }
 
 //kh_is_map, __hash_func, __hash_equal
-template<typename khkey_t, typename khval_t,class HashFunc,class HashEq>
+template<typename khkey_t, typename khval_t,class HashFunc,class HashEq,bool kh_is_map=true>
 struct kh_T {
     typedef khiter_t iterator;
-    typedef kh_T<khkey_t,khval_t,HashFunc,HashEq> kh_t;
+    typedef kh_T<khkey_t,khval_t,HashFunc,HashEq,kh_is_map> kh_t;
     khint_t n_buckets;
     khint_t m_size;
     khint_t n_occupied;
@@ -68,12 +68,13 @@ struct kh_T {
     static void kh_alloc(kh_t *h)
     {
         khint_t sz = h->n_buckets;
-        uint8_t *p = (uint8_t *)h->m_mem->_malloc(sizeof(uint8_t)*sz/4+(sizeof(khkey_t)+sizeof(khval_t))*sz);
+        int len = sizeof(khkey_t) + (kh_is_map ? sizeof(khval_t) : 0);
+        uint8_t *p = (uint8_t *)h->m_mem->_malloc(sizeof(uint8_t)*sz/4+len*sz);
         h->m_size = h->n_occupied = 0;
         h->upper_bound = UPPER_BOUND(sz);
         h->keys = (khkey_t *)p;
-        h->vals = (khval_t *)(p+sizeof(khkey_t)*sz);
-        h->ed_flags = (p+sizeof(khkey_t)*sz+sizeof(khval_t)*sz);
+        h->vals = kh_is_map ? (khval_t *)(p+sizeof(khkey_t)*sz) : nullptr;
+        h->ed_flags = p + len*sz;
         kh_fill_flags(h->ed_flags, 0xaa, sz/4);
         h->mask = sz-1;
         h->inc = sz/2-1;
@@ -133,7 +134,7 @@ struct kh_T {
             for (i=0 ; i<old_n_buckets ; i++) {
                 if (!__ac_iseither(old_ed_flags, i)) {
                     khint_t k = this->put(old_keys[i]);
-                    this->value(k) = old_vals[i];
+                    if (kh_is_map) this->value(k) = old_vals[i];
                 }
             }
             this->m_mem->_free(old_keys);
@@ -178,7 +179,7 @@ struct kh_T {
         for (k = begin(); k != end(); k++) {
             if (exist(k)) {
                 k2 = h2->put(key(k));
-                h2->value(k2) = value(k);
+                if (kh_is_map) h2->value(k2) = value(k);
             }
         }
         return h2;

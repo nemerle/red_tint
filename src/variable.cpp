@@ -441,15 +441,15 @@ void mrb_vm_special_set(mrb_state *mrb, mrb_sym i, mrb_value v)
 static mrb_bool obj_iv_p(mrb_value obj)
 {
     switch (mrb_type(obj)) {
-        case MRB_TT_OBJECT:
-        case MRB_TT_CLASS:
-        case MRB_TT_MODULE:
-        case MRB_TT_SCLASS:
-        case MRB_TT_HASH:
-        case MRB_TT_DATA:
-            return true;
-        default:
-            return false;
+    case MRB_TT_OBJECT:
+    case MRB_TT_CLASS:
+    case MRB_TT_MODULE:
+    case MRB_TT_SCLASS:
+    case MRB_TT_HASH:
+    case MRB_TT_DATA:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -465,7 +465,7 @@ mrb_value RObject::iv_get(mrb_sym sym)
 mrb_value mrb_iv_get(const mrb_value &obj, mrb_sym sym)
 {
     if (obj_iv_p(obj)) {
-        return mrb_obj_ptr(obj)->iv_get(sym);
+        return mrb_ptr(obj)->iv_get(sym);
     }
     return mrb_nil_value();
 }
@@ -496,7 +496,7 @@ void mrb_obj_iv_ifnone(mrb_state *mrb, RObject *obj, mrb_sym sym, mrb_value v)
 void mrb_iv_set(mrb_state *mrb, mrb_value obj, mrb_sym sym, const mrb_value &v)
 {
     if (obj_iv_p(obj)) {
-        mrb_obj_ptr(obj)->iv_set(sym, v);
+        mrb_ptr(obj)->iv_set(sym, v);
     }
     else {
         mrb->mrb_raise(E_ARGUMENT_ERROR, "cannot set instance variable");
@@ -517,13 +517,13 @@ mrb_bool mrb_obj_iv_defined(mrb_state *mrb, struct RObject *obj, mrb_sym sym)
 mrb_bool mrb_iv_defined(mrb_state *mrb, mrb_value obj, mrb_sym sym)
 {
     if (!obj_iv_p(obj)) return false;
-    return mrb_obj_iv_defined(mrb, mrb_obj_ptr(obj), sym);
+    return mrb_obj_iv_defined(mrb, mrb_ptr(obj), sym);
 }
 
 void mrb_iv_copy(mrb_state *mrb, mrb_value dest, mrb_value src)
 {
-    RObject *d = mrb_obj_ptr(dest);
-    RObject *s = mrb_obj_ptr(src);
+    RObject *d = mrb_ptr(dest);
+    RObject *s = mrb_ptr(src);
 
     if (d->iv) {
         d->iv->iv_free(mrb);
@@ -578,7 +578,7 @@ mrb_value mrb_obj_iv_inspect(mrb_state *mrb, struct RObject *obj)
 mrb_value mrb_iv_remove(mrb_value obj, mrb_sym sym)
 {
     if (obj_iv_p(obj)) {
-        iv_tbl *t = mrb_obj_ptr(obj)->iv;
+        iv_tbl *t = mrb_ptr(obj)->iv;
         mrb_value val;
 
         if (t && t->iv_del(sym, &val)) {
@@ -636,8 +636,8 @@ mrb_value mrb_obj_instance_variables(mrb_state *mrb, mrb_value self)
     mrb_value ary;
 
     ary = mrb_ary_new(mrb);
-    if (obj_iv_p(self) && mrb_obj_ptr(self)->iv) {
-        mrb_obj_ptr(self)->iv->iv_foreach(mrb, iv_i, &ary);
+    if (obj_iv_p(self) && mrb_ptr(self)->iv) {
+        mrb_ptr(self)->iv->iv_foreach(mrb, iv_i, &ary);
     }
     return ary;
 }
@@ -806,13 +806,13 @@ static void
 mod_const_check(mrb_state *mrb, const mrb_value &mod)
 {
     switch (mrb_type(mod)) {
-        case MRB_TT_CLASS:
-        case MRB_TT_MODULE:
-        case MRB_TT_SCLASS:
-            break;
-        default:
-            mrb->mrb_raise(E_TYPE_ERROR, "constant look-up for non class/module");
-            break;
+    case MRB_TT_CLASS:
+    case MRB_TT_MODULE:
+    case MRB_TT_SCLASS:
+        break;
+    default:
+        mrb->mrb_raise(E_TYPE_ERROR, "constant look-up for non class/module");
+        break;
     }
 }
 
@@ -822,7 +822,7 @@ mrb_value RClass::const_get(mrb_sym sym)
     mrb_value v;
     iv_tbl *t;
     mrb_bool retry = 0;
-    mrb_sym cm;
+    mrb_value name;
 
 L_RETRY:
     while (c) {
@@ -838,18 +838,8 @@ L_RETRY:
         retry = 1;
         goto L_RETRY;
     }
-    c = this;
-    cm = m_vm->intern2("const_missing", 13);
-    while (c) {
-        if (mrb_respond_to(m_vm, mrb_obj_value(c), cm)) {
-            mrb_value name = mrb_symbol_value(sym);
-            return mrb_funcall_argv(m_vm, mrb_obj_value(c), cm, 1, &name);
-        }
-        c = c->super;
-    }
-    mrb_name_error(m_vm, sym, "uninitialized constant %S", mrb_sym2str(m_vm, sym));
-    /* not reached */
-    return mrb_nil_value();
+    name = mrb_symbol_value(sym);
+    return mrb_funcall_argv(m_vm, mrb_obj_value(this), m_vm->intern2("const_missing", 13), 1, &name);
 }
 
 mrb_value mrb_const_get(mrb_state *mrb, mrb_value mod, mrb_sym sym)
@@ -971,6 +961,14 @@ void mrb_gv_set(mrb_state *mrb, mrb_sym sym, mrb_value v)
 
     mrb->globals->iv_put(sym, v);
 }
+void
+mrb_gv_remove(mrb_state *mrb, mrb_sym sym)
+{
+    if (!mrb->globals) {
+        return;
+    }
+    mrb->globals->iv_del(sym,NULL);
+}
 
 static int gv_i_arr(mrb_sym sym, mrb_value v, void *p)
 {
@@ -1060,8 +1058,8 @@ mrb_sym mrb_class_sym(mrb_state *mrb, RClass *c, RClass *outer)
         if (!outer)
             return 0;
         csym_arg arg {c,0};
-            outer->iv->iv_foreach(mrb, csym_i, &arg);
-            return arg.sym;
+        outer->iv->iv_foreach(mrb, csym_i, &arg);
+        return arg.sym;
     }
     return mrb_symbol(name);
 }

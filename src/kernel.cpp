@@ -29,7 +29,9 @@ enum mrb_method_flag_t {
     NOEX_VCALL     = 0x40,
     NOEX_RESPONDS  = 0x80
 };
-void method_entry_loop(RClass* klass, RArray *ary)
+typedef kh_T<mrb_sym,char,IntHashFunc,IntHashEq,false> kh_st_t;
+
+void method_entry_loop(RClass* klass, kh_st_t &ary)
 {
     RClass::kh_mt *h = klass->mt;
     if (!h)
@@ -37,7 +39,7 @@ void method_entry_loop(RClass* klass, RArray *ary)
 
     for (khint_t i=0; i<h->end(); i++) {
         if (h->exist(i)) {
-            ary->push(mrb_symbol_value(h->key(i)));
+            ary.put(h->key(i));
         }
     }
 }
@@ -45,18 +47,25 @@ void method_entry_loop(RClass* klass, RArray *ary)
 mrb_value mrb_obj_singleton_methods(mrb_state *mrb, mrb_bool recur, mrb_value obj)
 {
     RClass* klass = RClass::mrb_class(mrb, obj);
-    RArray *arr = RArray::create(mrb);
+    kh_st_t *h_set=kh_st_t::init(mrb->gc());
+    khint_t i;
     if (klass && (klass->tt == MRB_TT_SCLASS)) {
-        method_entry_loop(klass, arr);
+        method_entry_loop(klass, *h_set);
         klass = klass->super;
     }
     if (recur) {
         while (klass && ((klass->tt == MRB_TT_SCLASS) || (klass->tt == MRB_TT_ICLASS))) {
-            method_entry_loop(klass, arr);
+            method_entry_loop(klass, *h_set);
             klass = klass->super;
         }
     }
-
+    RArray *arr = RArray::create(mrb);
+    for (i=h_set->begin(); i<h_set->end(); i++) {
+        if (h_set->exist(i)) {
+            arr->push(mrb_symbol_value(h_set->key(i)));
+        }
+    }
+    h_set->destroy();
     return mrb_obj_value(arr);
 }
 mrb_value mrb_obj_methods(mrb_state *mrb, mrb_bool recur, mrb_value obj, mrb_method_flag_t flag)
@@ -121,7 +130,7 @@ mrb_bool mrb_obj_basic_to_s_p(mrb_state *mrb, mrb_value obj)
 mrb_value mrb_obj_inspect(mrb_state *mrb, mrb_value obj)
 {
     if ((mrb_type(obj) == MRB_TT_OBJECT) && mrb_obj_basic_to_s_p(mrb, obj)) {
-        return mrb_obj_iv_inspect(mrb, mrb_obj_ptr(obj));
+        return mrb_obj_iv_inspect(mrb, mrb_ptr(obj));
     }
     return mrb_any_to_s(mrb, obj);
 }
@@ -344,17 +353,17 @@ RClass* mrb_singleton_class_clone(mrb_state *mrb, mrb_value obj)
 static void init_copy(mrb_state *mrb, mrb_value dest, mrb_value obj)
 {
     switch (mrb_type(obj)) {
-    case MRB_TT_OBJECT:
-    case MRB_TT_CLASS:
-    case MRB_TT_MODULE:
-    case MRB_TT_SCLASS:
-    case MRB_TT_HASH:
-    case MRB_TT_DATA:
-        mrb_iv_copy(mrb, dest, obj);
-        break;
+        case MRB_TT_OBJECT:
+        case MRB_TT_CLASS:
+        case MRB_TT_MODULE:
+        case MRB_TT_SCLASS:
+        case MRB_TT_HASH:
+        case MRB_TT_DATA:
+            mrb_iv_copy(mrb, dest, obj);
+            break;
 
-    default:
-        break;
+        default:
+            break;
     }
     mrb->funcall(dest, "initialize_copy", 1, obj);
 }
@@ -545,17 +554,17 @@ mrb_value mrb_obj_instance_eval(mrb_state *mrb, mrb_value self)
         mrb->mrb_raise(E_NOTIMP_ERROR, "instance_eval with string not implemented");
     }
     switch (mrb_type(self)) {
-    case MRB_TT_SYMBOL:
-    case MRB_TT_FIXNUM:
-    case MRB_TT_FLOAT:
-        c = nullptr;
-        break;
-    default:
-    {
-        mrb_value cv = mrb_singleton_class(mrb, self);
-        c = mrb_class_ptr(cv);
-    }
-        break;
+        case MRB_TT_SYMBOL:
+        case MRB_TT_FIXNUM:
+        case MRB_TT_FLOAT:
+            c = nullptr;
+            break;
+        default:
+        {
+            mrb_value cv = mrb_singleton_class(mrb, self);
+            c = mrb_class_ptr(cv);
+        }
+            break;
     }
     return mrb_yield_internal(mrb, b, 0, 0, self, c);
 }
@@ -605,7 +614,7 @@ static mrb_value obj_is_instance_of(mrb_state *mrb, mrb_value self)
 mrb_value mrb_obj_ivar_defined(mrb_state *mrb, mrb_value self)
 {
     mrb_sym mid=get_valid_iv_sym(mrb,mrb->get_arg<mrb_value>());
-    mrb_bool defined_p = mrb_obj_iv_defined(mrb, mrb_obj_ptr(self), mid);
+    mrb_bool defined_p = mrb_obj_iv_defined(mrb, mrb_ptr(self), mid);
 
     return mrb_bool_value(defined_p);
 }
@@ -705,10 +714,12 @@ mrb_value mrb_obj_is_kind_of_m(mrb_state *mrb, mrb_value self)
 
 mrb_value class_instance_method_list(mrb_state *mrb, mrb_bool recur, RClass* klass, int obj)
 {
+    khint_t i;
     RClass* oldklass = nullptr;
-    RArray *p_ary = RArray::create(mrb);
+    kh_st_t *v = kh_st_t::init(mrb->gc());
+
     while (klass && (klass != oldklass)) {
-        method_entry_loop(klass, p_ary);
+        method_entry_loop(klass, *v);
         //TODO: wtf ?
         if ((klass->tt == MRB_TT_ICLASS) || (klass->tt == MRB_TT_SCLASS)) {
         }
@@ -718,7 +729,14 @@ mrb_value class_instance_method_list(mrb_state *mrb, mrb_bool recur, RClass* kla
         oldklass = klass;
         klass = klass->super;
     }
+    RArray *p_ary = RArray::create(mrb);
 
+    for (i=v->begin(); i<v->end(); i++) {
+        if (v->exist(i)) {
+            p_ary->push(mrb_symbol_value(v->key(i)));
+        }
+    }
+    v->destroy();
     return mrb_obj_value(p_ary);
 }
 
@@ -843,21 +861,21 @@ mrb_value mrb_f_raise(mrb_state *mrb, mrb_value self)
 
     argc = mrb_get_args(mrb, "|oo", &a[0], &a[1]);
     switch (argc) {
-    case 0:
-        mrb->mrb_raise(E_RUNTIME_ERROR, "");
-        break;
-    case 1:
-        a[1] = mrb_check_string_type(mrb, a[0]);
-        if (!mrb_nil_p(a[1])) {
-            argc = 2;
-            a[0] = mrb_obj_value(E_RUNTIME_ERROR);
-        }
-        /* fall through */
-    default:
-        exc = mrb_make_exception(mrb, argc, a);
-        mrb_obj_ptr(exc)->iv_set(mrb_intern2(mrb, "lastpc", 6), mrb_voidp_value(mrb,mrb->m_ctx->m_ci->pc));
-        mrb_exc_raise(mrb, exc);
-        break;
+        case 0:
+            mrb->mrb_raise(E_RUNTIME_ERROR, "");
+            break;
+        case 1:
+            a[1] = mrb_check_string_type(mrb, a[0]);
+            if (!mrb_nil_p(a[1])) {
+                argc = 2;
+                a[0] = mrb_obj_value(E_RUNTIME_ERROR);
+            }
+            /* fall through */
+        default:
+            exc = mrb_make_exception(mrb, argc, a);
+            mrb_ptr(exc)->iv_set(mrb_intern2(mrb, "lastpc", 6), mrb_cptr_value(mrb,mrb->m_ctx->m_ci->pc));
+            mrb_exc_raise(mrb, exc);
+            break;
     }
     return mrb_nil_value();            /* not reached */
 }

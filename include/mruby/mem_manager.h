@@ -40,6 +40,15 @@ public:
                 res->m_vm = m_vm;
                 return res;
             }
+            template<typename T, typename... Args >
+    T *     new_t(Args... args) {
+                return new(_malloc(sizeof(T))) T(args...);
+            }
+            template<typename T, typename... Args >
+    T *     new_ta(size_t sz) {
+                return new(_malloc(sizeof(T))) T[sz];
+            }
+
     RBasic *mrb_obj_alloc(mrb_vtype ttype, RClass *cls);
     void *  _calloc(size_t nelem, size_t len);
     void *  _realloc(void *p, size_t len);

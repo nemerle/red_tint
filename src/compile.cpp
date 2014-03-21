@@ -10,15 +10,15 @@
 
 mrb_sym mrb_parser_state::intern(const char *s)
 {
-    return mrb_intern(m_mrb, s);
+    return m_mrb->intern_cstr(s);
 }
 mrb_sym mrb_parser_state::intern2(const char *s, size_t len)
 {
-    return mrb_intern2(m_mrb, s, len);
+    return m_mrb->intern2(s, len);
 }
 mrb_sym mrb_parser_state::intern_c(const char c)
 {
-    return mrb_intern2(m_mrb, &c, 1);
+    return m_mrb->intern2(&c, 1);
 }
 void mrb_parser_state::cons_free(mrb_ast_node *cons)
 {
@@ -45,7 +45,7 @@ mrb_ast_node* mrb_parser_state::cons(mrb_ast_node *car, mrb_ast_node *cdr)
     else {
         c = new_t<mrb_ast_list_like_node>();
     }
-    c->init(car,cdr,m_lineno,m_filename);
+    c->init(car,cdr,m_lineno,current_filename_index);
     return c;
 }
 mrb_ast_node* mrb_parser_state::append(mrb_ast_node *a, mrb_ast_node *b)
@@ -165,6 +165,7 @@ mrb_ast_node* mrb_parser_state::var_reference(mrb_ast_node *lhs)
     }
     return lhs;
 }
+
 mrb_ast_node* mrb_parser_state::new_strterm(mrb_string_type type, int term, int paren)
 {
     return cons((mrb_ast_node*)(intptr_t)type,
@@ -392,7 +393,7 @@ void mrb_parser_state::parser_init_cxt(mrbc_context *cxt)
     if (cxt->lineno)
         m_lineno = cxt->lineno;
     if (cxt->filename)
-        m_filename = cxt->filename;
+        mrb_parser_set_filename(cxt->filename);
     if (cxt->syms) { // add cxt symbols to locals
         init_locals();
         for (int i=0; i<cxt->slen; i++) {

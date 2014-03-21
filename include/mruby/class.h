@@ -76,6 +76,7 @@ public:
     const char *class_name();
     void define_module_function(const char *name, mrb_func_t func, mrb_aspec aspec);
     RClass *from_sym(mrb_sym id);
+    mrb_value mrb_instance_alloc();
 };
 
 
@@ -89,8 +90,6 @@ RProc *mrb_method_search_vm(mrb_state*, RClass**, mrb_sym);
 RProc *mrb_method_search(mrb_state*, RClass*, mrb_sym);
 
 RClass* mrb_class_real(RClass* cl);
-
-void mrb_obj_call_init(mrb_state *mrb, mrb_value obj, int argc, mrb_value *argv);
 
 void mrb_gc_free_mt(mrb_state*, struct RClass*);
 

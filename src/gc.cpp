@@ -29,11 +29,11 @@ extern void mrb_free_context(mrb_state *mrb, struct mrb_context *ctx);
 
   mruby's GC is Tri-color Incremental GC with Mark & Sweep.
   Algorithm details are omitted.
-  Instead, the part about the implementation described below.
+  Instead, the implementation part is described below.
 
   == Object's Color
 
-  Each object to be painted in three colors.
+  Each object can be painted in three colors:
 
     * White - Unmarked.
     * Gray - Marked, But the child objects are unmarked.
@@ -69,9 +69,9 @@ extern void mrb_free_context(mrb_state *mrb, struct mrb_context *ctx);
 
   = Write Barrier
 
-  mruby implementer, C extension library writer must write a write
+  mruby implementer and C extension library writer must write a write
   barrier when writing a pointer to an object on object's field.
-  Two different write barrier:
+  Two different write barrier are available:
 
     * mrb_field_write_barrier
     * mrb_write_barrier
@@ -89,6 +89,9 @@ extern void mrb_free_context(mrb_state *mrb, struct mrb_context *ctx);
                   the Old objects live.
 
      * Major GC - same as a full regular GC cycle.
+
+  The difference to a "traditional" generational GC is, that the major GC
+  in mruby is triggered incrementally in a tri-color manner.
 
 
 */
@@ -143,10 +146,10 @@ gettimeofday_time(void)
 #define GC_TIME_STOP_AND_REPORT do {\
     gc_time = gettimeofday_time() - gc_time;\
     gc_total_time += gc_time;\
-    fprintf(stderr, "gc_state: %d\n", mrb->gc_state);\
-    fprintf(stderr, "live: %d\n", mrb->live);\
-    fprintf(stderr, "majorgc_old_threshold: %d\n", mrb->majorgc_old_threshold);\
-    fprintf(stderr, "gc_threshold: %d\n", mrb->gc_threshold);\
+    fprintf(stderr, "gc_state: %d\n", m_gc_state);\
+    fprintf(stderr, "live: %zu\n", mrb->live);\
+    fprintf(stderr, "majorgc_old_threshold: %zu\n", majorgc_old_threshold);\
+    fprintf(stderr, "gc_threshold: %zu\n", m_gc_threshold);\
     fprintf(stderr, "gc_time: %30.20f\n", gc_time);\
     fprintf(stderr, "gc_total_time: %30.20f\n\n", gc_total_time);\
     } while(0)
@@ -310,9 +313,10 @@ void MemManager::mrb_heap_init()
     add_heap();
     this->gc_interval_ratio = DEFAULT_GC_INTERVAL_RATIO;
     this->gc_step_ratio = DEFAULT_GC_STEP_RATIO;
+#ifndef MRB_GC_TURN_OFF_GENERATIONAL
     this->is_generational_gc_mode = true;
     m_gc_full = true;
-
+#endif
 #ifdef GC_PROFILE
     program_invoke_time = gettimeofday_time();
 #endif
@@ -578,7 +582,7 @@ void MemManager::obj_free(RBasic *obj)
     case MRB_TT_DATA:
     {
         RData *d = (RData*)obj;
-        if (d->type->dfree) {
+        if (d->type && d->type->dfree) {
             d->type->dfree(m_vm, d->data);
         }
         mrb_gc_free_iv(m_vm, (RObject*)obj);
@@ -612,7 +616,10 @@ void MemManager::root_scan_phase()
     mark(m_vm->top_self); /* mark top_self */
     mark(m_vm->m_exc); /* mark exception */
 
-    mark_context(m_vm->m_ctx);
+    mark_context(m_vm->root_c);
+    if (m_vm->root_c != m_vm->m_ctx) {
+        mark_context(m_vm->m_ctx);
+    }
     /* mark stack */
     if (nullptr==m_vm->m_irep)
         return;
@@ -864,6 +871,7 @@ void MemManager::clear_all_old()
 
     mrb_assert(is_generational(this));
     if (is_major_gc(this)) {
+        /* finish the half baked GC */
         incremental_gc_until(GC_STATE_NONE);
     }
 
@@ -926,15 +934,13 @@ void MemManager::mrb_full_gc()
     GC_INVOKE_TIME_REPORT("mrb_full_gc()");
     GC_TIME_START;
 
-    if (m_gc_state == GC_STATE_SWEEP) {
-        /* finish sweep phase */
-        incremental_gc_until(GC_STATE_NONE);
-    }
-
-    /* clear all the old objects back to young */
     if (is_generational(this)) {
+        /* clear all the old objects back to young */
         clear_all_old();
         m_gc_full = true;
+    } else if (m_gc_state != GC_STATE_NONE) {
+        /* finish half baked GC cycle */
+        incremental_gc_until(GC_STATE_NONE);
     }
 
     incremental_gc_until(GC_STATE_NONE);

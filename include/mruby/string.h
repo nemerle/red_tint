@@ -33,6 +33,7 @@ public:
     void str_append(mrb_value str2);
     void str_buf_cat(const char *ptr) { str_buf_cat(ptr,strlen(ptr)); }
     void str_buf_cat(const char *m_ptr, size_t len);
+    void str_modify();
 private:
 };
 

@@ -16,6 +16,7 @@
 #include "mruby/proc.h"
 #include "mruby/string.h"
 #include "mruby/variable.h"
+#include "mruby/debug.h"
 #include "error.h"
 
 mrb_value mrb_exc_new(RClass *c, const char *ptr, long len)
@@ -180,14 +181,18 @@ static void exc_debug_info(mrb_state *mrb, RObject *exc)
     mrb_code *pc = ci->pc;
 
     exc->iv_set(mrb_intern2(mrb, "ciidx", 5), mrb_fixnum_value(ci - mrb->m_ctx->cibase));
-    ci--;
-    while (ci >= mrb->m_ctx->cibase) {
-        if (ci->proc && !MRB_PROC_CFUNC_P(ci->proc)) {
-            mrb_irep *irep = ci->proc->body.irep;
 
-            if (irep->filename && irep->lines && irep->iseq <= pc && pc < irep->iseq + irep->ilen) {
-                exc->iv_set(mrb_intern2(mrb, "file", 4), mrb_str_new_cstr(mrb, irep->filename));
-                exc->iv_set(mrb_intern2(mrb, "line", 4), mrb_fixnum_value(irep->lines[pc - irep->iseq - 1]));
+    while (ci >= mrb->m_ctx->cibase) {
+        mrb_code *err = ci->err;
+
+        if (!err && pc) err = pc - 1;
+        if (err && ci->proc && !MRB_PROC_CFUNC_P(ci->proc)) {
+            mrb_irep *irep = ci->proc->body.irep;
+            int32_t const line = mrb_debug_get_line(irep, err - irep->iseq);
+            char const* file = mrb_debug_get_filename(irep, err - irep->iseq);
+            if (line != -1 && file) {
+                exc->iv_set(mrb->intern2("file", 4), mrb_str_new_cstr(mrb, file));
+                exc->iv_set(mrb->intern2("line", 4), mrb_fixnum_value(line));
                 return;
             }
         }
@@ -198,7 +203,7 @@ static void exc_debug_info(mrb_state *mrb, RObject *exc)
 
 void mrb_exc_raise(mrb_state *mrb, mrb_value exc)
 {
-    mrb->m_exc = mrb_obj_ptr(exc);
+    mrb->m_exc = mrb_ptr(exc);
     exc_debug_info(mrb, mrb->m_exc);
     if (!mrb->jmp) {
         mrb_p(mrb, exc);
@@ -410,7 +415,7 @@ void mrb_sys_fail(mrb_state *mrb, const char *mesg)
         mrb->mrb_raise(E_RUNTIME_ERROR, mesg);
     }
 }
-
+extern mrb_value mrb_get_backtrace(mrb_state *mrb, mrb_value self);
 void mrb_init_exception(mrb_state *mrb)
 {
     RClass *e;
@@ -422,7 +427,9 @@ void mrb_init_exception(mrb_state *mrb)
             .define_method("==", exc_equal, MRB_ARGS_REQ(1))
             .define_method("to_s", exc_to_s, MRB_ARGS_NONE())
             .define_method("message", exc_message, MRB_ARGS_NONE())
-            .define_method("inspect", exc_inspect, MRB_ARGS_NONE());
+            .define_method("inspect", exc_inspect, MRB_ARGS_NONE())
+            .define_method("backtrace", mrb_get_backtrace, MRB_ARGS_NONE())
+            .fin();
 
     mrb->eStandardError_class = &mrb->define_class("StandardError",       mrb->eException_class);       /* 15.2.23 */
     mrb->define_class("RuntimeError", mrb->eStandardError_class);                                       /* 15.2.28 */

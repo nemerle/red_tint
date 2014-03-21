@@ -32,44 +32,14 @@ static mrb_float
 mrb_to_flo(mrb_state *mrb, mrb_value val)
 {
     switch (mrb_type(val)) {
-        case MRB_TT_FIXNUM:
-            return (mrb_float)mrb_fixnum(val);
-        case MRB_TT_FLOAT:
-            break;
-        default:
-            mrb->mrb_raise(E_TYPE_ERROR, "non float value");
+    case MRB_TT_FIXNUM:
+        return (mrb_float)mrb_fixnum(val);
+    case MRB_TT_FLOAT:
+        break;
+    default:
+        mrb->mrb_raise(E_TYPE_ERROR, "non float value");
     }
     return mrb_float(val);
-}
-
-/*
- *  call-seq:
- *     +num  ->  num
- *
- *  Unary Plus---Returns the receiver's value.
- */
-
-static mrb_value
-num_uplus(mrb_state *mrb, mrb_value num)
-{
-    return num;
-}
-
-/*
- *  call-seq:
- *     -num  ->  numeric
- *
- *  Unary Minus---Returns the receiver's value, negated.
- */
-
-static mrb_value num_uminus(mrb_state *mrb, mrb_value num)
-{
-    return mrb_float_value((mrb_float)0 - mrb_to_flo(mrb, num));
-}
-
-static mrb_value fix_uminus(mrb_state *mrb, mrb_value num)
-{
-    return mrb_fixnum_value(0 - mrb_fixnum(num));
 }
 
 /*
@@ -126,26 +96,6 @@ static mrb_value num_div(mrb_state *mrb, mrb_value x)
 
     mrb_get_args(mrb, "f", &y);
     return mrb_float_value(mrb_to_flo(mrb, x) / y);
-}
-
-/*
- *  call-seq:
- *     num.abs        ->  numeric
- *     num.magnitude  ->  numeric
- *
- *  Returns the absolute value of <i>num</i>.
- *
- *     12.abs         #=> 12
- *     (-34.56).abs   #=> 34.56
- *     -34.56.abs     #=> 34.56
- */
-
-static mrb_value num_abs(mrb_state *mrb, mrb_value num)
-{
-    if (mrb_to_flo(mrb, num) < 0) {
-        return num_uminus(mrb, num);
-    }
-    return num;
 }
 
 /********************************************************************
@@ -402,14 +352,14 @@ static mrb_value flo_eq(mrb_state *mrb, mrb_value x)
     mrb_value y = mrb->get_arg<mrb_value>();
 
     switch (mrb_type(y)) {
-        case MRB_TT_FIXNUM:
-            b = (mrb_float)mrb_fixnum(y);
-            break;
-        case MRB_TT_FLOAT:
-            b = mrb_float(y);
-            break;
-        default:
-            return num_equal(mrb, x, y);
+    case MRB_TT_FIXNUM:
+        b = (mrb_float)mrb_fixnum(y);
+        break;
+    case MRB_TT_FLOAT:
+        b = mrb_float(y);
+        break;
+    default:
+        return num_equal(mrb, x, y);
     }
     a = mrb_float(x);
     return mrb_bool_value(a == b);
@@ -667,42 +617,6 @@ int_to_i(mrb_state *mrb, mrb_value num)
     return num;
 }
 
-/* 15.2.8.3.21 */
-/*
- *  call-seq:
- *     fixnum.next  ->  integer
- *     fixnum.succ  ->  integer
- *
- *  Returns the <code>Integer</code> equal to <i>int</i> + 1.
- *
- *     1.next      #=> 2
- *     (-1).next   #=> 0
- */
-
-static mrb_value
-fix_succ(mrb_state *mrb, mrb_value num)
-{
-    return mrb_fixnum_value(mrb_fixnum(num)+1);
-}
-
-/* 15.2.8.3.19 */
-/*
- *  call-seq:
- *     int.next  ->  integer
- *     int.succ  ->  integer
- *
- *  Returns the <code>Integer</code> equal to <i>int</i> + 1.
- *
- *     1.next      #=> 2
- *     (-1).next   #=> 0
- */
-static mrb_value
-int_succ(mrb_state *mrb, mrb_value num)
-{
-    if (mrb_fixnum_p(num)) return fix_succ(mrb, num);
-    return mrb->funcall(num, "+", 1, mrb_fixnum_value(1));
-}
-
 #define SQRT_INT_MAX ((mrb_int)1<<((sizeof(mrb_int)*CHAR_BIT-1)/2))
 /*tests if N*N would overflow*/
 #define FIT_SQRT_INT(n) (((n)<SQRT_INT_MAX)&&((n)>=-SQRT_INT_MAX))
@@ -837,7 +751,20 @@ static mrb_value fix_divmod(mrb_state *mrb, mrb_value x)
         return mrb_assoc_new(mrb, a, b);
     }
 }
+static mrb_value
+flo_divmod(mrb_state *mrb, mrb_value x)
+{
+  mrb_value y;
+  mrb_float div, mod;
+  mrb_value a, b;
 
+  mrb_get_args(mrb, "o", &y);
+
+  flodivmod(mrb, mrb_float(x), mrb_to_flo(mrb, y), &div, &mod);
+  a = mrb_float_value((mrb_int)div);
+  b = mrb_float_value(mod);
+  return mrb_assoc_new(mrb, a, b);
+}
 /* 15.2.8.3.7  */
 /*
  * call-seq:
@@ -955,8 +882,8 @@ lshift(mrb_state *mrb, mrb_int val, int width)
 {
     if (width > NUMERIC_SHIFT_WIDTH_MAX) {
         mrb->mrb_raisef(E_RANGE_ERROR, "width(%S) > (%S:sizeof(mrb_int)*CHAR_BIT-1)",
-                   mrb_fixnum_value(width),
-                   mrb_fixnum_value(NUMERIC_SHIFT_WIDTH_MAX));
+                        mrb_fixnum_value(width),
+                        mrb_fixnum_value(NUMERIC_SHIFT_WIDTH_MAX));
     }
     val = val << width;
     return mrb_fixnum_value(val);
@@ -1253,14 +1180,14 @@ static mrb_value num_cmp(mrb_state *mrb, mrb_value self)
 
     x = mrb_to_flo(mrb, self);
     switch (mrb_type(other)) {
-        case MRB_TT_FIXNUM:
-            y = (mrb_float)mrb_fixnum(other);
-            break;
-        case MRB_TT_FLOAT:
-            y = mrb_float(other);
-            break;
-        default:
-            return mrb_nil_value();
+    case MRB_TT_FIXNUM:
+        y = (mrb_float)mrb_fixnum(other);
+        break;
+    case MRB_TT_FLOAT:
+        y = mrb_float(other);
+        break;
+    default:
+        return mrb_nil_value();
     }
     if (x > y)
         return mrb_fixnum_value(1);
@@ -1297,13 +1224,9 @@ mrb_init_numeric(mrb_state *mrb)
 
     /* Numeric Class */
     numeric = &mrb->define_class("Numeric",  mrb->object_class)
-            .include_module("Comparable")
-            .define_method("+@",       num_uplus,      MRB_ARGS_REQ(1))  /* 15.2.7.4.1  */
-            .define_method("-@",       num_uminus,     MRB_ARGS_REQ(1))  /* 15.2.7.4.2  */
             .define_method("**",       num_pow,        MRB_ARGS_REQ(1))
             .define_method("/",        num_div,        MRB_ARGS_REQ(1))  /* 15.2.8.3.4  */
             .define_method("quo",      num_div,        MRB_ARGS_REQ(1))  /* 15.2.7.4.5 (x) */
-            .define_method("abs",      num_abs,        MRB_ARGS_NONE())  /* 15.2.7.4.3  */
             .define_method("<=>",      num_cmp,        MRB_ARGS_REQ(1))  /* 15.2.9.3.6  */
             ;
     /* Integer Class */
@@ -1315,7 +1238,6 @@ mrb_init_numeric(mrb_state *mrb)
     mrb->fixnum_class = &mrb->define_class("Fixnum", integer)
             .define_method("+",        fix_plus,          MRB_ARGS_REQ(1)) /* 15.2.8.3.1  */
             .define_method("-",        fix_minus,         MRB_ARGS_REQ(1)) /* 15.2.8.3.2  */
-            .define_method("-@",       fix_uminus,        MRB_ARGS_REQ(1)) /* 15.2.7.4.2  */
             .define_method("*",        fix_mul,           MRB_ARGS_REQ(1)) /* 15.2.8.3.3  */
             .define_method("%",        fix_mod,           MRB_ARGS_REQ(1)) /* 15.2.8.3.5  */
             .define_method("==",       fix_equal,         MRB_ARGS_REQ(1)) /* 15.2.8.3.7  */
@@ -1327,8 +1249,6 @@ mrb_init_numeric(mrb_state *mrb)
             .define_method(">>",       fix_rshift,        MRB_ARGS_REQ(1)) /* 15.2.8.3.13 */
             .define_method("eql?",     num_eql,           MRB_ARGS_REQ(1)) /* 15.2.8.3.16 */
             .define_method("hash",     flo_hash,          MRB_ARGS_NONE()) /* 15.2.8.3.18 */
-            .define_method("next",     int_succ,          MRB_ARGS_NONE()) /* 15.2.8.3.19 */
-            .define_method("succ",     fix_succ,          MRB_ARGS_NONE()) /* 15.2.8.3.21 */
             .define_method("to_f",     fix_to_f,          MRB_ARGS_NONE()) /* 15.2.8.3.23 */
             .define_method("to_s",     fix_to_s,          MRB_ARGS_NONE()) /* 15.2.8.3.25 */
             .define_method("inspect",  fix_to_s,          MRB_ARGS_NONE())
@@ -1352,6 +1272,7 @@ mrb_init_numeric(mrb_state *mrb)
             .define_method("to_i",      flo_truncate,     MRB_ARGS_NONE()) /* 15.2.9.3.14 */
             .define_method("to_int",    flo_truncate,     MRB_ARGS_NONE())
             .define_method("truncate",  flo_truncate,     MRB_ARGS_NONE()) /* 15.2.9.3.15 */
+            .define_method("divmod",   flo_divmod,       MRB_ARGS_REQ(1))
             .define_method("to_s",      flo_to_s,         MRB_ARGS_NONE()) /* 15.2.9.3.16(x) */
             .define_method("inspect",   flo_to_s,         MRB_ARGS_NONE())
             ;

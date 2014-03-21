@@ -145,6 +145,9 @@ struct mrb_parser_state {
     mrb_parser_message error_buffer[10];
     mrb_parser_message warn_buffer[10];
 
+    mrb_sym* filename_table;
+    size_t filename_table_length;
+    int current_filename_index;
 
     void local_add(mrb_sym sym);
     size_t local_switch();
@@ -169,6 +172,8 @@ struct mrb_parser_state {
     jmp_buf jmp;
 
 public:
+    void mrb_parser_set_filename(char const* n);
+    char const* mrb_parser_get_filename(uint16_t idx);
     mrb_sym intern(const char *s);
     mrb_sym intern2(const char *s, size_t len);
     mrb_sym intern_c(const char c);
@@ -200,50 +205,50 @@ public:
     void yywarn(const char *s);
     void yyerror(const char *s);
 
-                    // (:fcall self mid args)
+    // (:fcall self mid args)
     FCallNode *     new_fcall(mrb_sym m, CommandArgs *a) { return new_t<FCallNode>(new_t<SelfNode>(),m,a); }
-                    // (:call a b c)
+    // (:call a b c)
     CallNode *      new_call(mrb_ast_node *r, mrb_sym m, CommandArgs *a) { return new_t<CallNode>(r,m,a); }
-                    //! (:scope (vars..) (prog...))
+    //! (:scope (vars..) (prog...))
     ScopeNode *     new_scope(mrb_ast_node *body) {return new_t<ScopeNode>(localsToVec(), body);}
     ScopeNode *     empty_scope(mrb_ast_node *body) {return new_t<ScopeNode>(body);}
     EnsureNode *    new_ensure(mrb_ast_node *a, mrb_ast_node *b) { return new_t<EnsureNode>(a,empty_scope(b)); }
     NilNode *       new_nil() { return new_t<NilNode>(); } //!< (:nil)
     IfNode *        new_unless(mrb_ast_node *cond, mrb_ast_node *then, mrb_ast_node *f_else)
-                    {
-                        return new_t<IfNode>(cond,f_else,then);
-                    }
+    {
+        return new_t<IfNode>(cond,f_else,then);
+    }
     YieldNode *     new_yield(CommandArgs *c);
-                    //! (:return . c)
+    //! (:return . c)
     ArrayNode *     new_array(mrb_ast_node *a) {  return new_t<ArrayNode>(a); }
     mrb_sym         new_strsym(StrNode *str);
-                    //! (:def m local_vars (arg . body))
+    //! (:def m local_vars (arg . body))
     DefNode *       new_def(mrb_sym m, ArgsStore *a, mrb_ast_node *b)
-                    {
-                        return new_t<DefNode>(m,localsToVec(),a,b);
-                    }
-                    //! (:sdef obj m local_vars (arg . body))
+    {
+        return new_t<DefNode>(m,localsToVec(),a,b);
+    }
+    //! (:sdef obj m local_vars (arg . body))
     SdefNode *      new_sdef(mrb_ast_node *o, mrb_sym m, ArgsStore *a, mrb_ast_node *b)
-                    {
-                        return new_t<SdefNode>(o,m,localsToVec(), a, b);
-                    }
+    {
+        return new_t<SdefNode>(o,m,localsToVec(), a, b);
+    }
     tLocals         localsToVec() {
-                        assert(m_locals_stack);
-                        return m_locals_stack->back();
-                    }
+        assert(m_locals_stack);
+        return m_locals_stack->back();
+    }
     ArgsStore *     new_args(mrb_ast_node *m, mrb_ast_node *opt, mrb_sym rest, mrb_ast_node *m2, mrb_sym blk) {
-                        return new_simple<ArgsStore>(m,opt,rest,m2,blk);
-                    }
+        return new_simple<ArgsStore>(m,opt,rest,m2,blk);
+    }
 
     BlockNode *     new_block(ArgsStore *arg, mrb_ast_node *body)
-                    {
-                        return new_t<BlockNode>(localsToVec(), arg, body);
-                    }
+    {
+        return new_t<BlockNode>(localsToVec(), arg, body);
+    }
     LambdaNode *    new_lambda(ArgsStore *a, mrb_ast_node *b) { return new_t<LambdaNode>(localsToVec(), a, b); }
     StrNode *       new_str(const char *s, int len)
-                    {
-                        return new_t<StrNode>(parser_strndup(s, len), len);
-                    }
+    {
+        return new_t<StrNode>(parser_strndup(s, len), len);
+    }
     XstrNode *      new_xstr(const char *s, int len) {return new_t<XstrNode>(parser_strndup(s, len),len);}
     DsymNode *      new_dsym(mrb_ast_node *a) { return new_t<DsymNode>(new_t<DstrNode>(a)); }
     RegxNode *      new_regx(const char *p1, const char *p2) { return new_t<RegxNode>(p1,p2); }
@@ -254,8 +259,8 @@ public:
     mrb_ast_node *  cond(mrb_ast_node *n);
     mrb_ast_node *  ret_args(CommandArgs *n);
     bool            is_strterm_type(int str_func)  {
-                        return ((int)(intptr_t)(m_lex_strterm->left()) & (str_func));
-                    }
+        return ((int)(intptr_t)(m_lex_strterm->left()) & (str_func));
+    }
     void            backref_error(const mrb_ast_node *n);
     void            yyerror_i(const char *fmt, int i);
     int             heredoc_identifier();
@@ -267,15 +272,15 @@ public:
     void            init_locals();
     mrb_ast_node *  str_list2(mrb_ast_node *a, mrb_ast_node *b);
     int             paren_nest();
-                    template<typename T, typename... Args >
+    template<typename T, typename... Args >
     T *             new_t(Args... args) {
-                        T *res = new(parser_palloc(sizeof(T))) T(args...);
-                        res->locationInit(this->m_lineno,this->m_filename);
-                        return res;
-                    }
-                    template<typename T, typename... Args >
+        T *res = new(parser_palloc(sizeof(T))) T(args...);
+        res->locationInit(this->m_lineno,this->current_filename_index);
+        return res;
+    }
+    template<typename T, typename... Args >
     T *             new_simple(Args... args) {
-                        return new(parser_palloc(sizeof(T))) T(args...);
+        return new(parser_palloc(sizeof(T))) T(args...);
     }
     void heredoc_treat_nextline();
 };

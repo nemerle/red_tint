@@ -63,43 +63,44 @@ RString *RString::create(mrb_state *mrb, mrb_int capa) {
     return s;
 }
 
-static void str_modify(mrb_state *mrb, RString *s)
+void RString::str_modify()
 {
-    if (s->flags & MRB_STR_SHARED) {
-        mrb_shared_string *shared = s->aux.shared;
+    if (this->flags & MRB_STR_SHARED) {
+        mrb_shared_string *shared = this->aux.shared;
 
-        if (shared->refcnt == 1 && s->m_ptr == shared->ptr) {
-            s->m_ptr = shared->ptr;
-            s->aux.capa = shared->len;
-            mrb->gc()._free(shared);
+        if (shared->refcnt == 1 && this->m_ptr == shared->ptr) {
+            this->m_ptr = shared->ptr;
+            this->aux.capa = shared->len;
+            this->m_ptr[this->len] = '\0';
+            m_vm->gc()._free(shared);
         }
         else {
             char *ptr, *p;
             mrb_int len;
 
-            p = s->m_ptr;
-            len = s->len;
-            ptr = (char *)mrb->gc()._malloc((size_t)len + 1);
+            p = this->m_ptr;
+            len = this->len;
+            ptr = (char *)m_vm->gc()._malloc((size_t)len + 1);
             if (p) {
                 memcpy(ptr, p, len);
             }
             ptr[len] = '\0';
-            s->m_ptr = ptr;
-            s->aux.capa = len;
-            str_decref(mrb, shared);
+            this->m_ptr = ptr;
+            this->aux.capa = len;
+            str_decref(m_vm, shared);
         }
-        s->flags &= ~MRB_STR_SHARED;
+        this->flags &= ~MRB_STR_SHARED;
         return;
     }
-    if (s->flags & MRB_STR_NOFREE) {
-        char *p = s->m_ptr;
+    if (this->flags & MRB_STR_NOFREE) {
+        char *p = this->m_ptr;
 
-        s->m_ptr = (char *)mrb->gc()._malloc((size_t)s->len + 1);
+        this->m_ptr = (char *)m_vm->gc()._malloc((size_t)this->len + 1);
         if (p) {
-            memcpy(s->m_ptr, p, s->len);
+            memcpy(this->m_ptr, p, this->len);
         }
-        s->m_ptr[s->len] = '\0';
-        s->aux.capa = s->len;
+        this->m_ptr[this->len] = '\0';
+        this->aux.capa = this->len;
         return;
     }
 }
@@ -109,7 +110,7 @@ mrb_value mrb_str_resize(mrb_state *mrb, mrb_value str, mrb_int len)
     int slen;
     RString *s = mrb_str_ptr(str);
 
-    str_modify(mrb, s);
+    s->str_modify();
     slen = s->len;
     if (len != slen) {
         if (slen < len || slen - len > 256) {
@@ -177,7 +178,7 @@ void RString::str_buf_cat(const char *_ptr, size_t _len)
     mrb_int total;
     ptrdiff_t off = -1;
 
-    str_modify(m_vm, this);
+    str_modify();
     if (_ptr >= m_ptr && _ptr <= m_ptr + this->len) {
         off = _ptr - m_ptr;
     }
@@ -353,7 +354,7 @@ void mrb_str_concat(mrb_state *mrb, mrb_value self, mrb_value other)
     RString *s1 = mrb_str_ptr(self), *s2;
     int len;
 
-    str_modify(mrb, s1);
+    s1->str_modify();
     if (!mrb_is_a_string(other)) {
         other = mrb_str_to_str(mrb, other);
     }
@@ -737,37 +738,37 @@ mrb_str_aref(mrb_state *mrb, mrb_value str, mrb_value indx)
 
     regexp_check(mrb, indx);
     switch (mrb_type(indx)) {
-    case MRB_TT_FIXNUM:
-        idx = mrb_fixnum(indx);
+        case MRB_TT_FIXNUM:
+            idx = mrb_fixnum(indx);
 
 num_index:
-        str = mrb_str_substr(mrb, str, idx, 1);
-        if (!mrb_nil_p(str) && RSTRING_LEN(str) == 0) return mrb_nil_value();
-        return str;
+            str = mrb_str_substr(mrb, str, idx, 1);
+            if (!mrb_nil_p(str) && RSTRING_LEN(str) == 0) return mrb_nil_value();
+            return str;
 
-    case MRB_TT_STRING:
-        if (mrb_str_index(str, indx, 0) != -1)
-            return mrb_str_dup(mrb, indx);
-        return mrb_nil_value();
-
-    case MRB_TT_RANGE:
-        /* check if indx is Range */
-    {
-        mrb_int beg, len;
-        mrb_value tmp;
-
-        len = RSTRING_LEN(str);
-        if (mrb_range_beg_len(mrb, indx, &beg, &len, len)) {
-            tmp = mrb_str_subseq(mrb, str, beg, len);
-            return tmp;
-        }
-        else {
+        case MRB_TT_STRING:
+            if (mrb_str_index(str, indx, 0) != -1)
+                return mrb_str_dup(mrb, indx);
             return mrb_nil_value();
+
+        case MRB_TT_RANGE:
+            /* check if indx is Range */
+        {
+            mrb_int beg, len;
+            mrb_value tmp;
+
+            len = RSTRING_LEN(str);
+            if (mrb_range_beg_len(mrb, indx, &beg, &len, len)) {
+                tmp = mrb_str_subseq(mrb, str, beg, len);
+                return tmp;
+            }
+            else {
+                return mrb_nil_value();
+            }
         }
-    }
-    default:
-        idx = mrb_fixnum(indx);
-        goto num_index;
+        default:
+            idx = mrb_fixnum(indx);
+            goto num_index;
     }
     return mrb_nil_value();    /* not reached */
 }
@@ -857,7 +858,7 @@ mrb_str_capitalize_bang(mrb_state *mrb, mrb_value str)
     int modify = 0;
     RString *s = mrb_str_ptr(str);
 
-    str_modify(mrb, s);
+    s->str_modify();
     if (s->len == 0 || !s->m_ptr) return mrb_nil_value();
     p = s->m_ptr; pend = s->m_ptr + s->len;
     if (ISLOWER(*p)) {
@@ -914,7 +915,7 @@ mrb_str_chomp_bang(mrb_state *mrb, mrb_value str)
     mrb_int len;
     RString *s = mrb_str_ptr(str);
 
-    str_modify(mrb, s);
+    s->str_modify();
     len = s->len;
     if (mrb_get_args(mrb, "|S", &rs) == 0) {
         if (len == 0) return mrb_nil_value();
@@ -1013,7 +1014,7 @@ mrb_str_chop_bang(mrb_state *mrb, mrb_value str)
 {
     RString *s = mrb_str_ptr(str);
 
-    str_modify(mrb, s);
+    s->str_modify();
     if (s->len > 0) {
         int len;
         len = s->len - 1;
@@ -1071,7 +1072,7 @@ mrb_str_downcase_bang(mrb_state *mrb, mrb_value str)
     int modify = 0;
     RString *s = mrb_str_ptr(str);
 
-    str_modify(mrb, s);
+    s->str_modify();
     p = s->m_ptr;
     pend = s->m_ptr + s->len;
     while (p < pend) {
@@ -1311,30 +1312,30 @@ mrb_str_index_m(mrb_state *mrb, mrb_value str)
     }
 
     switch (mrb_type(sub)) {
-    case MRB_TT_FIXNUM: {
-        int c = mrb_fixnum(sub);
-        mrb_int len = RSTRING_LEN(str);
-        uint8_t *p = (uint8_t*)RSTRING_PTR(str);
+        case MRB_TT_FIXNUM: {
+            int c = mrb_fixnum(sub);
+            mrb_int len = RSTRING_LEN(str);
+            uint8_t *p = (uint8_t*)RSTRING_PTR(str);
 
-        for (;pos<len;pos++) {
-            if (p[pos] == c) return mrb_fixnum_value(pos);
+            for (;pos<len;pos++) {
+                if (p[pos] == c) return mrb_fixnum_value(pos);
+            }
+            return mrb_nil_value();
         }
-        return mrb_nil_value();
-    }
 
-    default: {
-        mrb_value tmp;
+        default: {
+            mrb_value tmp;
 
-        tmp = mrb_check_string_type(mrb, sub);
-        if (mrb_nil_p(tmp)) {
-            mrb->mrb_raisef(E_TYPE_ERROR, "type mismatch: %S given", sub);
+            tmp = mrb_check_string_type(mrb, sub);
+            if (mrb_nil_p(tmp)) {
+                mrb->mrb_raisef(E_TYPE_ERROR, "type mismatch: %S given", sub);
+            }
+            sub = tmp;
         }
-        sub = tmp;
-    }
-        /* fall through */
-    case MRB_TT_STRING:
-        pos = mrb_str_index(str, sub, pos);
-        break;
+            /* fall through */
+        case MRB_TT_STRING:
+            pos = mrb_str_index(str, sub, pos);
+            break;
     }
 
     if (pos == -1) return mrb_nil_value();
@@ -1468,7 +1469,7 @@ mrb_ptr_to_str(mrb_state *mrb, void *p)
     RString *p_str;
     char *p1;
     char *p2;
-    intptr_t n = (intptr_t)p;
+    uintptr_t n = (uintptr_t)p;
 
     p_str = RString::create(mrb, nullptr, 2 + sizeof(uintptr_t) * CHAR_BIT / 4);
     p1 = p_str->m_ptr;
@@ -1540,7 +1541,7 @@ mrb_str_reverse_bang(mrb_state *mrb, mrb_value str)
     char *p, *e;
     char c;
 
-    str_modify(mrb, s);
+    s->str_modify();
     if (s->len > 1) {
         p = s->m_ptr;
         e = p + s->len - 1;
@@ -1655,31 +1656,31 @@ mrb_str_rindex_m(mrb_state *mrb, mrb_value str)
     }
 
     switch (mrb_type(sub)) {
-    case MRB_TT_FIXNUM: {
-        int c = mrb_fixnum(sub);
-        mrb_int len = RSTRING_LEN(str);
-        uint8_t *p = (uint8_t*)RSTRING_PTR(str);
+        case MRB_TT_FIXNUM: {
+            int c = mrb_fixnum(sub);
+            mrb_int len = RSTRING_LEN(str);
+            uint8_t *p = (uint8_t*)RSTRING_PTR(str);
 
-        for (pos=len;pos>=0;pos--) {
-            if (p[pos] == c) return mrb_fixnum_value(pos);
+            for (pos=len;pos>=0;pos--) {
+                if (p[pos] == c) return mrb_fixnum_value(pos);
+            }
+            return mrb_nil_value();
         }
-        return mrb_nil_value();
-    }
 
-    default: {
-        mrb_value tmp;
+        default: {
+            mrb_value tmp;
 
-        tmp = mrb_check_string_type(mrb, sub);
-        if (mrb_nil_p(tmp)) {
-            mrb->mrb_raisef(E_TYPE_ERROR, "type mismatch: %S given", sub);
+            tmp = mrb_check_string_type(mrb, sub);
+            if (mrb_nil_p(tmp)) {
+                mrb->mrb_raisef(E_TYPE_ERROR, "type mismatch: %S given", sub);
+            }
+            sub = tmp;
         }
-        sub = tmp;
-    }
-        /* fall through */
-    case MRB_TT_STRING:
-        pos = mrb_str_rindex(mrb, str, sub, pos);
-        if (pos >= 0) return mrb_fixnum_value(pos);
-        break;
+            /* fall through */
+        case MRB_TT_STRING:
+            pos = mrb_str_rindex(mrb, str, sub, pos);
+            if (pos >= 0) return mrb_fixnum_value(pos);
+            break;
 
     } /* end of switch (TYPE(sub)) */
     return mrb_nil_value();
@@ -1893,20 +1894,20 @@ mrb_value mrb_cstr_to_inum(mrb_state *mrb, const char *str, int base, int badche
     if (base <= 0) {
         if (str[0] == '0') {
             switch (str[1]) {
-            case 'x': case 'X':
-                base = 16;
-                break;
-            case 'b': case 'B':
-                base = 2;
-                break;
-            case 'o': case 'O':
-                base = 8;
-                break;
-            case 'd': case 'D':
-                base = 10;
-                break;
-            default:
-                base = 8;
+                case 'x': case 'X':
+                    base = 16;
+                    break;
+                case 'b': case 'B':
+                    base = 2;
+                    break;
+                case 'o': case 'O':
+                    base = 8;
+                    break;
+                case 'd': case 'D':
+                    base = 10;
+                    break;
+                default:
+                    base = 8;
             }
         }
         else if (base < -1) {
@@ -1917,35 +1918,35 @@ mrb_value mrb_cstr_to_inum(mrb_state *mrb, const char *str, int base, int badche
         }
     }
     switch (base) {
-    case 2:
-        if (str[0] == '0' && (str[1] == 'b'||str[1] == 'B')) {
-            str += 2;
-        }
-        break;
-    case 3:
-        break;
-    case 8:
-        if (str[0] == '0' && (str[1] == 'o'||str[1] == 'O')) {
-            str += 2;
-        }
-    case 4: case 5: case 6: case 7:
-        break;
-    case 10:
-        if (str[0] == '0' && (str[1] == 'd'||str[1] == 'D')) {
-            str += 2;
-        }
-    case 9: case 11: case 12: case 13: case 14: case 15:
-        break;
-    case 16:
-        if (str[0] == '0' && (str[1] == 'x'||str[1] == 'X')) {
-            str += 2;
-        }
-        break;
-    default:
-        if (base < 2 || 36 < base) {
-            mrb->mrb_raisef(E_ARGUMENT_ERROR, "illegal radix %S", mrb_fixnum_value(base));
-        }
-        break;
+        case 2:
+            if (str[0] == '0' && (str[1] == 'b'||str[1] == 'B')) {
+                str += 2;
+            }
+            break;
+        case 3:
+            break;
+        case 8:
+            if (str[0] == '0' && (str[1] == 'o'||str[1] == 'O')) {
+                str += 2;
+            }
+        case 4: case 5: case 6: case 7:
+            break;
+        case 10:
+            if (str[0] == '0' && (str[1] == 'd'||str[1] == 'D')) {
+                str += 2;
+            }
+        case 9: case 11: case 12: case 13: case 14: case 15:
+            break;
+        case 16:
+            if (str[0] == '0' && (str[1] == 'x'||str[1] == 'X')) {
+                str += 2;
+            }
+            break;
+        default:
+            if (base < 2 || 36 < base) {
+                mrb->mrb_raisef(E_ARGUMENT_ERROR, "illegal radix %S", mrb_fixnum_value(base));
+            }
+            break;
     } /* end of switch (base) { */
     if (*str == '0') {    /* squeeze preceeding 0s */
         int us = 0;
@@ -2199,7 +2200,7 @@ mrb_str_upcase_bang(mrb_state *mrb, mrb_value str)
     char *p, *pend;
     int modify = 0;
 
-    str_modify(mrb, s);
+    s->str_modify();
     p = RSTRING_PTR(str);
     pend = RSTRING_END(str);
     while (p < pend) {
@@ -2255,25 +2256,25 @@ mrb_str_dump(mrb_state *mrb, mrb_value str)
     while (p < pend) {
         uint8_t c = *p++;
         switch (c) {
-        case '"': case '\\':
-        case '\n': case '\r':
-        case '\t': case '\f':
-        case '\013': case '\010': case '\007': case '\033':
-            len += 2;
-            break;
+            case '"': case '\\':
+            case '\n': case '\r':
+            case '\t': case '\f':
+            case '\013': case '\010': case '\007': case '\033':
+                len += 2;
+                break;
 
-        case '#':
-            len += IS_EVSTR(p, pend) ? 2 : 1;
-            break;
+            case '#':
+                len += IS_EVSTR(p, pend) ? 2 : 1;
+                break;
 
-        default:
-            if (ISPRINT(c)) {
-                len++;
-            }
-            else {
-                len += 4; /* \NNN */
-            }
-            break;
+            default:
+                if (ISPRINT(c)) {
+                    len++;
+                }
+                else {
+                    len += 4; /* \NNN */
+                }
+                break;
         }
     }
 
@@ -2287,66 +2288,66 @@ mrb_str_dump(mrb_state *mrb, mrb_value str)
         uint8_t c = *p++;
 
         switch (c) {
-        case '"':
-        case '\\':
-            *q++ = '\\';
-            *q++ = c;
-            break;
-
-        case '\n':
-            *q++ = '\\';
-            *q++ = 'n';
-            break;
-
-        case '\r':
-            *q++ = '\\';
-            *q++ = 'r';
-            break;
-
-        case '\t':
-            *q++ = '\\';
-            *q++ = 't';
-            break;
-
-        case '\f':
-            *q++ = '\\';
-            *q++ = 'f';
-            break;
-
-        case '\013':
-            *q++ = '\\';
-            *q++ = 'v';
-            break;
-
-        case '\010':
-            *q++ = '\\';
-            *q++ = 'b';
-            break;
-
-        case '\007':
-            *q++ = '\\';
-            *q++ = 'a';
-            break;
-
-        case '\033':
-            *q++ = '\\';
-            *q++ = 'e';
-            break;
-
-        case '#':
-            if (IS_EVSTR(p, pend)) *q++ = '\\';
-            *q++ = '#';
-            break;
-
-        default:
-            if (ISPRINT(c)) {
-                *q++ = c;
-            }
-            else {
+            case '"':
+            case '\\':
                 *q++ = '\\';
-                sprintf(q, "%03o", c&0xff);
-                q += 3;
-            }
+                *q++ = c;
+                break;
+
+            case '\n':
+                *q++ = '\\';
+                *q++ = 'n';
+                break;
+
+            case '\r':
+                *q++ = '\\';
+                *q++ = 'r';
+                break;
+
+            case '\t':
+                *q++ = '\\';
+                *q++ = 't';
+                break;
+
+            case '\f':
+                *q++ = '\\';
+                *q++ = 'f';
+                break;
+
+            case '\013':
+                *q++ = '\\';
+                *q++ = 'v';
+                break;
+
+            case '\010':
+                *q++ = '\\';
+                *q++ = 'b';
+                break;
+
+            case '\007':
+                *q++ = '\\';
+                *q++ = 'a';
+                break;
+
+            case '\033':
+                *q++ = '\\';
+                *q++ = 'e';
+                break;
+
+            case '#':
+                if (IS_EVSTR(p, pend)) *q++ = '\\';
+                *q++ = '#';
+                break;
+
+            default:
+                if (ISPRINT(c)) {
+                    *q++ = c;
+                }
+                else {
+                    *q++ = '\\';
+                    sprintf(q, "%03o", c&0xff);
+                    q += 3;
+                }
         }
     }
     *q++ = '"';
@@ -2368,7 +2369,11 @@ void RString::str_cat(const char *ptr, int len)
     }
     str_buf_cat(ptr, len);
 }
-
+mrb_value
+mrb_string_type(mrb_state *mrb, mrb_value str)
+{
+    return mrb_convert_type(mrb, str, MRB_TT_STRING, "String", "to_str");
+}
 mrb_value mrb_str_cat_cstr(mrb_state *mrb, mrb_value str, const char *ptr)
 {
     return mrb_str_cat(mrb, str, ptr, strlen(ptr));
@@ -2420,15 +2425,15 @@ mrb_value mrb_str_inspect(mrb_state *mrb, mrb_value str)
             continue;
         }
         switch (c) {
-        case '\n': cc = 'n'; break;
-        case '\r': cc = 'r'; break;
-        case '\t': cc = 't'; break;
-        case '\f': cc = 'f'; break;
-        case '\013': cc = 'v'; break;
-        case '\010': cc = 'b'; break;
-        case '\007': cc = 'a'; break;
-        case 033: cc = 'e'; break;
-        default: cc = 0; break;
+            case '\n': cc = 'n'; break;
+            case '\r': cc = 'r'; break;
+            case '\t': cc = 't'; break;
+            case '\f': cc = 'f'; break;
+            case '\013': cc = 'v'; break;
+            case '\010': cc = 'b'; break;
+            case '\007': cc = 'a'; break;
+            case 033: cc = 'e'; break;
+            default: cc = 0; break;
         }
         if (cc) {
             buf[0] = '\\';
@@ -2479,11 +2484,9 @@ mrb_init_string(mrb_state *mrb)
             .instance_tt(MRB_TT_STRING)
             .include_module(mrb->class_get("Comparable"))
 
-            .define_method("+",               mrb_str_plus_m,          MRB_ARGS_REQ(1))              /* 15.2.10.5.2  */
             .define_method("bytesize",        mrb_str_bytesize,        MRB_ARGS_NONE())
-            .define_method("size",            mrb_str_size,            MRB_ARGS_NONE())              /* 15.2.10.5.33 */
-            .define_method("length",          mrb_str_size,            MRB_ARGS_NONE())              /* 15.2.10.5.26 */
             .define_method("*",               mrb_str_times,           MRB_ARGS_REQ(1))              /* 15.2.10.5.1  */
+            .define_method("+",               mrb_str_plus_m,          MRB_ARGS_REQ(1))              /* 15.2.10.5.2  */
             .define_method("<=>",             mrb_str_cmp_m,           MRB_ARGS_REQ(1))              /* 15.2.10.5.3  */
             .define_method("==",              mrb_str_equal_m,         MRB_ARGS_REQ(1))              /* 15.2.10.5.4  */
             .define_method("[]",              mrb_str_aref_m,          MRB_ARGS_ANY())               /* 15.2.10.5.6  */
@@ -2503,10 +2506,12 @@ mrb_init_string(mrb_state *mrb)
             .define_method("initialize",      mrb_str_init,            MRB_ARGS_REQ(1))              /* 15.2.10.5.23 */
             .define_method("initialize_copy", mrb_str_replace,         MRB_ARGS_REQ(1))              /* 15.2.10.5.24 */
             .define_method("intern",          mrb_str_intern,          MRB_ARGS_NONE())              /* 15.2.10.5.25 */
+            .define_method("length",          mrb_str_size,            MRB_ARGS_NONE())              /* 15.2.10.5.26 */
             .define_method("replace",         mrb_str_replace,         MRB_ARGS_REQ(1))              /* 15.2.10.5.28 */
             .define_method("reverse",         mrb_str_reverse,         MRB_ARGS_NONE())              /* 15.2.10.5.29 */
             .define_method("reverse!",        mrb_str_reverse_bang,    MRB_ARGS_NONE())              /* 15.2.10.5.30 */
             .define_method("rindex",          mrb_str_rindex_m,        MRB_ARGS_ANY())               /* 15.2.10.5.31 */
+            .define_method("size",            mrb_str_size,            MRB_ARGS_NONE())              /* 15.2.10.5.33 */
             .define_method("slice",           mrb_str_aref_m,          MRB_ARGS_ANY())               /* 15.2.10.5.34 */
             .define_method("split",           mrb_str_split_m,         MRB_ARGS_ANY())               /* 15.2.10.5.35 */
             .define_method("to_i",            mrb_str_to_i,            MRB_ARGS_ANY())               /* 15.2.10.5.38 */

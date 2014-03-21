@@ -93,7 +93,7 @@ enum mrb_vtype {
     MRB_TT_SYMBOL,      /*   4 */
     MRB_TT_UNDEF,       /*   5 */
     MRB_TT_FLOAT,       /*   6 */
-    MRB_TT_VOIDP,       /*   7 */
+    MRB_TT_CPTR,       /*   7 */
     MRB_TT_OBJECT,      /*   8 */
     MRB_TT_CLASS,       /*   9 */
     MRB_TT_MODULE,      /*  10 */
@@ -141,7 +141,7 @@ typedef union mrb_value {
     };
     struct RBasic *bp;
     struct RFloat *fp;
-    struct RVoidp *vp;
+    struct RCptr *vp;
   } value;
   unsigned long w;
 } mrb_value;
@@ -209,7 +209,7 @@ static inline mrb_value mrb_float_value(mrb_float f)
 
 #define mrb_fixnum(o) (o).value.i
 #define mrb_symbol(o) (o).value.sym
-#define mrb_voidp(o) (o).value.p
+#define mrb_cptr(o) (o).value.p
 #define mrb_fixnum_p(o) (mrb_type(o) == MRB_TT_FIXNUM)
 #define mrb_float_p(o) (mrb_type(o) == MRB_TT_FLOAT)
 #define mrb_undef_p(o) (mrb_type(o) == MRB_TT_UNDEF)
@@ -218,7 +218,7 @@ static inline mrb_value mrb_float_value(mrb_float f)
 #define mrb_is_a_array(o) (mrb_type(o) == MRB_TT_ARRAY)
 #define mrb_is_a_string(o) (mrb_type(o) == MRB_TT_STRING)
 #define mrb_hash_p(o) (mrb_type(o) == MRB_TT_HASH)
-#define mrb_voidp_p(o) (mrb_type(o) == MRB_TT_VOIDP)
+#define mrb_cptr_p(o) (mrb_type(o) == MRB_TT_CPTR)
 #define mrb_as_bool(o)   (mrb_type(o) != MRB_TT_FALSE)
 #define mrb_test(o)   mrb_as_bool(o)
 
@@ -263,9 +263,9 @@ public:
     void define_singleton_method(const char *name, mrb_func_t func, mrb_aspec aspec);
 };
 
-#define mrb_obj_ptr(v)   ((RObject*)((v).value.p))
+#define mrb_ptr(v)   ((RObject*)((v).value.p))
 /* obsolete macro mrb_object; will be removed soon */
-#define mrb_immediate_p(x) (mrb_type(x) <= MRB_TT_VOIDP)
+#define mrb_immediate_p(x) (mrb_type(x) <= MRB_TT_CPTR)
 #define mrb_special_const_p(x) mrb_immediate_p(x)
 struct RFiber : public RObject {
   mrb_context *cxt;
@@ -277,7 +277,7 @@ struct RFloat {
   mrb_float f;
 };
 
-struct RVoidp {
+struct RCptr {
   MRB_OBJECT_HEADER;
   void *p;
 };
@@ -334,11 +334,11 @@ mrb_value
 mrb_voidp_value(struct mrb_state *mrb, void *p);
 #else
 static inline mrb_value
-mrb_voidp_value(struct mrb_state *mrb, void *p)
+mrb_cptr_value(struct mrb_state *mrb, void *p)
 {
     mrb_value v;
 
-    MRB_SET_VALUE(v, MRB_TT_VOIDP, value.p, p);
+    MRB_SET_VALUE(v, MRB_TT_CPTR, value.p, p);
     return v;
 }
 #endif

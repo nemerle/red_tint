@@ -10,6 +10,7 @@
 #include "mruby/class.h"
 #include "mruby/irep.h"
 #include "mruby/variable.h"
+#include "mruby/debug.h"
 
 void mrb_core_init(mrb_state*);
 void mrb_core_final(mrb_state*);
@@ -106,6 +107,7 @@ void mrb_irep_free(mrb_state *mrb, struct mrb_irep *irep)
     mm._free(irep->syms);
     mm._free((void *)irep->filename);
     mm._free(irep->lines);
+    mrb_debug_info_free(mrb, irep->debug_info);
     mm._free(irep);
 }
 void mrb_free_context(mrb_state *mrb, struct mrb_context *ctx)

@@ -93,16 +93,23 @@ parse_args(mrb_state *mrb, int argc, char **argv, struct mrbc_args *args)
                     item = argv[0];
 append_cmdline:
                     if (!args->cmdline) {
+                        size_t buflen;
                         char *buf;
 
-                        buf = (char *)mrb->gc()._malloc(strlen(item)+1);
-                        strcpy(buf, item);
+                        buflen = strlen(item) + 1;
+                        buf = (char *)mrb->gc()._malloc(buflen);
+                        memcpy(buf, item, buflen);
                         args->cmdline = buf;
                     }
                     else {
-                        args->cmdline = (char *)mrb->gc()._realloc(args->cmdline, strlen(args->cmdline)+strlen(item)+2);
-                        strcat(args->cmdline, "\n");
-                        strcat(args->cmdline, item);
+                        size_t cmdlinelen;
+                        size_t itemlen;
+
+                        cmdlinelen = strlen(args->cmdline);
+                        itemlen = strlen(item);
+                        args->cmdline = (char *)mrb->gc()._realloc(args->cmdline, cmdlinelen + itemlen + 2);
+                        args->cmdline[cmdlinelen] = '\n';
+                        memcpy(args->cmdline + cmdlinelen + 1, item, itemlen + 1);
                     }
                 }
                 else {

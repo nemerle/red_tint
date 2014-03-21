@@ -123,18 +123,18 @@ enum node_type : uint8_t {
 typedef std::vector<mrb_sym> tLocals;
 /* AST node structure */
 struct mrb_ast_node {
-    short lineno;
-    const char *filename;
+    uint16_t lineno;
+    uint16_t filename_index;
     virtual node_type getType() const=0;
     virtual mrb_ast_node *left() const=0;
     virtual void left(mrb_ast_node *v)=0;
     virtual mrb_ast_node *right() const=0;
     virtual void right(mrb_ast_node *v)=0;
-    virtual void init(mrb_ast_node *a,mrb_ast_node *b,short lin,const char *f) =0;
+    virtual void init(mrb_ast_node *a,mrb_ast_node *b,uint16_t lin,uint16_t f) =0;
     virtual void accept(NodeVisitor *v) { assert(false); }
-    void locationInit(short lin,const char *f) {
+    void locationInit(uint16_t lin, uint16_t f) {
         lineno = lin;
-        filename = f;
+        filename_index = f;
     }
 };
 struct mrb_ast_list_like_node : public mrb_ast_node {
@@ -145,7 +145,7 @@ struct mrb_ast_list_like_node : public mrb_ast_node {
     }
     virtual mrb_ast_node *right() const {return m_cdr; }
     virtual void right(mrb_ast_node *v) { m_cdr=v; }
-    virtual void init(mrb_ast_node *a,mrb_ast_node *b,short lin,const char *f) override {
+    virtual void init(mrb_ast_node *a,mrb_ast_node *b,uint16_t lin,uint16_t f) override {
         m_car = a;
         m_cdr = b;
         locationInit(lin,f);
@@ -159,7 +159,7 @@ struct UpdatedNode : public mrb_ast_node {
     mrb_ast_node *right() const { assert(false); return nullptr; }
     void right(mrb_ast_node *v) { assert(false); }
     virtual void accept(NodeVisitor *v) = 0;
-    virtual void init(mrb_ast_node *a,mrb_ast_node *b,short lin,const char *f) override {
+    virtual void init(mrb_ast_node *a,mrb_ast_node *b,uint16_t lin,uint16_t f) override {
         assert(false);
     }
 };

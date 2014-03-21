@@ -33,6 +33,7 @@ SET(MRUBY_SRC_C
     symbol.cpp
     variable.cpp
     vm.cpp
+    debug
     ../include/mrbconf.h
     ../include/mruby.h
     ../include/mruby/array.h
@@ -40,6 +41,7 @@ SET(MRUBY_SRC_C
     ../include/mruby/compile.h
     ../include/mruby/mem_manager.h
     ../include/mruby/data.h
+    ../include/mruby/debug
     ../include/mruby/dump.h
     ../include/mruby/khash.h
     ../include/mruby/hash.h

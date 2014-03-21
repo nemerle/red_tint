@@ -107,7 +107,8 @@ struct mrb_callinfo {
     int stackidx;
     int nregs;
     int argc;
-    mrb_code *pc;
+    mrb_code *pc;                 /* return address */
+    mrb_code *err;                /* error position */
     int acc;
     RClass *target_class;
     int ridx;
@@ -133,7 +134,7 @@ struct mrb_context {
   int m_rsize;
   RProc **m_ensure;
   int m_esize;
-  uint8_t status;
+  enum mrb_fiber_state status;
   struct RFiber *fib;
 };
 struct SysInterface {
@@ -284,19 +285,6 @@ mrb_value mrb_check_to_integer(mrb_state *mrb, const mrb_value &val, const char 
 #define MRB_ARGS_NONE() ((mrb_aspec)0)
 
 
-/* For backward compatibility. */
-static inline
-mrb_sym mrb_intern(mrb_state *mrb,const char *cstr)
-{
-    return mrb_intern_cstr(mrb, cstr);
-}
-
-//void *mrb_malloc(mrb_state*, size_t);
-//void *mrb_calloc(mrb_state*, size_t, size_t);
-//void *mrb_realloc(mrb_state*, void*, size_t);
-//RBasic *mrb_obj_alloc(mrb_state*, enum mrb_vtype, RClass*);
-//void *mrb_free(mrb_state*, void*);
-
 mrb_value mrb_str_new(mrb_state *mrb, const char *p, size_t len);
 mrb_value mrb_str_new_cstr(mrb_state*, const char*);
 mrb_value mrb_str_new_static(mrb_state *mrb, const char *p, size_t len);
@@ -342,7 +330,6 @@ mrb_value mrb_obj_clone(mrb_state *mrb, mrb_value self);
 #ifndef ISPRINT
 //#define ISASCII(c) isascii((int)(unsigned char)(c))
 #define ISASCII(c) 1
-#undef ISPRINT
 #define ISPRINT(c) (ISASCII(c) && isprint((int)(unsigned char)(c)))
 #define ISSPACE(c) (ISASCII(c) && isspace((int)(unsigned char)(c)))
 #define ISUPPER(c) (ISASCII(c) && isupper((int)(unsigned char)(c)))

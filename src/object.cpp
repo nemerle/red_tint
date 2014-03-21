@@ -27,7 +27,7 @@ int mrb_obj_eq(mrb_value v1, mrb_value v2)
             return (mrb_float(v1) == mrb_float(v2));
 
         default:
-            return (v1.value.p == v2.value.p);
+            return (mrb_ptr(v1) == mrb_ptr(v2));
     }
 }
 
@@ -404,7 +404,7 @@ mrb_value mrb_any_to_s(mrb_state *mrb, mrb_value obj)
     rs->str_cat(cname,strlen(cname));
     rs->str_cat(":", 1);
     mrb_value str(mrb_obj_value(rs));
-    mrb_str_concat(mrb, str, mrb_ptr_to_str(mrb, mrb_voidp(obj)));
+    mrb_str_concat(mrb, str, mrb_ptr_to_str(mrb, mrb_cptr(obj)));
     rs->str_buf_cat(">", 1);
     return str;
 }
@@ -498,17 +498,13 @@ static mrb_value mrb_convert_to_integer(mrb_state *mrb, mrb_value val, int base)
                 goto arg_error;
             return val;
 
-        case MRB_TT_STRING:
-string_conv:
-            return mrb_str_to_inum(mrb, val, base, true);
-
         default:
             break;
     }
     if (base != 0) {
         tmp = mrb_check_string_type(mrb, val);
         if (!mrb_nil_p(tmp))
-            goto string_conv;
+            return mrb_str_to_inum(mrb, val, base, true);
 arg_error:
         mrb->mrb_raise(E_ARGUMENT_ERROR, "base specified for non string value");
     }

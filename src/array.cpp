@@ -779,7 +779,7 @@ mrb_value RArray::entry(mrb_int offset)
 }
 
 static constexpr bool simpleArrComp(const RArray *a, const mrb_value &b) {
-    return (a == b.value.p);
+    return (a == mrb_cptr(b));
 }
 mrb_value RArray::inspect_ary(RArray *list_arr)
 {
@@ -936,7 +936,7 @@ mrb_value RArray::mrb_ary_equal()
 {
     mrb_value ary2(m_vm->get_arg<mrb_value>());
 
-    if ( this == ary2.value.p) {
+    if ( this == mrb_basic_ptr(ary2)) {
         return mrb_true_value();
     }
     if (mrb_special_const_p(ary2)) {
@@ -972,7 +972,7 @@ mrb_value RArray::mrb_ary_eql()
 {
     mrb_value ary2(m_vm->get_arg<mrb_value>());
 
-    if ( this == ary2.value.p) {  //was mrb_obj_equal(m_vm, ary1, ary2)
+    if ( this == mrb_basic_ptr(ary2)) {  //was mrb_obj_equal(m_vm, ary1, ary2)
         return mrb_true_value();
     }
     if (!mrb_is_a_array(ary2)) {

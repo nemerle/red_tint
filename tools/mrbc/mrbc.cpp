@@ -61,15 +61,19 @@ usage(const char *name)
 
 static char * get_outfilename(mrb_state *mrb, char *infile, const char *ext)
 {
+    size_t infilelen;
+    size_t extlen;
     char *outfile;
     char *p;
 
-    outfile = (char*)mrb->gc()._malloc(strlen(infile) + strlen(ext) + 1);
+    infilelen = strlen(infile);
+    extlen = strlen(ext);
+    outfile = (char*)mrb->gc()._malloc(infilelen + extlen + 1);
     strcpy(outfile, infile);
     if (*ext) {
         if ((p = strrchr(outfile, '.')) == NULL)
-            p = &outfile[strlen(outfile)];
-        strcpy(p, ext);
+             p = outfile + infilelen;;
+        memcpy(p, ext, extlen + 1);
     }
 
     return outfile;
@@ -179,9 +183,7 @@ static int partial_hook(mrb_parser_state *p)
         fprintf(stderr, "%s: cannot open program file. (%s)\n", args->prog, fn);
         return -1;
     }
-    mrbc_filename(p->m_mrb, c, fn);
-    p->m_filename = c->filename;
-    p->m_lineno = 1;
+    p->mrb_parser_set_filename(fn);
     return 0;
 }
 
