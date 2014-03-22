@@ -11,6 +11,7 @@
 #include "mruby/irep.h"
 #include "mruby/variable.h"
 #include "mruby/debug.h"
+#include "mruby/string.h"
 
 void mrb_core_init(mrb_state*);
 void mrb_core_final(mrb_state*);
@@ -116,10 +117,10 @@ void mrb_irep_free(mrb_state *mrb, mrb_irep *irep)
     if (!(irep->flags & MRB_ISEQ_NO_FREE))
         mm._free(irep->iseq);
     for (int i=0; i<irep->plen; i++) {
-        if (irep->m_pool[i].type == irep_pool_type::IREP_TT_STRING)
-            mrb->gc()._free(irep->m_pool[i].value.s);
+        if (mrb_type(irep->pool[i]) == MRB_TT_STRING)
+            mm._free(mrb_ptr(irep->pool[i]));
     }
-    mm._free(irep->m_pool);
+    mm._free(irep->pool);
     mm._free(irep->syms);
     for (int i=0; i<irep->rlen; i++) {
         mrb_irep_decref(mrb, irep->reps[i]);

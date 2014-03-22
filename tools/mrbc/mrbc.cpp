@@ -20,7 +20,6 @@
 
 void mrb_show_version(mrb_state *);
 void mrb_show_copyright(mrb_state *);
-void parser_dump(mrb_state*, struct mrb_ast_node*, int);
 void codedump_all(mrb_state*, int);
 static char *
 get_outfilename(mrb_state *mrb, char *infile, const char *ext);

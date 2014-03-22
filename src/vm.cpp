@@ -444,7 +444,7 @@ static void localjump_error(mrb_state *mrb, localjump_error_kind kind)
     mrb_value msg = mrb_str_buf_new(mrb, sizeof(lead) + 7);
     mrb_str_buf_cat(msg, lead, sizeof(lead) - 1);
     mrb_str_buf_cat(msg, kind_str[kind], kind_str_len[kind]);
-    mrb_value exc = mrb_exc_new3(E_LOCALJUMP_ERROR, msg);
+    mrb_value exc = mrb_exc_new_str(E_LOCALJUMP_ERROR, msg);
     mrb->m_exc = mrb_ptr(exc);
 }
 
@@ -462,10 +462,11 @@ static void argnum_error(mrb_state *mrb, int num)
         str = mrb_format(mrb, "wrong number of arguments (%S for %S)",
                          mrb_fixnum_value(mrb->m_ctx->m_ci->argc), mrb_fixnum_value(num));
     }
-    exc = mrb_exc_new3(E_ARGUMENT_ERROR, str);
+    exc = mrb_exc_new_str(E_ARGUMENT_ERROR, str);
     mrb->m_exc = mrb_ptr(exc);
 }
-#define ERR_PC_HOOK(mrb, pc) mrb->m_ctx->m_ci->err = pc;
+#define ERR_PC_SET(mrb, pc) mrb->m_ctx->m_ci->err = pc;
+#define ERR_PC_CLR(mrb)     mrb->m_ctx->m_ci->err = 0;
 #ifdef ENABLE_DEBUG
 #define CODE_FETCH_HOOK(mrb, irep, pc, regs) if ((mrb)->code_fetch_hook) (mrb)->code_fetch_hook((mrb), (irep), (pc), (regs));
 #else
@@ -518,7 +519,7 @@ mrb_value mrb_state::mrb_context_run(RProc *proc, mrb_value self,unsigned int st
     /* assert(mrb_proc_cfunc_p(proc)) */
     mrb_irep *irep = proc->body.irep;
     mrb_code *pc = irep->iseq;
-    auto *pool = irep->m_pool;
+    auto *pool = irep->pool;
     mrb_sym *syms = irep->syms;
     mrb_value *regs = NULL;
     mrb_code i;
@@ -582,10 +583,7 @@ mrb_value mrb_state::mrb_context_run(RProc *proc, mrb_value self,unsigned int st
 
         CASE(OP_LOADL) {
             /* A Bx   R(A) := Pool(Bx) */
-            if (pool[GETARG_Bx(i)].type == irep_pool_type::IREP_TT_FLOAT)
-                SET_FLT_VALUE(regs[GETARG_A(i)], pool[GETARG_Bx(i)].value.f);
-            else
-                MRB_SET_VALUE(regs[GETARG_A(i)], MRB_TT_FIXNUM, value.i, pool[GETARG_Bx(i)].value.i);
+            regs[GETARG_A(i)] =  pool[GETARG_Bx(i)];
             NEXT;
         }
 
@@ -657,8 +655,9 @@ mrb_value mrb_state::mrb_context_run(RProc *proc, mrb_value self,unsigned int st
 
         CASE(OP_GETCV) {
             /* A B    R(A) := ivget(Sym(B)) */
-            ERR_PC_HOOK(this, pc);
+            ERR_PC_SET(this, pc);
             regs[GETARG_A(i)] = mrb_vm_cv_get(this, syms[GETARG_Bx(i)]);
+            ERR_PC_CLR(this);
             NEXT;
         }
 
@@ -670,8 +669,9 @@ mrb_value mrb_state::mrb_context_run(RProc *proc, mrb_value self,unsigned int st
 
         CASE(OP_GETCONST) {
             /* A B    R(A) := constget(Sym(B)) */
-            ERR_PC_HOOK(this, pc);
+            ERR_PC_SET(this, pc);
             mrb_value val = mrb_vm_const_get(this, syms[GETARG_Bx(i)]);
+            ERR_PC_CLR(this);
             regs =m_ctx->m_stack;
             regs[GETARG_A(i)] = val;
             NEXT;
@@ -686,8 +686,9 @@ mrb_value mrb_state::mrb_context_run(RProc *proc, mrb_value self,unsigned int st
         CASE(OP_GETMCNST) {
             /* A B C  R(A) := R(C)::Sym(B) */
             int a = GETARG_A(i);
-            ERR_PC_HOOK(this, pc);
+            ERR_PC_SET(this, pc);
             mrb_value val = this->const_get(regs[a], syms[GETARG_Bx(i)]);
+            ERR_PC_CLR(this);
             regs = m_ctx->m_stack;
             regs[a] = val;
             NEXT;
@@ -874,7 +875,7 @@ L_SEND:
                 _ci = m_ctx->m_ci;
                 if (!MRB_PROC_CFUNC_P(_ci[-1].proc)) {
                     irep = _ci[-1].proc->body.irep;
-                    pool = irep->m_pool;
+                    pool = irep->pool;
                     syms = irep->syms;
                 }
                 regs = m_ctx->m_stack = m_ctx->m_stbase + m_ctx->m_ci->stackidx;
@@ -886,7 +887,7 @@ L_SEND:
                 /* setup environment for calling method */
                 proc = m_ctx->m_ci->proc = m;
                 irep = m->body.irep;
-                pool = irep->m_pool;
+                pool = irep->pool;
                 syms = irep->syms;
                 _ci->nregs = irep->nregs;
                 call_stack_sizing(this,_ci,irep);
@@ -946,7 +947,7 @@ L_SEND:
                 regs[0] = m->env->stack[0];
                 pc = m->body.irep->iseq;
             }
-            pool = irep->m_pool;
+            pool = irep->pool;
             syms = irep->syms;
             JUMP;
         }
@@ -998,7 +999,7 @@ L_SEND:
                 /* setup environment for calling method */
                 ci->proc = m;
                 irep = m->body.irep;
-                pool = irep->m_pool;
+                pool = irep->pool;
                 syms = irep->syms;
                 ci->nregs = irep->nregs;
                 call_stack_sizing(this,ci,irep);
@@ -1176,7 +1177,7 @@ L_RAISE:
                         this->jmp = prev_jmp;
                         mrb_longjmp(this);
                     }
-                    while (eidx > _ci->eidx) {
+                    while (eidx > _ci[-1].eidx) {
                         ecall(this, --eidx);
                     }
                     if (_ci == m_ctx->cibase) {
@@ -1189,7 +1190,7 @@ L_RAISE:
                 }
 L_RESCUE:
                 irep = _ci->proc->body.irep;
-                pool = irep->m_pool;
+                pool = irep->pool;
                 syms = irep->syms;
                 regs = m_ctx->m_stack = m_ctx->m_stbase + _ci[1].stackidx;
                 pc = m_ctx->rescue[--_ci->ridx];
@@ -1224,7 +1225,7 @@ L_RESCUE:
                                 goto L_RAISE;
                             }
                             if (m_ctx->prev->m_ci == m_ctx->prev->cibase) {
-                                mrb_value exc = mrb_exc_new3(A_RUNTIME_ERROR(this),
+                                mrb_value exc = mrb_exc_new_str(A_RUNTIME_ERROR(this),
                                                              mrb_str_new(this, "double resume", 13));
                                 m_exc = mrb_ptr(exc);
                                 goto L_RAISE;
@@ -1261,7 +1262,7 @@ L_RESCUE:
                 DEBUG(printf("from :%s\n", mrb_sym2name(this, ci->mid)));
                 proc = m_ctx->m_ci->proc;
                 irep = proc->body.irep;
-                pool = irep->m_pool;
+                pool = irep->pool;
                 syms = irep->syms;
 
                 regs[acc] = v;
@@ -1298,7 +1299,7 @@ L_RESCUE:
             else {
                 /* setup environment for calling method */
                 irep = m->body.irep;
-                pool = irep->m_pool;
+                pool = irep->pool;
                 syms = irep->syms;
                 call_stack_sizing(this,_ci,irep);
                 regs = m_ctx->m_stack;
@@ -1806,7 +1807,7 @@ L_RESCUE:
 
         CASE(OP_STRING) {
             /* A Bx           R(A) := str_new(Lit(Bx)) */
-            regs[GETARG_A(i)] = mrb_str_new(this, pool[GETARG_Bx(i)].value.s->buf, pool[GETARG_Bx(i)].value.s->len);
+            regs[GETARG_A(i)] = mrb_str_dup(this, pool[GETARG_Bx(i)]);
             gc().arena_restore(ai);
             NEXT;
         }
@@ -1920,7 +1921,7 @@ L_RESCUE:
             }
             else {
                 irep = p->body.irep;
-                pool = irep->m_pool;
+                pool = irep->pool;
                 syms = irep->syms;
                 stack_extend(this, irep->nregs, 1);
                 ci->nregs = irep->nregs;
@@ -1986,6 +1987,7 @@ L_STOP:
                     ecall(this, n);
                 }
             }
+            m_ctx->m_ci->err = 0;
             this->jmp = prev_jmp;
             if (m_exc) {
                 return mrb_obj_value(m_exc);
@@ -1995,13 +1997,13 @@ L_STOP:
 
         CASE(OP_ERR) {
             /* Bx     raise RuntimeError with message Lit(Bx) */
-            mrb_value msg = mrb_str_new(this, pool[GETARG_Bx(i)].value.s->buf, pool[GETARG_Bx(i)].value.s->len);
+            mrb_value msg = mrb_str_dup(this, pool[GETARG_Bx(i)]);
             RClass *excep_class = A_RUNTIME_ERROR(this);
 
             if (GETARG_A(i) != 0) {
                 excep_class = I_LOCALJUMP_ERROR;
             }
-            m_exc = mrb_ptr(mrb_exc_new3(excep_class, msg));
+            m_exc = mrb_ptr(mrb_exc_new_str(excep_class, msg));
             goto L_RAISE;
         }
     }

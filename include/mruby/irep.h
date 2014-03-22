@@ -7,11 +7,6 @@
 //#include "mruby/compile.h"
 
 #define MRB_ISEQ_NO_FREE 1
-enum class irep_pool_type {
-  IREP_TT_STRING,
-  IREP_TT_FIXNUM,
-  IREP_TT_FLOAT,
-};
 struct mrb_irep {
     uint16_t idx; //FIXME: this overflows when large number of closures is created.
     uint16_t nlocals; /* Number of local variables */
@@ -19,18 +14,7 @@ struct mrb_irep {
     uint8_t flags;
 
     mrb_code *iseq;
-    struct irep_pool_string {
-        mrb_int len;
-        char buf[1];
-    };
-    struct irep_pool {
-        union {
-            mrb_float f;
-            irep_pool_string *s;
-            mrb_int i;
-        } value;
-        irep_pool_type type;
-    } *m_pool;
+    mrb_value *pool;
     mrb_sym *syms;
     struct mrb_irep **reps;
 
