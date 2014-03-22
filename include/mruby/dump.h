@@ -16,7 +16,7 @@ mrb_irep* mrb_read_irep_file(mrb_state*, FILE*);
 #endif
 mrb_irep *mrb_read_irep(mrb_state*, const uint8_t*);
 
-
+mrb_value mrb_load_irep_file_cxt(mrb_state*, FILE*, struct mrbc_context*);
 #ifdef ENABLE_STDIO
 mrb_value mrb_load_irep_file(mrb_state*,FILE*);
 #endif

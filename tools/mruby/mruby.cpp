@@ -114,7 +114,7 @@ append_cmdline:
                 }
                 else {
                     printf("%s: No code specified for -e\n", *origargv);
-        return EXIT_SUCCESS;
+                    return EXIT_SUCCESS;
                 }
                 break;
             case 'v':
@@ -179,7 +179,8 @@ main(int argc, char **argv)
     int n = -1;
     int i;
     struct mrbc_args args;
-
+    mrbc_context *c;
+    mrb_value v;
     if (mrb == NULL) {
         fputs("Invalid mrb_state, exiting mruby\n", stderr);
         return EXIT_FAILURE;
@@ -197,30 +198,16 @@ main(int argc, char **argv)
         pARGV->push(mrb_str_new(mrb, args.argv[i], strlen(args.argv[i])));
     }
     mrb_define_global_const(mrb, "ARGV", mrb_obj_value(pARGV));
-
+    c = mrbc_context_new(mrb);
+    if (args.verbose)
+        c->dump_result = 1;
+    if (args.check_syntax)
+        c->no_exec = 1;
     if (args.mrbfile) {
-        mrb_irep *irep = mrb_read_irep_file(mrb, args.rfp);
-        if (!irep) {
-            fprintf(stderr, "failed to load mrb file: %s\n", args.cmdline);
-        }
-        else if (!args.check_syntax) {
-            mrb->mrb_context_run(mrb_proc_new(mrb, irep), mrb_top_self(mrb),0);
-            n = 0;
-            if (mrb->m_exc) {
-                mrb_print_error(mrb);
-                n = -1;
-            }
-        }
+        v = mrb_load_irep_file_cxt(mrb, args.rfp, c);
     }
     else {
-        mrbc_context *c = mrbc_context_new(mrb);
         mrb_sym zero_sym = mrb_intern2(mrb, "$0", 2);
-        mrb_value v;
-
-        if (args.verbose)
-            c->dump_result = 1;
-        if (args.check_syntax)
-            c->no_exec = 1;
 
         if (args.rfp) {
             const char *cmdline;
@@ -235,16 +222,16 @@ main(int argc, char **argv)
             v = mrb_load_string_cxt(mrb, args.cmdline, c);
         }
 
-        mrbc_context_free(mrb, c);
-        if (mrb->m_exc) {
-            if (!mrb_undef_p(v)) {
-                mrb_print_error(mrb);
-            }
-            n = -1;
+    }
+    mrbc_context_free(mrb, c);
+    if (mrb->m_exc) {
+        if (!mrb_undef_p(v)) {
+            mrb_print_error(mrb);
         }
-        else if (args.check_syntax) {
-            printf("Syntax OK\n");
-        }
+        n = -1;
+    }
+    else if (args.check_syntax) {
+        printf("Syntax OK\n");
     }
     cleanup(mrb, &args);
 

@@ -102,7 +102,7 @@ struct mrb_lexer_state {
 };
 struct mrb_parser_state {
     mrb_state *m_mrb;
-    mrb_pool *pool;
+    struct mrb_pool *pool;
     mrb_ast_node *cells;
     std::string source;
     const char *s, *send;
@@ -299,7 +299,7 @@ void mrbc_partial_hook(mrb_state *mrb, mrbc_context *c, int (*partial_hook)(mrb_
 mrb_parser_state* mrb_parser_new(mrb_state*);
 void mrb_parser_free(mrb_parser_state*);
 void mrb_parser_parse(mrb_parser_state*,mrbc_context*);
-RProc *mrb_generate_code(mrb_state*, mrb_parser_state*);
+struct RProc *mrb_generate_code(mrb_state*, mrb_parser_state*);
 /* program load functions */
 #ifdef ENABLE_STDIO
 mrb_value mrb_load_file(mrb_state*,FILE*);

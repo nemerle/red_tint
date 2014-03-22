@@ -72,7 +72,7 @@ static char * get_outfilename(mrb_state *mrb, char *infile, const char *ext)
     memcpy(outfile, infile,infilelen + 1);
     if (*ext) {
         if ((p = strrchr(outfile, '.')) == NULL)
-             p = outfile + infilelen;
+            p = outfile + infilelen;
         memcpy(p, ext, extlen + 1);
     }
 
@@ -130,8 +130,8 @@ static int parse_args(mrb_state *mrb, int argc, char **argv, mrbc_args *args)
                 case 'g':
                     args->debug_info = 1;
                     break;
-      case 'h':
-        return -1;
+                case 'h':
+                    return -1;
                 case '-':
                     if (argv[i][1] == '\n') {
                         return i;
@@ -196,7 +196,7 @@ load_file(mrb_state *mrb, struct mrbc_args *args)
     mrb_value result;
     char *input = args->argv[args->idx];
     FILE *infile;
-
+    bool need_close = false;
     c = mrbc_context_new(mrb);
     if (args->verbose)
         c->dump_result = 1;
@@ -204,22 +204,27 @@ load_file(mrb_state *mrb, struct mrbc_args *args)
     if (input[0] == '-' && input[1] == '\0') {
         infile = stdin;
     }
-    else if ((infile = fopen(input, "r")) == NULL) {
-        fprintf(stderr, "%s: cannot open program file. (%s)\n", args->prog, input);
-        return mrb_nil_value();
+    else {
+        need_close = true;
+        if ((infile = fopen(input, "r")) == NULL) {
+            fprintf(stderr, "%s: cannot open program file. (%s)\n", args->prog, input);
+            return mrb_nil_value();
+        }
     }
     mrbc_filename(mrb, c, input);
     args->idx++;
     if (args->idx < args->argc) {
+        need_close = false;
         mrbc_partial_hook(mrb, c, partial_hook, (void*)args);
     }
 
     result = mrb_load_file_cxt(mrb, infile, c);
-    if (mrb_undef_p(result) || mrb_fixnum(result) < 0) {
-        mrbc_context_free(mrb, c);
+    if (need_close)
+        fclose(infile);
+    mrbc_context_free(mrb, c);
+    if (mrb_undef_p(result)) {
         return mrb_nil_value();
     }
-    mrbc_context_free(mrb, c);
     return result;
 }
 

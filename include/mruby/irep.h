@@ -4,9 +4,14 @@
 ** See Copyright Notice in mruby.h
 */
 #pragma once
+//#include "mruby/compile.h"
 
 #define MRB_ISEQ_NO_FREE 1
-
+enum class irep_pool_type {
+  IREP_TT_STRING,
+  IREP_TT_FIXNUM,
+  IREP_TT_FLOAT,
+};
 struct mrb_irep {
     uint16_t idx; //FIXME: this overflows when large number of closures is created.
     uint16_t nlocals; /* Number of local variables */
@@ -24,7 +29,7 @@ struct mrb_irep {
             irep_pool_string *s;
             mrb_int i;
         } value;
-        enum mrb_vtype type;
+        irep_pool_type type;
     } *m_pool;
     mrb_sym *syms;
     struct mrb_irep **reps;
@@ -38,6 +43,7 @@ struct mrb_irep {
 
 mrb_irep *mrb_add_irep(mrb_state *mrb);
 mrb_value mrb_load_irep(mrb_state*, const uint8_t*);
+mrb_value mrb_load_irep_ctx(mrb_state*, const uint8_t*, struct mrbc_context*);
 void mrb_irep_free(mrb_state*, struct mrb_irep*);
 void mrb_irep_incref(mrb_state*, struct mrb_irep*);
 void mrb_irep_decref(mrb_state*, struct mrb_irep*);

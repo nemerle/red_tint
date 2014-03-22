@@ -57,16 +57,18 @@ namespace {
 static inline void
 stack_clear(mrb_value *from, size_t count)
 {
+#ifndef MRB_NAN_BOXING
     const mrb_value mrb_value_zero = { { 0 } };
 
     while(count-- > 0) {
-#ifndef MRB_NAN_BOXING
         *from++ = mrb_value_zero;
+    }
 #else
+    while(count-- > 0) {
         SET_NIL_VALUE(*from);
         from++;
-#endif
     }
+#endif
 }
 static inline void
 stack_copy(mrb_value *dst, const mrb_value *src, size_t size)
@@ -580,7 +582,7 @@ mrb_value mrb_state::mrb_context_run(RProc *proc, mrb_value self,unsigned int st
 
         CASE(OP_LOADL) {
             /* A Bx   R(A) := Pool(Bx) */
-            if (pool[GETARG_Bx(i)].type == MRB_TT_FLOAT)
+            if (pool[GETARG_Bx(i)].type == irep_pool_type::IREP_TT_FLOAT)
                 SET_FLT_VALUE(regs[GETARG_A(i)], pool[GETARG_Bx(i)].value.f);
             else
                 MRB_SET_VALUE(regs[GETARG_A(i)], MRB_TT_FIXNUM, value.i, pool[GETARG_Bx(i)].value.i);

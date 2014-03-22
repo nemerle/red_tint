@@ -264,18 +264,13 @@ int mrb_parser_state::nextc()
     m_column++;
     return c;
 eof:
-    if (!this->eof) {
-        this->eof = true;
-        return '\n';
-    }
     if (!m_cxt)
         return -1;
     mrbc_context *cxt = m_cxt;
     if (cxt->partial_hook(this) < 0)
         return -1;
-    this->eof = false;
-    this->m_cxt = NULL;
-    c = nextc();
+    c = '\n';
+    m_lineno = 1;
     m_cxt = cxt;
     return c;
 }
@@ -364,6 +359,9 @@ int mrb_parser_state::heredoc_identifier()
             return 0;
         }
     } else {
+        if (c == -1) {
+            return 0;                 /* missing here document identifier */
+        }
         if (! identchar(c)) {
             this->pushback(c);
             if (indent) pushback('-');
@@ -631,7 +629,10 @@ retry:
         case '\0':    /* NUL */
         case '\004':  /* ^D */
         case '\032':  /* ^Z */
+            return 0;
         case -1:      /* end of script. */
+            if (this->heredocs_from_nextline)
+                goto maybe_heredoc;
             return 0;
 
             /* white spaces */
@@ -643,6 +644,7 @@ retry:
             this->skip('\n');
             /* fall through */
         case '\n':
+            maybe_heredoc:
             heredoc_treat_nextline();
             switch (m_lstate) {
                 case EXPR_BEG:

@@ -116,7 +116,7 @@ void mrb_irep_free(mrb_state *mrb, mrb_irep *irep)
     if (!(irep->flags & MRB_ISEQ_NO_FREE))
         mm._free(irep->iseq);
     for (int i=0; i<irep->plen; i++) {
-        if (irep->m_pool[i].type == MRB_TT_STRING)
+        if (irep->m_pool[i].type == irep_pool_type::IREP_TT_STRING)
             mrb->gc()._free(irep->m_pool[i].value.s);
     }
     mm._free(irep->m_pool);

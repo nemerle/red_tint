@@ -484,7 +484,7 @@ void codegen_scope::genop_peep(mrb_code i, int val)
         case OP_STRCAT:
             if (c0 == OP_STRING) {
                 int i = GETARG_Bx(i0);
-                if (m_irep->m_pool[i].type == MRB_TT_STRING &&
+                if (m_irep->m_pool[i].type == irep_pool_type::IREP_TT_STRING &&
                         m_irep->m_pool[i].value.s->len == 0) {
                     m_pc--;
                     return;
@@ -540,7 +540,7 @@ int codegen_scope::new_lit(mrb_value val)
             for (i=0; i<m_irep->plen; i++) {
                 pv = &m_irep->m_pool[i];
                 mrb_int len;
-                if (pv->type != MRB_TT_STRING) continue;
+                if (pv->type != irep_pool_type::IREP_TT_STRING) continue;
                 if ((len = pv->value.s->len) != RSTRING_LEN(val)) continue;
                 if (memcmp(pv->value.s->buf, RSTRING_PTR(val), len) == 0)
                     return i;
@@ -549,14 +549,14 @@ int codegen_scope::new_lit(mrb_value val)
         case MRB_TT_FLOAT:
             for (i=0; i<m_irep->plen; i++) {
               pv = &m_irep->m_pool[i];
-              if (pv->type != MRB_TT_FLOAT) continue;
+              if (pv->type != irep_pool_type::IREP_TT_FLOAT) continue;
                 if (pv->value.f == mrb_float(val)) return i;
             }
             break;
         case MRB_TT_FIXNUM:
             for (i=0; i<m_irep->plen; i++) {
                 pv = &m_irep->m_pool[i];
-                if (pv->type != MRB_TT_FIXNUM) continue;
+                if (pv->type != irep_pool_type::IREP_TT_FIXNUM) continue;
                 if (pv->value.i == mrb_fixnum(val)) return i;
             }
             break;
@@ -573,18 +573,21 @@ int codegen_scope::new_lit(mrb_value val)
 
     pv = &m_irep->m_pool[m_irep->plen];
     i = m_irep->plen++;
-    pv->type = mrb_type(val);
+    pv->type = (irep_pool_type)mrb_type(val);
 
-    switch (pv->type) {
+    switch (mrb_type(val)) {
         case MRB_TT_STRING:
+            pv->type =  irep_pool_type::IREP_TT_STRING;
             pv->value.s = (mrb_irep::irep_pool_string*)s_realloc(0, sizeof(mrb_irep::irep_pool_string) + RSTRING_LEN(val));
             pv->value.s->len = RSTRING_LEN(val);
             memcpy(pv->value.s->buf, RSTRING_PTR(val), RSTRING_LEN(val));
             break;
         case MRB_TT_FLOAT:
+            pv->type =  irep_pool_type::IREP_TT_FLOAT;
             pv->value.f = mrb_float(val);
             break;
         case MRB_TT_FIXNUM:
+            pv->type =  irep_pool_type::IREP_TT_FIXNUM;
             pv->value.i = mrb_fixnum(val);
             break;
         default:
