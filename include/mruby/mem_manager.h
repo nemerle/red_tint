@@ -130,6 +130,8 @@ protected:
     size_t      m_majorgc_old_threshold;
     struct alloca_header *mems;
     void incremental_gc_step();
+    size_t mark_irep_pool_size(struct mrb_irep *irep);
+    void mark_irep_pool(struct mrb_irep *irep);
 };
 // helper class to use user passed allocation routine in std containers
 template <class T>

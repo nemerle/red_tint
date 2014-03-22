@@ -587,6 +587,18 @@ void mrb_state::get_arg(const mrb_value &arg,mrb_int &tgt) {
             break;
     }
 }
+void mrb_state::get_arg(const mrb_value &arg, RClass *&tgt) {
+    switch (mrb_type(arg)) {
+        case MRB_TT_CLASS:
+        case MRB_TT_MODULE:
+        case MRB_TT_SCLASS:
+            break;
+        default:
+            mrb_raisef(I_TYPE_ERROR, "%S is not class/module", arg);
+            break;
+    }
+    tgt = mrb_class_ptr(arg);
+}
 void mrb_state::get_arg(const mrb_value &arg, mrb_sym &tgt) {
 
     if (mrb_type(arg) == MRB_TT_SYMBOL) {

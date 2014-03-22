@@ -76,6 +76,7 @@ static  mrb_value   splat(mrb_state *mrb, const mrb_value &v);
         mrb_value   empty_p() const;
         mrb_value   inspect();
         void        splice(mrb_int head, mrb_int len, const mrb_value &rpl);
+        void mrb_ary_modify();
 protected:
         mrb_value * base_ptr() {
             return (flags & MRB_ARY_SHARED) ? m_aux.shared->ptr : m_ptr;

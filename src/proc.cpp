@@ -19,6 +19,7 @@ RProc * mrb_proc_new(mrb_state *mrb, mrb_irep *irep)
     p->target_class = (mrb->m_ctx->m_ci) ? mrb->m_ctx->m_ci->target_class : nullptr;
     p->body.irep = irep;
     p->env = nullptr;
+    mrb_irep_incref(mrb, irep);
 
     return p;
 }
@@ -149,15 +150,14 @@ static mrb_value proc_lambda(mrb_state *mrb, mrb_value self)
 void mrb_init_proc(mrb_state *mrb)
 {
     RProc *m;
-    mrb_irep *call_irep = (mrb_irep *)mrb->gc().mrb_alloca(sizeof(mrb_irep));
+    mrb_irep *call_irep = (mrb_irep *)mrb->gc()._malloc(sizeof(mrb_irep));
     static constexpr mrb_irep mrb_irep_zero = { 0 };
 
-    if ( call_iseq == nullptr || call_irep == nullptr )
+    if ( call_irep == nullptr )
         return;
 
     *call_irep = mrb_irep_zero;
     call_irep->flags = MRB_ISEQ_NO_FREE;
-    call_irep->idx = -1;
     call_irep->iseq = call_iseq;
     call_irep->ilen = 1;
 

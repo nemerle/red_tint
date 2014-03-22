@@ -317,3 +317,6 @@ assert("Array (Longish inline array)") do
   ary.each {|p| h[p.class] += 1}
   assert_equal({Array=>200}, h)
 end
+
+
+

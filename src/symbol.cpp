@@ -77,23 +77,22 @@ mrb_sym mrb_intern2(mrb_state *mrb, const char *name, size_t len)
 }
 mrb_sym mrb_state::intern2(const char *name, size_t len)
 {
-    SymTable &name2sym_tab(*this->name2sym);
     symbol_name sname;
     mrb_sym sym;
     char *p;
 
     sname.len = len;
     sname.name = name;
-    khiter_t k = name2sym_tab.find(sname);
-    if (k != name2sym_tab.end())
-        return name2sym_tab[k];
+    khiter_t k = name2sym->find(sname);
+    if (k != name2sym->end())
+        return (*name2sym)[k];
 
     sym = ++this->symidx;
     p = (char *)gc()._malloc(len+1);
     memcpy(p, name, len);
     p[len] = 0;
     sname.name = (const char*)p;
-    name2sym_tab.insert(sname,sym);
+    name2sym->insert(sname,sym);
     return sym;
 }
 

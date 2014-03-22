@@ -425,87 +425,87 @@ void MemManager::mark_children(RBasic *obj)
     m_gray_list = obj->gcnext;
     mark(obj->c);
     switch (obj->tt) {
-    case MRB_TT_ICLASS:
-        mark(((RClass*)obj)->super);
-        break;
+        case MRB_TT_ICLASS:
+            mark(((RClass*)obj)->super);
+            break;
 
-    case MRB_TT_CLASS:
-    case MRB_TT_MODULE:
-    case MRB_TT_SCLASS:
-    {
-        RClass *c = (RClass*)obj;
+        case MRB_TT_CLASS:
+        case MRB_TT_MODULE:
+        case MRB_TT_SCLASS:
+        {
+            RClass *c = (RClass*)obj;
 
-        c->mark_mt(m_vm->gc());
-        mark(c->super);
-    }
-        /* fall through */
+            c->mark_mt(m_vm->gc());
+            mark(c->super);
+        }
+            /* fall through */
 
-    case MRB_TT_OBJECT:
-    case MRB_TT_DATA:
-        mrb_gc_mark_iv(m_vm, (RObject*)obj);
-        break;
+        case MRB_TT_OBJECT:
+        case MRB_TT_DATA:
+            mrb_gc_mark_iv(m_vm, (RObject*)obj);
+            break;
 
-    case MRB_TT_PROC:
-    {
-        RProc *p = (RProc*)obj;
+        case MRB_TT_PROC:
+        {
+            RProc *p = (RProc*)obj;
 
-        mark(p->env);
-        mark(p->target_class);
-    }
-        break;
+            mark(p->env);
+            mark(p->target_class);
+        }
+            break;
 
-    case MRB_TT_ENV:
-    {
-        REnv *e = (REnv*)obj;
+        case MRB_TT_ENV:
+        {
+            REnv *e = (REnv*)obj;
 
-        if (e->cioff < 0) {
-            int i, len;
+            if (e->cioff < 0) {
+                int i, len;
 
-            len = (int)e->flags;
-            for (i=0; i<len; i++) {
-                mrb_gc_mark_value(m_vm, e->stack[i]);
+                len = (int)e->flags;
+                for (i=0; i<len; i++) {
+                    mrb_gc_mark_value(m_vm, e->stack[i]);
+                }
             }
         }
-    }
-        break;
-    case MRB_TT_FIBER:
-    {
-        mrb_context *c = ((RFiber*)obj)->cxt;
-        mark_context(c);
-    }
-        break;
-    case MRB_TT_ARRAY:
-    {
-        RArray *a = (RArray*)obj;
-        size_t i, e;
-
-        for (i=0,e=a->m_len; i<e; i++) {
-            mrb_gc_mark_value(m_vm, a->m_ptr[i]);
+            break;
+        case MRB_TT_FIBER:
+        {
+            mrb_context *c = ((RFiber*)obj)->cxt;
+            mark_context(c);
         }
-    }
-        break;
+            break;
+        case MRB_TT_ARRAY:
+        {
+            RArray *a = (RArray*)obj;
+            size_t i, e;
 
-    case MRB_TT_HASH:
-        mrb_gc_mark_iv(m_vm, (RObject*)obj);
-        mrb_gc_mark_hash(m_vm, (RHash*)obj);
-        break;
-
-    case MRB_TT_STRING:
-        break;
-
-    case MRB_TT_RANGE:
-    {
-        RRange *r((RRange*)obj);
-
-        if (r->edges) {
-            mrb_gc_mark_value(m_vm, r->edges->beg);
-            mrb_gc_mark_value(m_vm, r->edges->end);
+            for (i=0,e=a->m_len; i<e; i++) {
+                mrb_gc_mark_value(m_vm, a->m_ptr[i]);
+            }
         }
-    }
-        break;
+            break;
 
-    default:
-        break;
+        case MRB_TT_HASH:
+            mrb_gc_mark_iv(m_vm, (RObject*)obj);
+            mrb_gc_mark_hash(m_vm, (RHash*)obj);
+            break;
+
+        case MRB_TT_STRING:
+            break;
+
+        case MRB_TT_RANGE:
+        {
+            RRange *r((RRange*)obj);
+
+            if (r->edges) {
+                mrb_gc_mark_value(m_vm, r->edges->beg);
+                mrb_gc_mark_value(m_vm, r->edges->end);
+            }
+        }
+            break;
+
+        default:
+            break;
     }
 }
 
@@ -523,83 +523,89 @@ void MemManager::obj_free(RBasic *obj)
 {
     DEBUG(printf("obj_free(%p,tt=%d)\n",obj,obj->tt));
     switch (obj->tt) {
-    /* immediate - no mark */
-    case MRB_TT_TRUE:
-    case MRB_TT_FIXNUM:
-    case MRB_TT_SYMBOL:
-    case MRB_TT_FLOAT:
-        /* cannot happen */
-        return;
+        /* immediate - no mark */
+        case MRB_TT_TRUE:
+        case MRB_TT_FIXNUM:
+        case MRB_TT_SYMBOL:
+        case MRB_TT_FLOAT:
+            /* cannot happen */
+            return;
 
-    case MRB_TT_OBJECT:
-        mrb_gc_free_iv(m_vm, (RObject*)obj);
-        break;
+        case MRB_TT_OBJECT:
+            mrb_gc_free_iv(m_vm, (RObject*)obj);
+            break;
 
-    case MRB_TT_CLASS:
-    case MRB_TT_MODULE:
-    case MRB_TT_SCLASS:
-        mrb_gc_free_mt(m_vm, (RClass*)obj);
-        mrb_gc_free_iv(m_vm, (RObject*)obj);
-        break;
+        case MRB_TT_CLASS:
+        case MRB_TT_MODULE:
+        case MRB_TT_SCLASS:
+            mrb_gc_free_mt(m_vm, (RClass*)obj);
+            mrb_gc_free_iv(m_vm, (RObject*)obj);
+            break;
 
-    case MRB_TT_ENV:
-    {
-        REnv *e = (REnv*)obj;
+        case MRB_TT_ENV:
+        {
+            REnv *e = (REnv*)obj;
 
-        if (e->cioff < 0) {
-            _free(e->stack);
-            e->stack = 0;
+            if (e->cioff < 0) {
+                _free(e->stack);
+                e->stack = 0;
+            }
         }
-    }
-        break;
-    case MRB_TT_FIBER:
-    {
-        mrb_context *c = ((RFiber*)obj)->cxt;
+            break;
+        case MRB_TT_FIBER:
+        {
+            mrb_context *c = ((RFiber*)obj)->cxt;
 
-        mrb_free_context(m_vm,c);
-    }
-        break;
-    case MRB_TT_ARRAY:
-        if (obj->flags & MRB_ARY_SHARED)
-            mrb_ary_decref(m_vm, ((RArray*)obj)->m_aux.shared);
-        else
-            _free(((RArray*)obj)->m_ptr);
-        break;
-
-    case MRB_TT_HASH:
-        mrb_gc_free_iv(m_vm, (RObject*)obj);
-        mrb_gc_free_hash(m_vm, (RHash*)obj);
-        break;
-
-    case MRB_TT_STRING:
-        mrb_gc_free_str(m_vm, (RString*)obj);
-        break;
-
-    case MRB_TT_RANGE:
-        _free(((RRange*)obj)->edges);
-        break;
-
-    case MRB_TT_DATA:
-    {
-        RData *d = (RData*)obj;
-        if (d->type && d->type->dfree) {
-            d->type->dfree(m_vm, d->data);
+            mrb_free_context(m_vm,c);
         }
-        mrb_gc_free_iv(m_vm, (RObject*)obj);
-    }
-        break;
+            break;
+        case MRB_TT_ARRAY:
+            if (obj->flags & MRB_ARY_SHARED)
+                mrb_ary_decref(m_vm, ((RArray*)obj)->m_aux.shared);
+            else
+                _free(((RArray*)obj)->m_ptr);
+            break;
 
-    default:
-        break;
+        case MRB_TT_HASH:
+            mrb_gc_free_iv(m_vm, (RObject*)obj);
+            mrb_gc_free_hash(m_vm, (RHash*)obj);
+            break;
+
+        case MRB_TT_STRING:
+            mrb_gc_free_str(m_vm, (RString*)obj);
+            break;
+        case MRB_TT_PROC:
+        {
+            struct RProc *p = (struct RProc*)obj;
+
+            if (!MRB_PROC_CFUNC_P(p) && p->body.irep) {
+                mrb_irep_decref(m_vm, p->body.irep);
+            }
+        }
+            break;
+        case MRB_TT_RANGE:
+            _free(((RRange*)obj)->edges);
+            break;
+
+        case MRB_TT_DATA:
+        {
+            RData *d = (RData*)obj;
+            if (d->type && d->type->dfree) {
+                d->type->dfree(m_vm, d->data);
+            }
+            mrb_gc_free_iv(m_vm, (RObject*)obj);
+        }
+            break;
+
+        default:
+            break;
     }
     obj->tt = MRB_TT_FREE;
 }
 
 void MemManager::root_scan_phase()
 {
-    int j;
     size_t i, e;
-    mrb_callinfo *ci;
 
     if (!is_minor_gc(this)) {
         m_gray_list = 0;
@@ -623,18 +629,6 @@ void MemManager::root_scan_phase()
     /* mark stack */
     if (nullptr==m_vm->m_irep)
         return;
-
-    /* mark irep pool */
-    size_t len = m_vm->irep_len;
-    if (len > m_vm->irep_capa) len = m_vm->irep_capa;
-    for (i=0; i<len; i++) {
-        mrb_irep *irep = m_vm->m_irep[i];
-        if (!irep)
-            continue;
-        for (int j=0; j<irep->plen; j++) {
-            mrb_gc_mark_value(m_vm, irep->m_pool[j]);
-        }
-    }
 }
 
 size_t MemManager::gc_gray_mark(RBasic *obj)
@@ -644,75 +638,75 @@ size_t MemManager::gc_gray_mark(RBasic *obj)
     mark_children(obj);
 
     switch (obj->tt) {
-    case MRB_TT_ICLASS:
-        children++;
-        break;
+        case MRB_TT_ICLASS:
+            children++;
+            break;
 
-    case MRB_TT_CLASS:
-    case MRB_TT_SCLASS:
-    case MRB_TT_MODULE:
-    {
-        RClass *c = (RClass*)obj;
+        case MRB_TT_CLASS:
+        case MRB_TT_SCLASS:
+        case MRB_TT_MODULE:
+        {
+            RClass *c = (RClass*)obj;
 
-        children += mrb_gc_mark_iv_size(m_vm, c);
-        children += c->mark_mt_size();
-        children++;
-    }
-        break;
-
-    case MRB_TT_OBJECT:
-    case MRB_TT_DATA:
-        children += mrb_gc_mark_iv_size(m_vm, (RObject*)obj);
-        break;
-
-    case MRB_TT_ENV:
-        children += (int)obj->flags;
-        break;
-    case MRB_TT_FIBER:
-    {
-        mrb_context *c = ((RFiber*)obj)->cxt;
-        size_t i;
-
-        /* mark stack */
-        i = c->m_stack - c->m_stbase;
-        if (c->m_ci)
-            i += c->m_ci->nregs;
-        if (c->m_stbase + i > c->stend)
-            i = c->stend - c->m_stbase;
-        children += i;
-
-        /* mark ensure stack */
-        children += (c->m_ci) ? c->m_ci->eidx : 0;
-
-        /* mark closure */
-        if (c->cibase) {
-            mrb_callinfo *ci;
-            for (i=0, ci = c->cibase; ci <= c->m_ci; i++, ci++)
-                ; // TODO: ?
+            children += mrb_gc_mark_iv_size(m_vm, c);
+            children += c->mark_mt_size();
+            children++;
         }
-        children += i;
-    }
-        break;
+            break;
 
-    case MRB_TT_ARRAY:
-    {
-        RArray *a = (RArray*)obj;
-        children += a->m_len;
-    }
-        break;
+        case MRB_TT_OBJECT:
+        case MRB_TT_DATA:
+            children += mrb_gc_mark_iv_size(m_vm, (RObject*)obj);
+            break;
 
-    case MRB_TT_HASH:
-        children += mrb_gc_mark_iv_size(m_vm, (RObject*)obj);
-        children += mrb_gc_mark_hash_size(m_vm, (RHash*)obj);
-        break;
+        case MRB_TT_ENV:
+            children += (int)obj->flags;
+            break;
+        case MRB_TT_FIBER:
+        {
+            mrb_context *c = ((RFiber*)obj)->cxt;
+            size_t i;
 
-    case MRB_TT_PROC:
-    case MRB_TT_RANGE:
-        children+=2;
-        break;
+            /* mark stack */
+            i = c->m_stack - c->m_stbase;
+            if (c->m_ci)
+                i += c->m_ci->nregs;
+            if (c->m_stbase + i > c->stend)
+                i = c->stend - c->m_stbase;
+            children += i;
 
-    default:
-        break;
+            /* mark ensure stack */
+            children += (c->m_ci) ? c->m_ci->eidx : 0;
+
+            /* mark closure */
+            if (c->cibase) {
+                mrb_callinfo *ci;
+                for (i=0, ci = c->cibase; ci <= c->m_ci; i++, ci++)
+                    ; // TODO: ?
+            }
+            children += i;
+        }
+            break;
+
+        case MRB_TT_ARRAY:
+        {
+            RArray *a = (RArray*)obj;
+            children += a->m_len;
+        }
+            break;
+
+        case MRB_TT_HASH:
+            children += mrb_gc_mark_iv_size(m_vm, (RObject*)obj);
+            children += mrb_gc_mark_hash_size(m_vm, (RHash*)obj);
+            break;
+
+        case MRB_TT_PROC:
+        case MRB_TT_RANGE:
+            children+=2;
+            break;
+
+        default:
+            break;
     }
     return children;
 }
@@ -818,31 +812,31 @@ size_t MemManager::incremental_sweep_phase(size_t limit)
 size_t MemManager::incremental_gc(size_t limit)
 {
     switch (m_gc_state) {
-    case GC_STATE_NONE:
-        root_scan_phase();
-        m_gc_state = GC_STATE_MARK;
-        flip_white_part(this);
-        return 0;
-    case GC_STATE_MARK:
-        if (m_gray_list) {
-            return incremental_marking_phase(limit);
-        }
-        else {
-            final_marking_phase();
-            prepare_incremental_sweep();
+        case GC_STATE_NONE:
+            root_scan_phase();
+            m_gc_state = GC_STATE_MARK;
+            flip_white_part(this);
             return 0;
+        case GC_STATE_MARK:
+            if (m_gray_list) {
+                return incremental_marking_phase(limit);
+            }
+            else {
+                final_marking_phase();
+                prepare_incremental_sweep();
+                return 0;
+            }
+        case GC_STATE_SWEEP: {
+            size_t tried_sweep = 0;
+            tried_sweep = incremental_sweep_phase(limit);
+            if (tried_sweep == 0)
+                m_gc_state = GC_STATE_NONE;
+            return tried_sweep;
         }
-    case GC_STATE_SWEEP: {
-        size_t tried_sweep = 0;
-        tried_sweep = incremental_sweep_phase(limit);
-        if (tried_sweep == 0)
-            m_gc_state = GC_STATE_NONE;
-        return tried_sweep;
-    }
-    default:
-        /* unknown state */
-        mrb_assert(0);
-        return 0;
+        default:
+            /* unknown state */
+            mrb_assert(0);
+            return 0;
     }
 }
 

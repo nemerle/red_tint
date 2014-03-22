@@ -96,15 +96,35 @@ mrb_state* mrb_open(void)
 
     return mrb;
 }
+void
+mrb_irep_incref(mrb_state *mrb, mrb_irep *irep)
+{
+    irep->refcnt++;
+}
 
-
-void mrb_irep_free(mrb_state *mrb, struct mrb_irep *irep)
+void
+mrb_irep_decref(mrb_state *mrb, mrb_irep *irep)
+{
+    irep->refcnt--;
+    if (irep->refcnt == 0) {
+        mrb_irep_free(mrb, irep);
+    }
+}
+void mrb_irep_free(mrb_state *mrb, mrb_irep *irep)
 {
     MemManager &mm(mrb->gc());
     if (!(irep->flags & MRB_ISEQ_NO_FREE))
         mm._free(irep->iseq);
+    for (int i=0; i<irep->plen; i++) {
+        if (irep->m_pool[i].type == MRB_TT_STRING)
+            mrb->gc()._free(irep->m_pool[i].value.s);
+    }
     mm._free(irep->m_pool);
     mm._free(irep->syms);
+    for (int i=0; i<irep->rlen; i++) {
+        mrb_irep_decref(mrb, irep->reps[i]);
+    }
+    mm._free(irep->reps);
     mm._free((void *)irep->filename);
     mm._free(irep->lines);
     mrb_debug_info_free(mrb, irep->debug_info);
@@ -112,14 +132,14 @@ void mrb_irep_free(mrb_state *mrb, struct mrb_irep *irep)
 }
 void mrb_free_context(mrb_state *mrb, struct mrb_context *ctx)
 {
-  if (!ctx)
-      return;
-  MemManager &mm(mrb->gc());
-  mm._free(ctx->m_stbase);
-  mm._free(ctx->cibase);
-  mm._free(ctx->rescue);
-  mm._free(ctx->m_ensure);
-  mm._free(ctx);
+    if (!ctx)
+        return;
+    MemManager &mm(mrb->gc());
+    mm._free(ctx->m_stbase);
+    mm._free(ctx->cibase);
+    mm._free(ctx->rescue);
+    mm._free(ctx->m_ensure);
+    mm._free(ctx);
 }
 
 void mrb_close(mrb_state *mrb)
@@ -131,10 +151,6 @@ void mrb_close(mrb_state *mrb)
 
     /* free */
     mrb_gc_free_gv(mrb);
-    for (i=0; i<mrb->irep_len; i++) {
-        mrb_irep_free(mrb, mrb->m_irep[i]);
-    }
-    mm._free(mrb->m_irep);
     mrb_free_context(mrb,mrb->root_c);
     mrb_symtbl_free(mrb);
     mm.mrb_heap_free();
@@ -148,32 +164,12 @@ void mrb_close(mrb_state *mrb)
 
 mrb_irep* mrb_add_irep(mrb_state *mrb)
 {
-    static constexpr mrb_irep mrb_irep_zero = { 0 };
+    static const mrb_irep mrb_irep_zero = { 0 };
     mrb_irep *irep;
-    MemManager &mm(mrb->gc());
-    if (!mrb->m_irep) {
-        size_t max = MRB_IREP_ARRAY_INIT_SIZE;
 
-        if (mrb->irep_len > max) max = mrb->irep_len+1;
-        mrb->m_irep = (mrb_irep **) mm._calloc(max, sizeof(mrb_irep*));
-        mrb->irep_capa = max;
-    }
-    else if (mrb->irep_capa <= mrb->irep_len) {
-        size_t i;
-        size_t old_capa = mrb->irep_capa;
-        while (mrb->irep_capa <= mrb->irep_len) {
-            mrb->irep_capa *= 2;
-        }
-        mrb->m_irep = (mrb_irep **)mm._realloc(mrb->m_irep, sizeof(mrb_irep*)*mrb->irep_capa);
-        for (i = old_capa; i < mrb->irep_capa; i++) {
-            mrb->m_irep[i] = nullptr;
-        }
-    }
-    irep = (mrb_irep *)mm._malloc(sizeof(mrb_irep));
+    irep = (mrb_irep *)mrb->gc()._malloc(sizeof(mrb_irep));
     *irep = mrb_irep_zero;
-    mrb->m_irep[mrb->irep_len] = irep;
-    irep->idx = mrb->irep_len++;
-
+    irep->refcnt = 1;
     return irep;
 }
 

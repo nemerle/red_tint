@@ -113,6 +113,7 @@ struct mrb_parser_state {
     const char *m_filename;
     int m_lineno;
     int m_column;
+    int eof;
     typedef std::vector<mrb_sym> tLocals;
     typedef std::vector<tLocals> tLocalsStack;
     typedef std::vector<tLocalsStack *> tLocalsContext;
@@ -298,7 +299,7 @@ void mrbc_partial_hook(mrb_state *mrb, mrbc_context *c, int (*partial_hook)(mrb_
 mrb_parser_state* mrb_parser_new(mrb_state*);
 void mrb_parser_free(mrb_parser_state*);
 void mrb_parser_parse(mrb_parser_state*,mrbc_context*);
-int mrb_generate_code(mrb_state*, mrb_parser_state*);
+RProc *mrb_generate_code(mrb_state*, mrb_parser_state*);
 /* program load functions */
 #ifdef ENABLE_STDIO
 mrb_value mrb_load_file(mrb_state*,FILE*);

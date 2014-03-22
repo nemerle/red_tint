@@ -114,7 +114,7 @@ append_cmdline:
                 }
                 else {
                     printf("%s: No code specified for -e\n", *origargv);
-                    return 0;
+        return EXIT_SUCCESS;
                 }
                 break;
             case 'v':
@@ -199,12 +199,12 @@ main(int argc, char **argv)
     mrb_define_global_const(mrb, "ARGV", mrb_obj_value(pARGV));
 
     if (args.mrbfile) {
-        n = mrb_read_irep_file(mrb, args.rfp);
-        if (n < 0) {
+        mrb_irep *irep = mrb_read_irep_file(mrb, args.rfp);
+        if (!irep) {
             fprintf(stderr, "failed to load mrb file: %s\n", args.cmdline);
         }
         else if (!args.check_syntax) {
-            mrb->mrb_run(mrb_proc_new(mrb, mrb->m_irep[n]), mrb_top_self(mrb));
+            mrb->mrb_context_run(mrb_proc_new(mrb, irep), mrb_top_self(mrb),0);
             n = 0;
             if (mrb->m_exc) {
                 mrb_print_error(mrb);
@@ -223,13 +223,11 @@ main(int argc, char **argv)
             c->no_exec = 1;
 
         if (args.rfp) {
+            const char *cmdline;
+            cmdline = args.cmdline ? args.cmdline : "-";
             mrbc_filename(mrb, c, args.cmdline ? args.cmdline : "-");
+            mrb_gv_set(mrb, zero_sym, mrb_str_new_cstr(mrb, cmdline));
             v = mrb_load_file_cxt(mrb, args.rfp, c);
-//            const char *cmdline;
-//            cmdline = args.cmdline ? args.cmdline : "-";
-//            mrbc_filename(mrb, c, cmdline);
-//            mrb_gv_set(mrb, zero_sym, mrb_str_new_cstr(mrb, cmdline));
-//            v = mrb_load_string_cxt(mrb, args.cmdline, c);
         }
         else {
             mrbc_filename(mrb, c, "-e");

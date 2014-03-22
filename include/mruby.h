@@ -207,7 +207,8 @@ public:
     RClass &define_class(const char *name, RClass *super);
     mrb_value const_get(mrb_value mod, mrb_sym sym);
     mrb_value mrb_run(RProc *proc, mrb_value self);
-    void codedump_all(int start);
+    mrb_value mrb_context_run(RProc*, mrb_value, unsigned int);
+    void codedump_all(RProc *proc);
     template<class T>
     T get_arg() {
         T res;
@@ -221,9 +222,11 @@ public:
     mrb_value funcall(mrb_value self, const char *name, int argc...);
     bool class_defined(const char *name);
     void mrb_objspace_each_objects(each_object_callback *callback, void *data);
+    mrb_value run_proc(RProc *proc, mrb_value self, int stack_keep);
 protected:
     void get_arg(const mrb_value &arg, mrb_int &tgt);
     void get_arg(const mrb_value &arg, mrb_sym &tgt);
+    void get_arg(const mrb_value &arg, RClass *&tgt);
     void get_arg(const mrb_value &arg, mrb_value &tgt) { tgt = arg; }
     RProc *prepare_method_missing(RClass *c, mrb_sym mid, const int &a, int &n, mrb_value *regs);
     template<bool optional=false>
@@ -249,7 +252,8 @@ protected:
         return sp;
     }
 private:
-    void codedump(int n);
+    void codedump_recur(mrb_irep *irep);
+    void codedump(mrb_irep *irep);
 };
 
 typedef mrb_value (*mrb_func_t)(mrb_state *mrb, mrb_value);
@@ -291,7 +295,6 @@ mrb_value mrb_str_new_static(mrb_state *mrb, const char *p, size_t len);
 
 mrb_state* mrb_open(void);
 //mrb_state* mrb_open_allocf(mrb_allocf, void *ud);
-void mrb_irep_free(mrb_state*, struct mrb_irep*);
 void mrb_close(mrb_state*);
 
 mrb_value mrb_top_self(mrb_state *);

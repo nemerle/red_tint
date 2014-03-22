@@ -14,15 +14,30 @@ struct mrb_irep {
     uint8_t flags;
 
     mrb_code *iseq;
-    mrb_value *m_pool;
+    struct irep_pool_string {
+        mrb_int len;
+        char buf[1];
+    };
+    struct irep_pool {
+        union {
+            mrb_float f;
+            irep_pool_string *s;
+            mrb_int i;
+        } value;
+        enum mrb_vtype type;
+    } *m_pool;
     mrb_sym *syms;
+    struct mrb_irep **reps;
 
     /* debug info */
     const char *filename;
     uint16_t *lines;
     struct mrb_irep_debug_info* debug_info;
-    size_t ilen, plen, slen;
+    size_t ilen, plen, slen, rlen, refcnt;
 };
 
 mrb_irep *mrb_add_irep(mrb_state *mrb);
 mrb_value mrb_load_irep(mrb_state*, const uint8_t*);
+void mrb_irep_free(mrb_state*, struct mrb_irep*);
+void mrb_irep_incref(mrb_state*, struct mrb_irep*);
+void mrb_irep_decref(mrb_state*, struct mrb_irep*);

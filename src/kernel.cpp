@@ -584,10 +584,7 @@ bool mrb_obj_is_instance_of(mrb_state *mrb, mrb_value obj, RClass* c)
  */
 static mrb_value obj_is_instance_of(mrb_state *mrb, mrb_value self)
 {
-    mrb_value arg=mrb->get_arg<mrb_value>();
-    mrb_bool instance_of_p;
-
-    instance_of_p = mrb_obj_is_instance_of(mrb, self, mrb_class_ptr(arg));
+    mrb_bool instance_of_p = mrb_obj_is_instance_of(mrb, self, mrb->get_arg<RClass *>());
 
     return mrb_bool_value(instance_of_p);
 }
@@ -705,8 +702,8 @@ mrb_obj_ivar_set(mrb_state *mrb, mrb_value self)
  */
 mrb_value mrb_obj_is_kind_of_m(mrb_state *mrb, mrb_value self)
 {
-    mrb_value arg = mrb->get_arg<mrb_value>();
-    mrb_bool kind_of_p = mrb_obj_is_kind_of(mrb, self, mrb_class_ptr(arg));
+
+    mrb_bool kind_of_p = mrb_obj_is_kind_of(mrb, self, mrb->get_arg<RClass *>());
 
     return mrb_bool_value(kind_of_p);
 }

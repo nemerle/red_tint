@@ -368,14 +368,16 @@ stmt		: keyword_alias fsym {p->m_lstate = EXPR_FNAME;} fsym
                     }
                 | var_lhs tOP_ASGN command_call
                     {
-                      $$ = p->new_t<OpAsgnNode>($1, $2, $3);
+                      $$ = p->new_t<OpAsgnNode>($1, $2, $3); //var_lhs tOP_ASGN command_call
                     }
                 | primary_value '[' opt_call_args rbracket tOP_ASGN command_call
                     {
+                     //primary_value '[' opt_call_args rbracket tOP_ASGN command_call
                       $$ = p->new_t<OpAsgnNode>(p->new_t<CallNode>($1, p->intern2("[]",2), $3), $5, $6);
                     }
                 | primary_value '.' tIDENTIFIER tOP_ASGN command_call
                     {
+                      //primary_value '.' tIDENTIFIER tOP_ASGN command_call
                       $$ = p->new_t<OpAsgnNode>(p->new_t<CallNode>($1, $3, nullptr), $4, $5);
                     }
                 | primary_value '.' tCONSTANT tOP_ASGN command_call
@@ -785,6 +787,7 @@ arg		: lhs '=' arg
                     }
                 | var_lhs tOP_ASGN arg
                     {
+                      //var_lhs tOP_ASGN arg
                       $$ = p->new_t<OpAsgnNode>($var_lhs, $2, $3);
                     }
                 | var_lhs tOP_ASGN arg modifier_rescue arg

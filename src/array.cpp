@@ -109,6 +109,11 @@ void RArray::ary_modify()
     }
     this->flags &= ~MRB_ARY_SHARED; // the array contents are no longer shared
 }
+void RArray::mrb_ary_modify()
+{
+  m_vm->gc().mrb_write_barrier(this);
+  ary_modify();
+}
 
 void RArray::ary_make_shared()
 {

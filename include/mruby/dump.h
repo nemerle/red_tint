@@ -10,11 +10,12 @@
 uint16_t
 calc_crc_16_ccitt(const uint8_t *src, size_t nbytes, uint16_t crcwk);
 #ifdef ENABLE_STDIO
-int mrb_dump_irep_binary(mrb_state*, size_t, int, FILE*);
-int mrb_dump_irep_cfunc(mrb_state *mrb, size_t n, int, FILE *f, const char *initname);
-int32_t mrb_read_irep_file(mrb_state*, FILE*);
+int mrb_dump_irep_binary(mrb_state*, mrb_irep*, int, FILE*);
+int mrb_dump_irep_cfunc(mrb_state *mrb, mrb_irep *irep, int debug_info, FILE *fp, const char *initname);
+mrb_irep* mrb_read_irep_file(mrb_state*, FILE*);
 #endif
-int32_t mrb_read_irep(mrb_state*, const uint8_t*);
+mrb_irep *mrb_read_irep(mrb_state*, const uint8_t*);
+
 
 #ifdef ENABLE_STDIO
 mrb_value mrb_load_irep_file(mrb_state*,FILE*);
@@ -39,7 +40,7 @@ mrb_value mrb_load_irep_file(mrb_state*,FILE*);
 
 /* Rite Binary File header */
 #define RITE_BINARY_IDENTIFIER        "RITE"
-#define RITE_BINARY_FORMAT_VER        "0001"
+#define RITE_BINARY_FORMAT_VER        "0002"
 #define RITE_COMPILER_NAME            "MATZ"
 #define RITE_COMPILER_VERSION         "0000"
 
@@ -71,18 +72,12 @@ struct rite_section_header {
 struct rite_section_irep_header : public rite_section_header {
 
     uint8_t rite_version[4];    // Rite Instruction Specification Version
-    uint8_t nirep[2];           // Number of ireps
-    uint8_t sirep[2];           // Start index
 };
 
 struct rite_section_lineno_header : public rite_section_header {
 
-    uint8_t nirep[2];           // Number of ireps
-    uint8_t sirep[2];           // Start index
 };
 struct rite_section_debug_header : public rite_section_header {
-    uint8_t nirep[2];           // Number of ireps
-    uint8_t sirep[2];           // Start index
 };
 struct rite_binary_footer : public rite_section_header {
 };

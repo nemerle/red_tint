@@ -69,10 +69,10 @@ static char * get_outfilename(mrb_state *mrb, char *infile, const char *ext)
     infilelen = strlen(infile);
     extlen = strlen(ext);
     outfile = (char*)mrb->gc()._malloc(infilelen + extlen + 1);
-    strcpy(outfile, infile);
+    memcpy(outfile, infile,infilelen + 1);
     if (*ext) {
         if ((p = strrchr(outfile, '.')) == NULL)
-             p = outfile + infilelen;;
+             p = outfile + infilelen;
         memcpy(p, ext, extlen + 1);
     }
 
@@ -130,6 +130,8 @@ static int parse_args(mrb_state *mrb, int argc, char **argv, mrbc_args *args)
                 case 'g':
                     args->debug_info = 1;
                     break;
+      case 'h':
+        return -1;
                 case '-':
                     if (argv[i][1] == '\n') {
                         return i;
@@ -187,7 +189,7 @@ static int partial_hook(mrb_parser_state *p)
     return 0;
 }
 
-static int
+static mrb_value
 load_file(mrb_state *mrb, struct mrbc_args *args)
 {
     mrbc_context *c;
@@ -204,7 +206,7 @@ load_file(mrb_state *mrb, struct mrbc_args *args)
     }
     else if ((infile = fopen(input, "r")) == NULL) {
         fprintf(stderr, "%s: cannot open program file. (%s)\n", args->prog, input);
-        return EXIT_FAILURE;
+        return mrb_nil_value();
     }
     mrbc_filename(mrb, c, input);
     args->idx++;
@@ -215,25 +217,26 @@ load_file(mrb_state *mrb, struct mrbc_args *args)
     result = mrb_load_file_cxt(mrb, infile, c);
     if (mrb_undef_p(result) || mrb_fixnum(result) < 0) {
         mrbc_context_free(mrb, c);
-        return EXIT_FAILURE;
+        return mrb_nil_value();
     }
     mrbc_context_free(mrb, c);
-    return EXIT_SUCCESS;
+    return result;
 }
 
 static int
-dump_file(mrb_state *mrb, FILE *wfp, const char *outfile, struct mrbc_args *args)
+dump_file(mrb_state *mrb, FILE *wfp, const char *outfile, RProc *proc, struct mrbc_args *args)
 {
     int n = MRB_DUMP_OK;
+    mrb_irep *irep = proc->body.irep;
 
     if (args->initname) {
-        n = mrb_dump_irep_cfunc(mrb, 0, args->debug_info, wfp, args->initname);
+        n = mrb_dump_irep_cfunc(mrb, irep, args->debug_info, wfp, args->initname);
         if (n == MRB_DUMP_INVALID_ARGUMENT) {
             fprintf(stderr, "%s: invalid C language symbol name\n", args->initname);
         }
     }
     else {
-        n = mrb_dump_irep_binary(mrb, 0, args->debug_info, wfp);
+        n =  mrb_dump_irep_binary(mrb, irep, args->debug_info, wfp);
     }
     if (n != MRB_DUMP_OK) {
         fprintf(stderr, "%s: error in mrb dump (%s) %d\n", args->prog, outfile, n);
@@ -248,6 +251,7 @@ main(int argc, char **argv)
     int n, result;
     struct mrbc_args args;
     FILE *wfp = stdout;
+    mrb_value load;
 
     if (mrb == NULL) {
         fputs("Invalid mrb_state, exiting mrbc\n", stderr);
@@ -275,12 +279,13 @@ main(int argc, char **argv)
     }
 
     args.idx = n;
-    if (load_file(mrb, &args) == EXIT_FAILURE) {
+    load = load_file(mrb, &args);
+    if (mrb_nil_p(load)){
         cleanup(mrb, &args);
         return EXIT_FAILURE;
     }
     if (args.check_syntax) {
-        printf("%s:%s:Syntax OK", args.prog, argv[n]);
+        printf("%s:%s:Syntax OK\n", args.prog, argv[n]);
     }
 
     if (args.check_syntax) {
@@ -301,7 +306,7 @@ main(int argc, char **argv)
         fprintf(stderr, "Output file is required\n");
         return EXIT_FAILURE;
     }
-    result = dump_file(mrb, wfp, args.outfile, &args);
+    result =  dump_file(mrb, wfp, args.outfile, mrb_proc_ptr(load), &args);
     if(wfp!=stdout)
         fclose(wfp);
     cleanup(mrb, &args);

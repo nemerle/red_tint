@@ -7,6 +7,19 @@
 #include "mruby/value.h"
 
 #include "mruby/irep.h"
+/* aspec access */
+#define MRB_ASPEC_REQ(a) (((a) >> 18) & 0x1f)
+#define MRB_ASPEC_OPT(a) (((a) >> 13) & 0x1f)
+#define MRB_ASPEC_REST(a) ((a) & (1<<12))
+#define MRB_ASPEC_POST(a) (((a) >> 7) & 0x1f)
+#define MRB_ASPEC_KEY(a) (((a) >> 2) & 0x1f)
+#define MRB_ASPEC_KDICT(a) ((a) & (1<<1))
+#define MRB_ASPEC_BLOCK(a) ((a) & 1)
+
+#define MRB_PROC_CFUNC (1<<7)
+#define MRB_PROC_CFUNC_P(p) ((p)->flags & MRB_PROC_CFUNC)
+#define MRB_PROC_STRICT (1<<8)
+#define MRB_PROC_STRICT_P(p) ((p)->flags & MRB_PROC_STRICT)
 
 struct REnv;
 struct RProc : public RBasic {
@@ -20,6 +33,9 @@ struct RProc : public RBasic {
     void copy_from(RProc *src) {
         flags = src->flags;
         body  = src->body;
+        if (!(this->flags & MRB_PROC_CFUNC)) {
+            body.irep->refcnt++;
+        };
         target_class = src->target_class;
         env   = src->env;
     }
@@ -37,19 +53,6 @@ struct REnv : public RBasic {
     static REnv *alloc(mrb_state *mrb);
 };
 
-/* aspec access */
-#define MRB_ASPEC_REQ(a) (((a) >> 18) & 0x1f)
-#define MRB_ASPEC_OPT(a) (((a) >> 13) & 0x1f)
-#define MRB_ASPEC_REST(a) ((a) & (1<<12))
-#define MRB_ASPEC_POST(a) (((a) >> 7) & 0x1f)
-#define MRB_ASPEC_KEY(a) (((a) >> 2) & 0x1f)
-#define MRB_ASPEC_KDICT(a) ((a) & (1<<1))
-#define MRB_ASPEC_BLOCK(a) ((a) & 1)
-
-#define MRB_PROC_CFUNC (1<<7)
-#define MRB_PROC_CFUNC_P(p) ((p)->flags & MRB_PROC_CFUNC)
-#define MRB_PROC_STRICT (1<<8)
-#define MRB_PROC_STRICT_P(p) ((p)->flags & MRB_PROC_STRICT)
 
 #define mrb_proc_ptr(v)    ((RProc*)((v).value.p))
 

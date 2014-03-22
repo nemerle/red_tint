@@ -463,7 +463,9 @@ struct BinaryNode : public UpdatedNode {
     mrb_ast_node *m_rhs;
 };
 struct ScopeNode : public UpdatedNode {
-    ScopeNode(const tLocals &l,mrb_ast_node *b) : m_locals(l),m_body(b) {}
+    ScopeNode(const tLocals &l,mrb_ast_node *b) : m_locals(l),m_body(b) {
+
+    }
     ScopeNode(mrb_ast_node *b) : m_body(b) {}
     virtual node_type       getType() const { return NODE_SCOPE; }
     tLocals &       locals() {return m_locals;}
