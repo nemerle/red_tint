@@ -36,6 +36,7 @@
 #include "mruby/class.h"
 #include "mruby/array.h"
 #include "mruby/mem_manager.h"
+#include "mruby/version.h"
 
 /* macros to get typical exception objects
  note:
@@ -77,8 +78,10 @@ RClass *mrb_define_class(mrb_state *, const char*, RClass*);
 RClass *mrb_define_module(mrb_state *, const char*);
 #ifndef __clang__
 #define NORET(x)  x __attribute__ ((noreturn))
+#define NORET_DEF(x)  x
 #else
 #define NORET(x)  [[noreturn]] x
+#define NORET_DEF(x)  [[noreturn]] x
 #endif
 mrb_value mrb_exc_new(struct RClass *c, const char *ptr, long len);
 NORET(void mrb_exc_raise(mrb_state *mrb, mrb_value exc));
@@ -91,20 +94,21 @@ int mrb_get_args(mrb_state *mrb, const char *format, ...);
 mrb_value mrb_funcall_argv(mrb_state*, mrb_value, mrb_sym, int, mrb_value*);
 mrb_value mrb_funcall_with_block(mrb_state*, mrb_value, mrb_sym, int, const mrb_value *, mrb_value);
 mrb_sym mrb_intern_cstr(mrb_state*,const char*);
-mrb_sym mrb_intern2(mrb_state*,const char*,size_t);
+mrb_sym mrb_intern(mrb_state*,const char*,size_t);
 mrb_sym mrb_intern_str(mrb_state*,mrb_value);
+mrb_sym mrb_intern_static(mrb_state*,const char*,size_t);
+#define mrb_intern_lit(mrb, lit) mrb_intern_static(mrb, (lit), sizeof(lit) - 1)
 mrb_value mrb_check_intern_cstr(mrb_state*,const char*);
 mrb_value mrb_check_intern_str(mrb_state*,mrb_value);
 mrb_value mrb_check_intern(mrb_state*,const char*,size_t);
 const char *mrb_sym2name(mrb_state*,mrb_sym);
 const char *mrb_sym2name_len(mrb_state*,mrb_sym,size_t&);
 mrb_value mrb_sym2str(mrb_state*,mrb_sym);
-mrb_value mrb_str_format(mrb_state *, int, const mrb_value *, mrb_value);
 
 struct mrb_callinfo {
     mrb_sym mid;
     RProc *proc;
-    int stackidx;
+    mrb_value *stackent;
     int nregs;
     int argc;
     mrb_code *pc;                 /* return address */
@@ -185,6 +189,7 @@ struct mrb_state {
 
 #ifdef ENABLE_DEBUG
     void (*code_fetch_hook)(struct mrb_state* mrb, struct mrb_irep *irep, mrb_code *pc, mrb_value *regs);
+    void (*debug_op_hook)(struct mrb_state* mrb, struct mrb_irep *irep, mrb_code *pc, mrb_value *regs);
 #endif
 
     RClass *eException_class;
@@ -200,7 +205,7 @@ struct mrb_state {
     {
         return intern2(name, strlen(name));
     }
-    mrb_sym intern2(const char *name, size_t len);
+    mrb_sym intern2(const char *name, size_t len, bool lit=false);
     ArgStore arg_store() {return ArgStore(); }
 public:
     static mrb_state *create(mrb_allocf f, void *ud);
@@ -292,6 +297,7 @@ mrb_value mrb_check_to_integer(mrb_state *mrb, const mrb_value &val, const char 
 mrb_value mrb_str_new(mrb_state *mrb, const char *p, size_t len);
 mrb_value mrb_str_new_cstr(mrb_state*, const char*);
 mrb_value mrb_str_new_static(mrb_state *mrb, const char *p, size_t len);
+#define mrb_str_new_lit(mrb, lit) mrb_str_new_static(mrb, (lit), sizeof(lit) - 1)
 
 mrb_state* mrb_open(void);
 //mrb_state* mrb_open_allocf(mrb_allocf, void *ud);
@@ -304,8 +310,8 @@ void mrb_p(mrb_state*, mrb_value);
 mrb_int mrb_obj_id(const mrb_value &obj);
 mrb_sym mrb_obj_to_sym(mrb_state *mrb, mrb_value name);
 
-int mrb_obj_eq(mrb_value , mrb_value );
-int mrb_obj_equal(mrb_value , mrb_value );
+bool mrb_obj_eq(mrb_value , mrb_value );
+bool mrb_obj_equal(mrb_value , mrb_value );
 int mrb_equal(mrb_state *mrb, mrb_value obj1, mrb_value obj2);
 mrb_value mrb_Integer(mrb_state *mrb, mrb_value val);
 mrb_value mrb_Float(mrb_state *mrb, mrb_value val);

@@ -39,7 +39,7 @@ end
 # ISO 15.2.31
 class NameError < StandardError
   attr_accessor :name
-  
+
   def new(message="NameError", name=nil)
     initialize(message, name)
   end
@@ -47,7 +47,7 @@ class NameError < StandardError
   def initialize(message=nil, name=nil)
     @name = name
     super(message)
-  end 
+  end
 end
 
 # ISO 15.2.32

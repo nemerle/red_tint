@@ -27,13 +27,13 @@ mrb_value mrb_load_irep_file(mrb_state*,FILE*);
  * unspecified issues like malloc failed.
  */
 #define MRB_DUMP_OK                   0
-#define MRB_DUMP_GENERAL_FAILURE      -1
-#define MRB_DUMP_WRITE_FAULT          -2
-#define MRB_DUMP_READ_FAULT           -3
-#define MRB_DUMP_CRC_ERROR            -4
-#define MRB_DUMP_INVALID_FILE_HEADER  -5
-#define MRB_DUMP_INVALID_IREP         -6
-#define MRB_DUMP_INVALID_ARGUMENT     -7
+#define MRB_DUMP_GENERAL_FAILURE      (-1)
+#define MRB_DUMP_WRITE_FAULT          (-2)
+#define MRB_DUMP_READ_FAULT           (-3)
+#define MRB_DUMP_CRC_ERROR            (-4)
+#define MRB_DUMP_INVALID_FILE_HEADER  (-5)
+#define MRB_DUMP_INVALID_IREP         (-6)
+#define MRB_DUMP_INVALID_ARGUMENT     (-7)
 
 /* null symbol length */
 #define MRB_DUMP_NULL_SYM_LEN         0xFFFF

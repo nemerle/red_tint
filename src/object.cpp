@@ -8,9 +8,8 @@
 #include "mruby/class.h"
 #include "mruby/numeric.h"
 #include "mruby/string.h"
-#include "error.h"
 
-int mrb_obj_eq(mrb_value v1, mrb_value v2)
+bool mrb_obj_eq(mrb_value v1, mrb_value v2)
 {
     if (mrb_type(v1) != mrb_type(v2)) return false;
     switch (mrb_type(v1)) {
@@ -31,7 +30,7 @@ int mrb_obj_eq(mrb_value v1, mrb_value v2)
     }
 }
 
-int mrb_obj_equal(mrb_value v1, mrb_value v2)
+bool mrb_obj_equal(mrb_value v1, mrb_value v2)
 {
     /* temporary definition */
     return mrb_obj_eq(v1, v2);
@@ -82,7 +81,7 @@ static mrb_value nil_to_s(mrb_state *mrb, mrb_value obj)
 
 static mrb_value nil_inspect(mrb_state *mrb, mrb_value obj)
 {
-    return mrb_str_new(mrb, "nil", 3);
+    return mrb_str_new_lit(mrb, "nil");
 }
 
 /***********************************************************************
@@ -140,7 +139,7 @@ static mrb_value true_xor(mrb_state *mrb, mrb_value obj)
 
 static mrb_value true_to_s(mrb_state *mrb, mrb_value obj)
 {
-    return mrb_str_new(mrb, "true", 4);
+    return mrb_str_new_lit(mrb, "true");
 }
 
 /* 15.2.5.3.4  */
@@ -242,7 +241,7 @@ static mrb_value false_or(mrb_state *mrb, mrb_value obj)
 
 static mrb_value false_to_s(mrb_state *mrb, mrb_value obj)
 {
-    return mrb_str_new(mrb, "false", 5);
+    return mrb_str_new_lit(mrb, "false");
 }
 
 void mrb_init_object(mrb_state *mrb)
@@ -275,7 +274,16 @@ void mrb_init_object(mrb_state *mrb)
             .define_method("inspect", false_to_s,  MRB_ARGS_NONE())
             ;
 }
-
+static mrb_value
+inspect_type(mrb_state *mrb, mrb_value val)
+{
+    if (mrb_type(val) == MRB_TT_FALSE || mrb_type(val) == MRB_TT_TRUE) {
+        return mrb_inspect(mrb, val);
+    }
+    else {
+        return mrb_str_new_cstr(mrb, mrb_obj_classname(mrb, val));
+    }
+}
 static mrb_value convert_type(mrb_state *mrb, const mrb_value &val, const char *tname, const char *method, bool raise)
 {
     mrb_sym m = mrb_intern_cstr(mrb, method);
@@ -283,7 +291,7 @@ static mrb_value convert_type(mrb_state *mrb, const mrb_value &val, const char *
         return mrb_funcall_argv(mrb, val, m, 0, 0);
 
     if (raise)
-        mrb->mrb_raisef(E_TYPE_ERROR, "can't convert %S into %S", val, mrb_str_new_cstr(mrb, tname));
+        mrb->mrb_raisef(E_TYPE_ERROR, "can't convert %S into %S", inspect_type(mrb, val), mrb_str_new_cstr(mrb, tname));
 
     return mrb_nil_value();
 }
@@ -305,7 +313,7 @@ mrb_value mrb_convert_type(mrb_state *mrb, const mrb_value &val, mrb_vtype type,
     mrb_value v = convert_type(mrb, val, tname, method, 1/*Qtrue*/);
     if (mrb_type(v) != type) {
         mrb->mrb_raisef(E_TYPE_ERROR, "%S cannot be converted to %S by #%S", val,
-                   mrb_str_new_cstr(mrb, tname), mrb_str_new_cstr(mrb, method));
+                        mrb_str_new_cstr(mrb, tname), mrb_str_new_cstr(mrb, method));
     }
     return v;
 }
@@ -326,27 +334,27 @@ static const struct types {
     const char *name;
 } builtin_types[] = {
     //    {MRB_TT_NIL,  "nil"},
-    {MRB_TT_FALSE,  "false"},
-    {MRB_TT_TRUE,   "true"},
-    {MRB_TT_FIXNUM, "Fixnum"},
-    {MRB_TT_SYMBOL, "Symbol"},  /* :symbol */
-    {MRB_TT_MODULE, "Module"},
-    {MRB_TT_OBJECT, "Object"},
-    {MRB_TT_CLASS,  "Class"},
-    {MRB_TT_ICLASS, "iClass"},  /* internal use: mixed-in module holder */
-    {MRB_TT_SCLASS, "SClass"},
-    {MRB_TT_PROC,   "Proc"},
-    {MRB_TT_FLOAT,  "Float"},
-    {MRB_TT_ARRAY,  "Array"},
-    {MRB_TT_HASH,   "Hash"},
-    {MRB_TT_STRING, "String"},
-    {MRB_TT_RANGE,  "Range"},
-    {MRB_TT_FILE,   "File"},
-    {MRB_TT_DATA,   "Data"},  /* internal use: wrapped C pointers */
-    //    {MRB_TT_VARMAP,  "Varmap"},  /* internal use: dynamic variables */
-    //    {MRB_TT_NODE,  "Node"},  /* internal use: syntax tree node */
-    //    {MRB_TT_UNDEF,  "undef"},  /* internal use: #undef; should not happen */
-    {-1,  0}
+{MRB_TT_FALSE,  "false"},
+{MRB_TT_TRUE,   "true"},
+{MRB_TT_FIXNUM, "Fixnum"},
+{MRB_TT_SYMBOL, "Symbol"},  /* :symbol */
+{MRB_TT_MODULE, "Module"},
+{MRB_TT_OBJECT, "Object"},
+{MRB_TT_CLASS,  "Class"},
+{MRB_TT_ICLASS, "iClass"},  /* internal use: mixed-in module holder */
+{MRB_TT_SCLASS, "SClass"},
+{MRB_TT_PROC,   "Proc"},
+{MRB_TT_FLOAT,  "Float"},
+{MRB_TT_ARRAY,  "Array"},
+{MRB_TT_HASH,   "Hash"},
+{MRB_TT_STRING, "String"},
+{MRB_TT_RANGE,  "Range"},
+{MRB_TT_FILE,   "File"},
+{MRB_TT_DATA,   "Data"},  /* internal use: wrapped C pointers */
+//    {MRB_TT_VARMAP,  "Varmap"},  /* internal use: dynamic variables */
+//    {MRB_TT_NODE,  "Node"},  /* internal use: syntax tree node */
+//    {MRB_TT_UNDEF,  "undef"},  /* internal use: #undef; should not happen */
+{-1,  0}
 };
 
 void mrb_check_type(mrb_state *mrb, mrb_value x, mrb_vtype t)
@@ -377,12 +385,12 @@ void mrb_check_type(mrb_state *mrb, mrb_value x, mrb_vtype t)
                 etype = mrb_obj_classname(mrb, x);
             }
             mrb->mrb_raisef(E_TYPE_ERROR, "wrong argument type %S (expected %S)",
-                       mrb_str_new_cstr(mrb, etype), mrb_str_new_cstr(mrb, type->name));
+                            mrb_str_new_cstr(mrb, etype), mrb_str_new_cstr(mrb, type->name));
         }
         type++;
     }
     mrb->mrb_raisef(E_TYPE_ERROR, "unknown type %S (%S given)",
-               mrb_fixnum_value(t), mrb_fixnum_value(mrb_type(x)));
+                    mrb_fixnum_value(t), mrb_fixnum_value(mrb_type(x)));
 }
 
 /* 15.3.1.3.46 */
@@ -464,8 +472,9 @@ static mrb_value mrb_to_integer(mrb_state *mrb, mrb_value val, const char *metho
         return val;
     mrb_value v = convert_type(mrb, val, "Integer", method, true);
     if (!mrb_obj_is_kind_of(mrb, v, mrb->fixnum_class)) {
+        mrb_value type = inspect_type(mrb, val);
         mrb->mrb_raisef(E_TYPE_ERROR, "can't convert %S to Integer (%S#%S gives %S)",
-                   val, val, mrb_str_new_cstr(mrb, method), v);
+                        type, type, mrb_str_new_cstr(mrb, method), inspect_type(mrb, v));
     }
     return v;
 }

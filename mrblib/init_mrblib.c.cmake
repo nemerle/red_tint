@@ -1,8 +1,5 @@
 #include "mruby.h"
 #include "mruby/irep.h"
-#include "mruby/dump.h"
-#include "mruby/string.h"
-#include "mruby/proc.h"
 
 #include "${compiled_libs}"
 #include "${compiled_gems}"

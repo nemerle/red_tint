@@ -66,8 +66,8 @@ struct codegen_scope : public NodeVisitor {
 
     mrb_irep *m_irep = nullptr;
     size_t m_pcapa = 0;
-    int m_scapa = 0;
-    int m_rcapa = 0;
+    size_t m_scapa = 0;
+    size_t m_rcapa = 0;
 
     int m_nlocals=0;
     int m_nregs=0;
@@ -287,17 +287,17 @@ void codegen_scope::error(const char *message)
         return;
     codegen_scope *p=this;
     while (p->m_prev) {
+        codegen_scope *tmp = p->m_prev;
         p->m_mpool->mrb_pool_close();
-        p = p->m_prev;
+        p = tmp;
     }
-    p->m_mpool->mrb_pool_close();
     if (p->m_filename && p->m_lineno) {
         m_mrb->sys.error_f("codegen error:%s:%d: %s\n", p->m_filename, p->m_lineno, message);
     }
     else {
         m_mrb->sys.error_f("codegen error: %s\n", message);
     }
-    longjmp(p->jmp, 1);
+    longjmp(this->jmp, 1);
 }
 
 void* codegen_scope::palloc(size_t len)
@@ -575,7 +575,7 @@ int codegen_scope::new_lit(mrb_value val)
 
     switch (mrb_type(val)) {
         case MRB_TT_STRING:
-            *pv = mrb_str_dup_static(m_mrb, val);
+            *pv = mrb_str_pool(m_mrb, val);
             break;
         case MRB_TT_FLOAT:
         case MRB_TT_FIXNUM:
@@ -753,17 +753,21 @@ int codegen_scope::do_lambda_internal(DefCommonNode *tree)
     if(tree->args())
         do_lambda_args(tree->args());
     do_lambda_body(tree->body());
-
+    int res = parent->m_irep->rlen-1;
     finish();
-    return parent->m_irep->rlen-1;
+    return res;
 }
 
 int codegen_scope::visit(ScopeNode *n)
 {
     codegen_scope *scope = codegen_scope::create(m_mrb, this, n->locals());
+    bool val = this->m_val_stack.back();
     scope->codegen(n->body(), true);
     if (!m_iseq) {
         scope->genop( MKOP_A(OP_STOP, 0));
+    }
+    else if (!val) {
+        scope->genop(MKOP_AB(OP_RETURN, 0, OP_R_NORMAL));
     }
     else {
         if (scope->m_nregs == 0) {
@@ -771,9 +775,7 @@ int codegen_scope::visit(ScopeNode *n)
             scope->genop( MKOP_AB(OP_RETURN, 0, OP_R_NORMAL));
         }
         else {
-            pop_sp();
-            scope->genop_peep(MKOP_AB(OP_RETURN, m_sp, OP_R_NORMAL), false);
-            push_();
+            scope->genop_peep(MKOP_AB(OP_RETURN, scope->m_sp-1, OP_R_NORMAL), false);
         }
     }
     scope->finish();
@@ -796,7 +798,7 @@ mrb_sym codegen_scope::attrsym(mrb_sym a)
     name2[len] = '=';
     name2[len+1] = '\0';
 
-    return mrb_intern2(m_mrb, name2, len+1);
+    return mrb_intern(m_mrb, name2, len+1);
 }
 
 int codegen_scope::gen_values(node *t, int val)
@@ -1082,7 +1084,7 @@ void codegen_scope::gen_vmassignment(node *tree, int rhs, int val)
 void codegen_scope::gen_send_intern()
 {
     pop_sp();
-    genop(MKOP_ABC(OP_SEND, m_sp, new_msym(mrb_intern2(m_mrb, "intern", 6)), 0));
+    genop(MKOP_ABC(OP_SEND, m_sp, new_msym(mrb_intern(m_mrb, "intern", 6)), 0));
     push_();
 }
 void codegen_scope::gen_literal_array(node *tree, int sym, int val)
@@ -1405,7 +1407,7 @@ void codegen_scope::visit(HashNode *node) {
 }
 void codegen_scope::visit(UndefNode *no) {
     bool val = m_val_stack.back();
-    int undef = new_msym(mrb_intern2(m_mrb, "undef_method", 12));
+    int undef = new_msym(mrb_intern(m_mrb, "undef_method", 12));
     int num = 0;
 
     genop( MKOP_A(OP_TCLASS, m_sp));
@@ -1483,7 +1485,7 @@ void codegen_scope::visit(MAsgnNode *node) {
 void codegen_scope::visit(AliasNode *n) {
     int a = new_msym(n->m_from);
     int b = new_msym(n->m_to);
-    int c = new_msym(mrb_intern2(m_mrb, "alias_method", 12));
+    int c = new_msym(mrb_intern(m_mrb, "alias_method", 12));
 
     genop( MKOP_A(OP_TCLASS, m_sp));
     push_();
@@ -1548,7 +1550,7 @@ void codegen_scope::visit(YieldNode *node) {
     pop_sp(n+1);
     if (sendv)
         n = CALL_MAXARGS;
-    genop( MKOP_ABC(OP_SEND, m_sp, new_msym(mrb_intern2(m_mrb, "call", 4)), n));
+    genop( MKOP_ABC(OP_SEND, m_sp, new_msym(mrb_intern(m_mrb, "call", 4)), n));
     if (val)
         push_();
 }
@@ -1614,7 +1616,7 @@ void codegen_scope::visit(AsgnNode *node) {
     gen_assignment(node->lhs(), m_sp, val);
 }
 void codegen_scope::visit(SplatNode *node) {
-    codegen(node->child(),true);
+    codegen(node->child(), true);
 }
 void codegen_scope::walk_string(mrb_ast_node *n) {
     bool val = m_val_stack.back();
@@ -1814,7 +1816,7 @@ void codegen_scope::visit(ForNode *n) {
     s->do_for_body(n);
     genop( MKOP_Abc(OP_LAMBDA, m_sp, m_irep->rlen-1, OP_L_BLOCK));
     pop_sp();
-    int idx = new_msym(mrb_intern2(m_mrb, "each", 4));
+    int idx = new_msym(mrb_intern(m_mrb, "each", 4));
     genop( MKOP_ABC(OP_SENDB, m_sp, idx, 0));
 
     if (val)
@@ -1859,12 +1861,12 @@ void codegen_scope::visit(RescueNode *node) {
                     codegen(n4->left(), true);
                 }
                 else {
-                    genop(MKOP_ABx(OP_GETCONST, m_sp, new_msym(mrb_intern2(m_mrb, "StandardError", 13))));
+                    genop(MKOP_ABx(OP_GETCONST, m_sp, new_msym(mrb_intern(m_mrb, "StandardError", 13))));
                     push_();
                 }
                 genop(MKOP_AB(OP_MOVE, m_sp, exc));
                 pop_sp();
-                genop(MKOP_ABC(OP_SEND, m_sp, new_msym(mrb_intern2(m_mrb, "===", 3)), 1));
+                genop(MKOP_ABC(OP_SEND, m_sp, new_msym(mrb_intern(m_mrb, "===", 3)), 1));
                 int tmp = new_label();
                 genop(MKOP_AsBx(OP_JMPIF, m_sp, pos2));
                 pos2 = tmp;
@@ -1929,7 +1931,12 @@ void codegen_scope::visit(CaseNode *node) {
             if (head) {
                 genop(MKOP_AB(OP_MOVE, m_sp, head));
                 pop_sp();
-                genop(MKOP_ABC(OP_SEND, m_sp, new_msym(mrb_intern2(m_mrb, "===", 3)), 1));
+                if (n->left()->getType() == NODE_SPLAT) {
+                    genop(MKOP_ABC(OP_SEND, m_sp, new_msym(mrb_intern_lit(m_mrb, "__case_eqq")), 1));
+                }
+                else {
+                    genop(MKOP_ABC(OP_SEND, m_sp, new_msym(mrb_intern_lit(m_mrb, "===")), 1));
+                }
             }
             else {
                 pop_sp();
@@ -1955,11 +1962,16 @@ void codegen_scope::visit(CaseNode *node) {
         tree = tree->right();
     }
     if (val) {
+        int pos = m_sp;
         genop(MKOP_A(OP_LOADNIL, m_sp));
+        if (pos3)
+            dispatch_linked(pos3);
+        pop_sp();
+        genop(MKOP_AB(OP_MOVE, m_sp, pos));
         push_();
-    }
-    if (pos3)
+    } else if (pos3)
         dispatch_linked(pos3);
+
 }
 void codegen_scope::visit(SclassNode *nd) {
     bool val = m_val_stack.back();
@@ -2118,7 +2130,9 @@ void codegen_scope::visit(EnsureNode *nn) {
     genop(MKOP_Bx(OP_EPUSH, 0));
     m_ensure_level++;
     codegen(nn->body(), val);
+    this->m_val_stack.push_back(false);
     idx = visit(nn->ensure());
+    this->m_val_stack.pop_back();
     m_iseq[epush] = MKOP_Bx(OP_EPUSH, idx);
     m_ensure_level--;
     genop_peep(MKOP_A(OP_EPOP, 1), false);
@@ -2172,7 +2186,7 @@ void codegen_scope::visit(XstrNode *xn) {
     char *p = xn->m_str;
     size_t len = xn->m_length;
     int ai = m_mrb->gc().arena_save();
-    int sym = new_sym( mrb_intern2(m_mrb, "Kernel", 6));
+    int sym = new_sym( mrb_intern(m_mrb, "Kernel", 6));
     int off = new_lit(mrb_str_new(m_mrb, p, len));
 
     genop( MKOP_A(OP_OCLASS, m_sp));
@@ -2180,7 +2194,7 @@ void codegen_scope::visit(XstrNode *xn) {
     push_();
     genop( MKOP_ABx(OP_STRING, m_sp, off));
     pop_sp();
-    sym = new_sym( mrb_intern2(m_mrb, "`", 1));
+    sym = new_sym( mrb_intern(m_mrb, "`", 1));
     genop( MKOP_ABC(OP_SEND, m_sp, sym, 1));
     m_mrb->gc().arena_restore(ai);
     push_();
@@ -2262,7 +2276,7 @@ void codegen_scope::visit(DregxNode *dn) {
         pop_sp();
     }
     pop_sp();
-    sym = new_sym( mrb_intern2(m_mrb, "compile", 7));
+    sym = new_sym( mrb_intern(m_mrb, "compile", 7));
     genop( MKOP_ABC(OP_SEND, m_sp, sym, argc));
     m_mrb->gc().arena_restore(ai);
     push_();
@@ -2407,13 +2421,14 @@ codegen_scope* codegen_scope::create(mrb_state *mrb, codegen_scope *prev, const 
 
     p->m_icapa = 1024;
     p->m_iseq = (mrb_code*)mrb->gc()._malloc(sizeof(mrb_code)*p->m_icapa);
+    p->m_irep->iseq = p->m_iseq;
 
     p->m_pcapa = 32;
     p->m_irep->pool = (mrb_value *)mrb->gc()._malloc(sizeof(mrb_value)*p->m_pcapa);
     p->m_irep->plen = 0;
 
     p->m_scapa = 256;
-    p->m_irep->syms = (mrb_sym*)mrb->gc()._malloc(sizeof(mrb_sym)*256);
+    p->m_irep->syms = (mrb_sym*)mrb->gc()._malloc(sizeof(mrb_sym)*p->m_scapa);
     p->m_irep->slen = 0;
 
     p->m_locals = lv;
@@ -2557,7 +2572,7 @@ void codegen_scope::loop_pop(int val)
 
 } // end of anonymous namespace
 
-RProc *mrb_generate_code(mrb_state *mrb, parser_state *p) {
+RProc *mrb_generate_code (mrb_state *mrb, parser_state *p) {
 
     codegen_scope *scope = codegen_scope::create(mrb, 0, 0);
 
@@ -2575,6 +2590,13 @@ RProc *mrb_generate_code(mrb_state *mrb, parser_state *p) {
         mrb_irep_decref(mrb, scope->m_irep);
         scope->m_mpool->mrb_pool_close();
         return proc;
+    } else {
+        if (scope->m_filename == scope->m_irep->filename) {
+            scope->m_irep->filename = nullptr;
+        }
+        mrb_irep_decref(mrb, scope->m_irep);
+        scope->m_mpool->mrb_pool_close();
+        return nullptr;
     }
     return 0;
 }

@@ -7,7 +7,6 @@
 #include <cstdlib>
 #include <cstring>
 #include "mruby.h"
-#include "mruby/class.h"
 #include "mruby/irep.h"
 #include "mruby/variable.h"
 #include "mruby/debug.h"
@@ -20,12 +19,14 @@ void mrb_symtbl_free(mrb_state *mrb);
 static mrb_value
 inspect_main(mrb_state *mrb, mrb_value mod)
 {
-    return mrb_str_new(mrb, "main", 4);
+    return mrb_str_new_lit(mrb, "main");
 }
 
 mrb_state* mrb_state::create(mrb_allocf f, void *ud)
 {
-
+#ifdef MRB_NAN_BOXING
+  mrb_assert(sizeof(void*) == 4);
+#endif
     static constexpr mrb_state mrb_state_zero = { 0 };
     static constexpr struct mrb_context mrb_context_zero = { 0 };
     mrb_state *mrb = (mrb_state *)(f)(nullptr, nullptr, sizeof(mrb_state), ud);
@@ -37,7 +38,10 @@ mrb_state* mrb_state::create(mrb_allocf f, void *ud)
     mrb->gc().ud = ud;
     mrb->gc().m_allocf = f;
     mrb->gc().current_white_part = MRB_GC_WHITE_A;
-
+#ifndef MRB_GC_FIXED_ARENA
+    mrb->gc().m_arena = (RBasic**)mrb->gc()._malloc(sizeof(RBasic*)*MRB_GC_ARENA_SIZE);
+    mrb->gc().arena_capa = MRB_GC_ARENA_SIZE;
+#endif
     mrb->gc().mrb_heap_init();
     mrb->m_ctx = ( mrb_context*)mrb->gc()._calloc(1,sizeof(mrb_context));
     *mrb->m_ctx = mrb_context_zero;
@@ -117,8 +121,17 @@ void mrb_irep_free(mrb_state *mrb, mrb_irep *irep)
     if (!(irep->flags & MRB_ISEQ_NO_FREE))
         mm._free(irep->iseq);
     for (int i=0; i<irep->plen; i++) {
-        if (mrb_type(irep->pool[i]) == MRB_TT_STRING)
-            mm._free(mrb_ptr(irep->pool[i]));
+        if (mrb_type(irep->pool[i]) == MRB_TT_STRING) {
+            if ((mrb_str_ptr(irep->pool[i])->flags & MRB_STR_NOFREE) == 0) {
+                mm._free(mrb_str_ptr(irep->pool[i])->m_ptr);
+            }
+            mm._free(mrb_basic_ptr(irep->pool[i]));
+        }
+#ifdef MRB_WORD_BOXING
+    else if (mrb_type(irep->pool[i]) == MRB_TT_FLOAT) {
+      mrb_free(mrb, mrb_obj_ptr(irep->pool[i]));
+	}
+#endif
     }
     mm._free(irep->pool);
     mm._free(irep->syms);
@@ -130,6 +143,34 @@ void mrb_irep_free(mrb_state *mrb, mrb_irep *irep)
     mm._free(irep->lines);
     mrb_debug_info_free(mrb, irep->debug_info);
     mm._free(irep);
+}
+mrb_value
+mrb_str_pool(mrb_state *mrb, mrb_value str)
+{
+    struct RString *s = mrb_str_ptr(str);
+    struct RString *ns;
+    mrb_int len;
+
+    ns = (struct RString *)mrb->gc()._malloc(sizeof(struct RString));
+    ns->tt = MRB_TT_STRING;
+    ns->c = mrb->string_class;
+
+    len = s->len;
+    ns->len = len;
+    ns->flags = 0;
+    if (s->flags & MRB_STR_NOFREE) {
+        ns->m_ptr = s->m_ptr;
+        ns->flags = MRB_STR_NOFREE;
+    }
+    else {
+        ns->m_ptr = (char *)mrb->gc()._malloc((size_t)len+1);
+        if (s->m_ptr) {
+            memcpy(ns->m_ptr, s->m_ptr, len);
+        }
+        ns->m_ptr[len] = '\0';
+    }
+
+    return mrb_obj_value(ns);
 }
 void mrb_free_context(mrb_state *mrb, struct mrb_context *ctx)
 {
@@ -146,7 +187,6 @@ void mrb_free_context(mrb_state *mrb, struct mrb_context *ctx)
 void mrb_close(mrb_state *mrb)
 {
     MemManager &mm(mrb->gc());
-    size_t i;
 
     mrb_core_final(mrb);
 
@@ -156,12 +196,11 @@ void mrb_close(mrb_state *mrb)
     mrb_symtbl_free(mrb);
     mm.mrb_heap_free();
     mm.mrb_alloca_free();
+#ifndef MRB_GC_FIXED_ARENA
+    mm._free(mm.m_arena);
+#endif
     mm._free(mrb);
 }
-
-#ifndef MRB_IREP_ARRAY_INIT_SIZE
-# define MRB_IREP_ARRAY_INIT_SIZE (256u)
-#endif
 
 mrb_irep* mrb_add_irep(mrb_state *mrb)
 {

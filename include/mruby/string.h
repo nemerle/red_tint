@@ -11,7 +11,8 @@
 #ifndef MRB_STR_BUF_MIN_SIZE
 # define MRB_STR_BUF_MIN_SIZE 128
 #endif
-
+#define MRB_STR_SHARED    1
+#define MRB_STR_NOFREE    2
 #define IS_EVSTR(p,e) ((p) < (e) && (*(p) == '$' || *(p) == '@' || *(p) == '{'))
 
 extern const char mrb_digitmap[];
@@ -45,7 +46,6 @@ private:
 #define RSTRING_END(s)    (RSTRING(s)->m_ptr + RSTRING(s)->len)
 
 void mrb_gc_free_str(mrb_state*, RString*);
-mrb_value mrb_str_literal(mrb_state*, mrb_value);
 void mrb_str_concat(mrb_state*, mrb_value, mrb_value);
 mrb_value mrb_str_plus(mrb_state*, mrb_value, mrb_value);
 mrb_value mrb_ptr_to_str(mrb_state *, void *);
@@ -60,7 +60,7 @@ char *mrb_string_value_cstr(mrb_state *mrb, mrb_value *ptr);
 char *mrb_string_value_ptr(mrb_state *mrb, mrb_value ptr);
 int mrb_str_offset(mrb_state *mrb, mrb_value str, int pos);
 mrb_value mrb_str_dup(mrb_state *mrb, mrb_value str); /* mrb_str_dup */
-mrb_value mrb_str_dup_static(mrb_state *mrb, mrb_value str); /* mrb_str_dup */
+mrb_value mrb_str_pool(mrb_state *mrb, mrb_value str); /* mrb_str_dup */
 mrb_value mrb_str_intern(mrb_state *mrb, mrb_value self);
 mrb_value mrb_str_cat_cstr(mrb_state *, mrb_value, const char *);
 mrb_value mrb_str_to_inum(mrb_state *mrb, mrb_value str, int base, int badcheck);
@@ -76,9 +76,3 @@ mrb_value mrb_str_append(mrb_state *mrb, mrb_value str, mrb_value str2);
 
 int mrb_str_cmp(mrb_state *mrb, mrb_value str1, mrb_value str2);
 char *mrb_str_to_cstr(mrb_state *mrb, mrb_value str);
-
-/* For backward compatibility */
-static inline mrb_value
-mrb_str_cat2(mrb_state *mrb, mrb_value str, const char *ptr) {
-    return mrb_str_cat_cstr(mrb, str, ptr);
-}

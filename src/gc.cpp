@@ -4,14 +4,8 @@
 ** See Copyright Notice in mruby.h
 */
 
-#ifndef SIZE_MAX
-/* Some versions of VC++
-  * has SIZE_MAX in stdint.h
-  */
-# include <limits.h>
-#endif
-#include <stdlib.h>
 #include <string.h>
+#include <stdlib.h>
 #include "mruby.h"
 #include "mruby/array.h"
 #include "mruby/class.h"
@@ -23,7 +17,6 @@
 #include "mruby/variable.h"
 #include "mruby/gc.h"
 
-extern void mrb_free_context(mrb_state *mrb, struct mrb_context *ctx);
 /*
   = Tri-color Incremental Garbage Collection
 
@@ -67,7 +60,7 @@ extern void mrb_free_context(mrb_state *mrb, struct mrb_context *ctx);
 
   For details, see the comments for each function.
 
-  = Write Barrier
+  == Write Barrier
 
   mruby implementer and C extension library writer must write a write
   barrier when writing a pointer to an object on object's field.
@@ -76,7 +69,6 @@ extern void mrb_free_context(mrb_state *mrb, struct mrb_context *ctx);
     * mrb_field_write_barrier
     * mrb_write_barrier
 
-  For details, see the comments for each function.
    == Generational Mode
 
    mruby's GC offers an Generational Mode while re-using the tri-color GC
@@ -94,7 +86,9 @@ extern void mrb_free_context(mrb_state *mrb, struct mrb_context *ctx);
   in mruby is triggered incrementally in a tri-color manner.
 
 
+  For details, see the comments for each function.
 */
+extern void mrb_free_context(mrb_state *mrb, struct mrb_context *ctx);
 
 struct free_obj {
     RBasic z;
@@ -166,6 +160,18 @@ gettimeofday_time(void)
 #endif
 
 #define GC_STEP_SIZE 1024
+void *MemManager::mrb_realloc_simple(void* p,size_t len)
+{
+    void *p2;
+
+    p2 = m_allocf(m_vm, p, len, this->ud);
+
+    if (!p2 && len > 0 && m_heaps) {
+        mrb_full_gc();
+        p2 = m_allocf(m_vm, p, len, this->ud);
+    }
+    return p2;
+}
 
 void* MemManager::_realloc(void *p, size_t len)
 {
@@ -194,18 +200,6 @@ void* MemManager::_malloc(size_t len)
 void *MemManager::mrb_malloc_simple(size_t len)
 {
     return mrb_realloc_simple(0,len);
-}
-void *MemManager::mrb_realloc_simple(void* p,size_t len)
-{
-    void *p2;
-
-    p2 = m_allocf(m_vm, p, len, this->ud);
-
-    if (!p2 && len > 0 && m_heaps) {
-        mrb_full_gc();
-        p2 = m_allocf(m_vm, p, len, this->ud);
-    }
-    return p2;
 }
 
 void* MemManager::_calloc(size_t nelem, size_t len)
@@ -340,11 +334,19 @@ void MemManager::mrb_heap_free()
 
 void MemManager::gc_protect(RBasic *p)
 {
-    if (this->arena_idx >= MRB_ARENA_SIZE) {
+#ifdef MRB_GC_FIXED_ARENA
+    if (this->arena_idx >= MRB_GC_ARENA_SIZE) {
         /* arena overflow error */
-        this->arena_idx = MRB_ARENA_SIZE - 4; /* force room in arena */
+        this->arena_idx = MRB_GC_ARENA_SIZE - 4; /* force room in arena */
         m_vm->mrb_raise(A_RUNTIME_ERROR(m_vm), "arena overflow error");
     }
+#else
+    if (this->arena_idx >= this->arena_capa) {
+        /* extend arena */
+        this->arena_capa *= 1.5;
+        this->m_arena = (RBasic**)_realloc(m_arena, sizeof(RBasic*)*this->arena_capa);
+    }
+#endif
     m_arena[this->arena_idx++] = p;
 }
 
@@ -390,7 +392,8 @@ void MemManager::mark_context_stack(mrb_context *ctx) {
     e = ctx->m_stack - ctx->m_stbase;
     if (ctx->m_ci)
         e += ctx->m_ci->nregs;
-    if (ctx->m_stbase + e > ctx->stend) e = ctx->stend - ctx->m_stbase;
+    if (ctx->m_stbase + e > ctx->stend)
+        e = ctx->stend - ctx->m_stbase;
     for (i=0; i<e; i++) {
         mrb_gc_mark_value(m_vm, ctx->m_stbase[i]);
     }
@@ -400,7 +403,8 @@ void MemManager::mark_context(mrb_context *ctx)
     size_t i;
     size_t e;
     mrb_callinfo *ci;
-
+    
+    /* mark stack */
     mark_context_stack(ctx);
 
     /* mark ensure stack */
@@ -408,13 +412,15 @@ void MemManager::mark_context(mrb_context *ctx)
     for (i=0; i<e; i++) {
         mark(ctx->m_ensure[i]);
     }
-    /* mark closure */
-    for (ci = ctx->cibase; ci <= ctx->m_ci; ci++) {
-        if (!ci) continue;
-        mark(ci->env);
-        mark(ci->proc);
-        mark(ci->target_class);
+    /* mark VM stack */
+    if (ctx->cibase) {
+        for (ci = ctx->cibase; ci <= ctx->m_ci; ci++) {
+            mark(ci->env);
+            mark(ci->proc);
+            mark(ci->target_class);
+        }
     }
+    /* mark fibers */
     if (ctx->prev && ctx->prev->fib)
         mark(ctx->prev->fib);
 }
@@ -450,7 +456,7 @@ void MemManager::mark_children(RBasic *obj)
             RProc *p = (RProc*)obj;
 
             mark(p->env);
-            mark(p->target_class);
+            mark(p->target_class());
         }
             break;
 
@@ -527,9 +533,14 @@ void MemManager::obj_free(RBasic *obj)
         case MRB_TT_TRUE:
         case MRB_TT_FIXNUM:
         case MRB_TT_SYMBOL:
-        case MRB_TT_FLOAT:
             /* cannot happen */
             return;
+        case MRB_TT_FLOAT:
+#ifdef MRB_WORD_BOXING
+            break;
+#else
+            return;
+#endif
 
         case MRB_TT_OBJECT:
             mrb_gc_free_iv(m_vm, (RObject*)obj);
@@ -555,8 +566,8 @@ void MemManager::obj_free(RBasic *obj)
         case MRB_TT_FIBER:
         {
             mrb_context *c = ((RFiber*)obj)->cxt;
-
-            mrb_free_context(m_vm,c);
+            if(c !=m_vm->root_c)
+                mrb_free_context(m_vm,c);
         }
             break;
         case MRB_TT_ARRAY:
@@ -626,9 +637,6 @@ void MemManager::root_scan_phase()
     if (m_vm->root_c != m_vm->m_ctx) {
         mark_context(m_vm->m_ctx);
     }
-    /* mark stack */
-    if (nullptr==m_vm->m_irep)
-        return;
 }
 
 size_t MemManager::gc_gray_mark(RBasic *obj)
@@ -710,8 +718,7 @@ size_t MemManager::gc_gray_mark(RBasic *obj)
     }
     return children;
 }
-void
-MemManager::gc_mark_gray_list() {
+void MemManager::gc_mark_gray_list() {
 
     while (m_gray_list) {
         if (m_gray_list->is_gray())
@@ -892,13 +899,7 @@ void MemManager::mrb_incremental_gc()
         incremental_gc_until(GC_STATE_NONE);
     }
     else {
-        size_t limit = 0, result = 0;
-        limit = (GC_STEP_SIZE/100) * this->gc_step_ratio;
-        while (result < limit) {
-            result += incremental_gc(limit);
-            if (m_gc_state == GC_STATE_NONE)
-                break;
-        }
+        incremental_gc_step();
     }
 
     if (m_gc_state == GC_STATE_NONE) {
@@ -956,6 +957,20 @@ int MemManager::arena_save()
 
 void MemManager::arena_restore(int idx)
 {
+#ifndef MRB_GC_FIXED_ARENA
+    int capa = this->arena_capa;
+
+    if (idx < capa / 2) {
+        capa *= 0.66;
+        if (capa < MRB_GC_ARENA_SIZE) {
+            capa = MRB_GC_ARENA_SIZE;
+        }
+        if (capa != this->arena_capa) {
+            m_arena = (RBasic**)_realloc(m_arena, sizeof(RBasic*)*capa);
+            this->arena_capa = capa;
+        }
+    }
+#endif
     this->arena_idx = idx;
 }
 
@@ -1219,7 +1234,7 @@ test_mrb_field_write_barrier(void)
     puts("test_mrb_field_write_barrier");
     mrb->is_generational_gc_mode = false;
     obj = mrb_basic_ptr(mrb_ary_new(mrb));
-    value = mrb_basic_ptr(mrb_str_new_cstr(mrb, "value"));
+    value = mrb_basic_ptr(mrb_str_new_lit(mrb, "value"));
     paint_black(obj);
     paint_partial_white(mrb,value);
 
@@ -1261,7 +1276,7 @@ test_mrb_field_write_barrier(void)
     {
         puts("test_mrb_field_write_barrier_value");
         obj = mrb_basic_ptr(mrb_ary_new(mrb));
-        mrb_value value = mrb_str_new_cstr(mrb, "value");
+        mrb_value value = mrb_str_new_lit(mrb, "value");
         paint_black(obj);
         paint_partial_white(mrb, mrb_basic_ptr(value));
 
@@ -1310,12 +1325,12 @@ test_add_gray_list(void)
     puts("test_add_gray_list");
     change_gen_gc_mode(mrb, false);
     mrb_assert(mrb->gray_list == NULL);
-    obj1 = mrb_basic_ptr(mrb_str_new_cstr(mrb, "test"));
+    obj1 = mrb_basic_ptr(mrb_str_new_lit(mrb, "test"));
     add_gray_list(mrb, obj1);
     mrb_assert(mrb->gray_list == obj1);
     mrb_assert(is_gray(obj1));
 
-    obj2 = mrb_basic_ptr(mrb_str_new_cstr(mrb, "test"));
+    obj2 = mrb_basic_ptr(mrb_str_new_lit(mrb, "test"));
     add_gray_list(mrb, obj2);
     mrb_assert(mrb->gray_list == obj2);
     mrb_assert(mrb->gray_list->gcnext == obj1);
@@ -1343,7 +1358,7 @@ test_gc_gray_mark(void)
 
     puts("  in MRB_TT_ARRAY");
     obj_v = mrb_ary_new(mrb);
-    value_v = mrb_str_new_cstr(mrb, "test");
+    value_v = mrb_str_new_lit(mrb, "test");
     paint_gray(mrb_basic_ptr(obj_v));
     paint_partial_white(mrb, mrb_basic_ptr(value_v));
     mrb_ary_push(mrb, obj_v, value_v);
@@ -1413,7 +1428,7 @@ test_incremental_gc(void)
     mrb_assert(mrb->live == total-freed);
 
     puts("test_incremental_gc(gen)");
-    advance_phase(mrb, GC_STATE_SWEEP);
+    incremental_gc_until(mrb, GC_STATE_SWEEP);
     change_gen_gc_mode(mrb, true);
 
     mrb_assert(mrb->gc_full == false);

@@ -608,7 +608,7 @@ block:
         case NODE_STR:
         {
             StrNode *sn=(StrNode *)orig;
-            printf("NODE_STR \"%s\" len %d\n", sn->m_str, sn->m_length);
+            printf("NODE_STR \"%s\" len %zu\n", sn->m_str, sn->m_length);
         }
             break;
 
@@ -828,7 +828,7 @@ load_exec(mrb_state *mrb, mrb_parser_state *p, mrbc_context *c)
             target = c->target_class;
         }
     }
-    proc->target_class = target;
+    proc->m_target_class = target;
     if (mrb->m_ctx->m_ci) {
         mrb->m_ctx->m_ci->target_class = target;
     }

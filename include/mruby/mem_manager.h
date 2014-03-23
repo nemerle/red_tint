@@ -12,8 +12,8 @@ struct heap_page;
 struct mrb_context;
 
 typedef void* (*mrb_allocf) (mrb_state *mrb, void*, size_t, void *ud);
-#ifndef MRB_ARENA_SIZE
-#define MRB_ARENA_SIZE 100
+#ifndef MRB_GC_ARENA_SIZE
+#define MRB_GC_ARENA_SIZE 100
 #endif
 
 struct MemManager {
@@ -112,7 +112,14 @@ protected:
     heap_page * sweeps;
     heap_page * m_free_heaps;
     size_t      m_live; /* count of live objects */
-    RBasic *    m_arena[MRB_ARENA_SIZE];
+public:
+#ifdef MRB_GC_FIXED_ARENA
+    RBasic *    m_arena[MRB_ARENA_SIZE]; /* GC protection array */
+#else
+    RBasic **   m_arena; /* GC protection array */
+    int         arena_capa;
+#endif
+protected:
     int         arena_idx;
 
     gc_state    m_gc_state; /* state of gc */

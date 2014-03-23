@@ -5,19 +5,17 @@
 */
 
 #include <errno.h>
-
 #include <stdarg.h>
 #include <stdlib.h>
-#include <string.h>
 #include "mruby.h"
 #include "mruby/array.h"
-#include "mruby/class.h"
 #include "mruby/irep.h"
 #include "mruby/proc.h"
 #include "mruby/string.h"
 #include "mruby/variable.h"
 #include "mruby/debug.h"
 #include "error.h"
+
 
 mrb_value mrb_exc_new(RClass *c, const char *ptr, long len)
 {
@@ -42,7 +40,7 @@ static mrb_value exc_initialize(mrb_state *mrb, mrb_value exc)
     mrb_value mesg;
 
     if (mrb_get_args(mrb, "|o", &mesg) == 1) {
-        mrb_iv_set(mrb, exc, mrb_intern2(mrb, "mesg", 4), mesg);
+        mrb_iv_set(mrb, exc, mrb_intern(mrb, "mesg", 4), mesg);
     }
     return exc;
 }
@@ -69,7 +67,7 @@ static mrb_value exc_exception(mrb_state *mrb, mrb_value self)
     if (mrb_obj_equal(self, a))
         return self;
     mrb_value exc = mrb_obj_clone(mrb, self);
-    mrb_iv_set(mrb, exc, mrb_intern2(mrb, "mesg", 4), a);
+    mrb_iv_set(mrb, exc, mrb_intern(mrb, "mesg", 4), a);
 
     return exc;
 }
@@ -84,7 +82,7 @@ static mrb_value exc_exception(mrb_state *mrb, mrb_value self)
 
 static mrb_value exc_to_s(mrb_state *mrb, mrb_value exc)
 {
-    mrb_value mesg = mrb_attr_get(exc, mrb_intern2(mrb, "mesg", 4));
+    mrb_value mesg = mrb_attr_get(exc, mrb_intern(mrb, "mesg", 4));
 
     if (mrb_nil_p(mesg))
         return mrb_str_new_cstr(mrb, mrb_obj_classname(mrb, exc));
@@ -152,14 +150,14 @@ static mrb_value exc_equal(mrb_state *mrb, mrb_value exc)
 {
     mrb_value mesg;
     mrb_bool equal_p;
-    mrb_sym id_mesg = mrb_intern2(mrb, "mesg", 4);
+    mrb_sym id_mesg = mrb_intern(mrb, "mesg", 4);
     mrb_value obj = mrb->get_arg<mrb_value>();
     if (mrb_obj_equal(exc, obj)) {
         equal_p = 1;
     }
     else {
         if (mrb_obj_class(mrb, exc) != mrb_obj_class(mrb, obj)) {
-            if (mrb_respond_to(mrb, obj, mrb_intern2(mrb, "message", 7))) {
+            if (mrb_respond_to(mrb, obj, mrb_intern(mrb, "message", 7))) {
                 mesg = mrb->funcall(obj, "message", 0);
             }
             else
@@ -180,7 +178,7 @@ static void exc_debug_info(mrb_state *mrb, RObject *exc)
     mrb_callinfo *ci = mrb->m_ctx->m_ci;
     mrb_code *pc = ci->pc;
 
-    exc->iv_set(mrb_intern2(mrb, "ciidx", 5), mrb_fixnum_value(ci - mrb->m_ctx->cibase));
+    exc->iv_set(mrb_intern(mrb, "ciidx", 5), mrb_fixnum_value(ci - mrb->m_ctx->cibase));
 
     while (ci >= mrb->m_ctx->cibase) {
         mrb_code *err = ci->err;
@@ -333,7 +331,7 @@ void mrb_bug(mrb_state *mrb, const char *fmt, ...)
 
 int sysexit_status(mrb_state *mrb, mrb_value err)
 {
-    mrb_value st = mrb_iv_get(err, mrb_intern2(mrb, "status", 6));
+    mrb_value st = mrb_iv_get(err, mrb_intern(mrb, "status", 6));
     return mrb_fixnum(st);
 }
 
@@ -369,7 +367,7 @@ mrb_value make_exception(mrb_state *mrb, int argc, mrb_value *argv, int isstr)
         n = 1;
 exception_call:
     {
-        mrb_sym exc = mrb_intern2(mrb, "exception", 9);
+        mrb_sym exc = mrb_intern(mrb, "exception", 9);
         if (mrb_respond_to(mrb, argv[0], exc)) {
             mesg = mrb_funcall_argv(mrb, argv[0], exc, n, argv+1);
         }

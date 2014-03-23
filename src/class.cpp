@@ -4,16 +4,18 @@
 ** See Copyright Notice in mruby.h
 */
 
-#include "mruby.h"
-#include <stdarg.h>
 #include <ctype.h>
+#include <stdarg.h>
+#include "mruby.h"
 #include "mruby/array.h"
 #include "mruby/class.h"
 #include "mruby/numeric.h"
 #include "mruby/proc.h"
 #include "mruby/string.h"
 #include "mruby/variable.h"
+#include "error.h"
 #include "mruby/khash.h"
+
 extern mrb_value class_instance_method_list(mrb_state*, mrb_bool, RClass*, int);
 typedef kh_T<mrb_sym,RProc*,IntHashFunc,IntHashEq> kh_mt;
 
@@ -431,7 +433,7 @@ int mrb_get_args(mrb_state *mrb, const char *format, ...)
                     s = mrb_str_ptr(ss);
                     len = (mrb_int)strlen(s->m_ptr);
                     if (len <  s->len) {
-                        mrb_raise(E_ARGUMENT_ERROR, "String contains NUL");
+                        mrb_raise(E_ARGUMENT_ERROR, "String contains null byte");
                     } else if (len > s->len) {
                         s->str_modify();
                     }
@@ -1074,7 +1076,7 @@ static mrb_value mrb_bob_missing(mrb_state *mrb, mrb_value mod)
 
     mrb_get_args(mrb, "n*", &name, &a, &alen);
 
-    if (mrb_respond_to(mrb,mod,mrb_intern2(mrb,"inspect",7))){
+    if (mrb_respond_to(mrb,mod,mrb_intern(mrb,"inspect",7))){
         inspect = mrb->funcall(mod, "inspect", 0);
         if (RSTRING_LEN(inspect) > 64) {
             inspect = mrb_any_to_s(mrb, mod);
@@ -1134,7 +1136,7 @@ mrb_value RClass::class_path()
     const char *name = mrb_sym2name_len(m_vm, sym, len);
     if (outer && outer != m_vm->object_class) {
         mrb_value base = outer->class_path();
-        path = mrb_str_plus(m_vm, base, mrb_str_new(m_vm, "::", 2));
+        path = mrb_str_plus(m_vm, base, mrb_str_new_lit(m_vm, "::"));
         mrb_str_concat(m_vm, path, mrb_str_new(m_vm, name, len));
     }
     else {
@@ -1156,7 +1158,7 @@ const char* RClass::class_name()
 {
     mrb_value path = class_path();
     if (mrb_nil_p(path)) {
-        path = mrb_str_new(m_vm, "#<Class:", 8);
+        path = mrb_str_new_lit(m_vm, "#<Class:");
         mrb_str_concat(m_vm, path, mrb_ptr_to_str(m_vm, this ));
         mrb_str_cat(m_vm, path, ">", 1);
     }
@@ -1329,7 +1331,7 @@ static mrb_value mrb_mod_to_s(mrb_state *mrb, mrb_value klass)
     if (mrb_type(klass) == MRB_TT_SCLASS) {
         mrb_value v = mrb_ptr(klass)->iv_get(mrb->intern2("__attached__", 12));
 
-        str = mrb_str_new(mrb, "#<Class:", 8);
+        str = mrb_str_new_lit(mrb, "#<Class:");
 
         switch (mrb_type(v)) {
             case MRB_TT_CLASS:

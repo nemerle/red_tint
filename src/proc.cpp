@@ -16,7 +16,14 @@ static mrb_code call_iseq[] = {
 RProc * mrb_proc_new(mrb_state *mrb, mrb_irep *irep)
 {
     RProc *p = RProc::alloc(mrb);
-    p->target_class = (mrb->m_ctx->m_ci) ? mrb->m_ctx->m_ci->target_class : nullptr;
+    mrb_callinfo *ci = mrb->m_ctx->m_ci;
+    p->m_target_class = nullptr;
+    if (ci) {
+        if (ci->proc)
+            p->m_target_class = ci->proc->m_target_class;
+        if (!p->m_target_class)
+            p->m_target_class = ci->target_class;
+    }
     p->body.irep = irep;
     p->env = nullptr;
     mrb_irep_incref(mrb, irep);
@@ -107,17 +114,17 @@ mrb_code* mrb_proc_iseq(mrb_state *mrb, RProc *p)
 /* 15.2.17.4.2 */
 static mrb_value mrb_proc_arity(mrb_state *mrb, mrb_value self)
 {
-  RProc *p = mrb_proc_ptr(self);
-  mrb_code *iseq = mrb_proc_iseq(mrb, p);
-  mrb_aspec aspec = GETARG_Ax(*iseq);
-  int ma, ra, pa, arity;
+    RProc *p = mrb_proc_ptr(self);
+    mrb_code *iseq = mrb_proc_iseq(mrb, p);
+    mrb_aspec aspec = GETARG_Ax(*iseq);
+    int ma, ra, pa, arity;
 
-  ma = MRB_ASPEC_REQ(aspec);
-  ra = MRB_ASPEC_REST(aspec);
-  pa = MRB_ASPEC_POST(aspec);
-  arity = ra ? -(ma + pa + 1) : ma + pa;
+    ma = MRB_ASPEC_REQ(aspec);
+    ra = MRB_ASPEC_REST(aspec);
+    pa = MRB_ASPEC_POST(aspec);
+    arity = ra ? -(ma + pa + 1) : ma + pa;
 
-  return mrb_fixnum_value(arity);
+    return mrb_fixnum_value(arity);
 }
 
 /* 15.3.1.2.6  */

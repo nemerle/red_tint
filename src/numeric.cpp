@@ -5,12 +5,6 @@
 */
 
 #include <float.h>
-#if defined(__FreeBSD__) && __FreeBSD__ < 4
-# include <floatingpoint.h>
-#endif
-#ifdef HAVE_IEEEFP_H
-# include <ieeefp.h>
-#endif
 #include <limits.h>
 #include <math.h>
 #include <stdlib.h>
@@ -32,12 +26,12 @@ static mrb_float
 mrb_to_flo(mrb_state *mrb, mrb_value val)
 {
     switch (mrb_type(val)) {
-    case MRB_TT_FIXNUM:
-        return (mrb_float)mrb_fixnum(val);
-    case MRB_TT_FLOAT:
-        break;
-    default:
-        mrb->mrb_raise(E_TYPE_ERROR, "non float value");
+        case MRB_TT_FIXNUM:
+            return (mrb_float)mrb_fixnum(val);
+        case MRB_TT_FLOAT:
+            break;
+        default:
+            mrb->mrb_raise(E_TYPE_ERROR, "non float value");
     }
     return mrb_float(val);
 }
@@ -122,14 +116,14 @@ mrb_value mrb_flo_to_str(mrb_state *mrb, mrb_value flo, int max_digit)
     n = mrb_float(flo);
 
     if (isnan(n)) {
-        result = mrb_str_new(mrb, "NaN", 3);
+        result = mrb_str_new_lit(mrb, "NaN");
     }
     else if (isinf(n)) {
         if (n < 0) {
-            result = mrb_str_new(mrb, "-inf", 4);
+            result = mrb_str_new_lit(mrb, "-inf");
         }
         else {
-            result = mrb_str_new(mrb, "inf", 3);
+            result = mrb_str_new_lit(mrb, "inf");
         }
     }
     else {
@@ -145,7 +139,7 @@ mrb_value mrb_flo_to_str(mrb_state *mrb, mrb_value flo, int max_digit)
             *(c++) = '-';
         }
 
-        exp = log10(n);
+    exp = (int)log10(n);
 
         if ((exp < 0 ? -exp : exp) > max_digit) {
             /* exponent representation */
@@ -168,7 +162,7 @@ mrb_value mrb_flo_to_str(mrb_state *mrb, mrb_value flo, int max_digit)
         /* puts digits */
         while (max_digit >= 0) {
             mrb_float weight = pow(10.0, m);
-            digit = floor(n / weight + FLT_EPSILON);
+      digit = (int)floor(n / weight + FLT_EPSILON);
             *(c++) = '0' + digit;
             n -= (digit * weight);
             max_digit--;
@@ -190,7 +184,7 @@ mrb_value mrb_flo_to_str(mrb_state *mrb, mrb_value flo, int max_digit)
             }
 
             if (exp >= 100) {
-                mrb->mrb_raise(E_RANGE_ERROR, "Too large expornent.");
+        mrb->mrb_raise(E_RANGE_ERROR, "Too large exponent.");
             }
 
             *(c++) = '0' + exp / 10;
@@ -352,14 +346,14 @@ static mrb_value flo_eq(mrb_state *mrb, mrb_value x)
     mrb_value y = mrb->get_arg<mrb_value>();
 
     switch (mrb_type(y)) {
-    case MRB_TT_FIXNUM:
-        b = (mrb_float)mrb_fixnum(y);
-        break;
-    case MRB_TT_FLOAT:
-        b = mrb_float(y);
-        break;
-    default:
-        return num_equal(mrb, x, y);
+        case MRB_TT_FIXNUM:
+            b = (mrb_float)mrb_fixnum(y);
+            break;
+        case MRB_TT_FLOAT:
+            b = mrb_float(y);
+            break;
+        default:
+            return num_equal(mrb, x, y);
     }
     a = mrb_float(x);
     return mrb_bool_value(a == b);
@@ -592,7 +586,11 @@ flo_truncate(mrb_state *mrb, mrb_value num)
     }
     return mrb_fixnum_value((mrb_int)f);
 }
-
+static mrb_value
+flo_nan_p(mrb_state *mrb, mrb_value num)
+{
+    return mrb_bool_value(isnan(mrb_float(num)));
+}
 /*
  * Document-class: Integer
  *
@@ -754,16 +752,16 @@ static mrb_value fix_divmod(mrb_state *mrb, mrb_value x)
 static mrb_value
 flo_divmod(mrb_state *mrb, mrb_value x)
 {
-  mrb_value y;
-  mrb_float div, mod;
-  mrb_value a, b;
+    mrb_value y;
+    mrb_float div, mod;
+    mrb_value a, b;
 
-  mrb_get_args(mrb, "o", &y);
+    mrb_get_args(mrb, "o", &y);
 
-  flodivmod(mrb, mrb_float(x), mrb_to_flo(mrb, y), &div, &mod);
-  a = mrb_float_value((mrb_int)div);
-  b = mrb_float_value(mod);
-  return mrb_assoc_new(mrb, a, b);
+    flodivmod(mrb, mrb_float(x), mrb_to_flo(mrb, y), &div, &mod);
+    a = mrb_float_value((mrb_int)div);
+    b = mrb_float_value(mod);
+    return mrb_assoc_new(mrb, a, b);
 }
 /* 15.2.8.3.7  */
 /*
@@ -1180,14 +1178,14 @@ static mrb_value num_cmp(mrb_state *mrb, mrb_value self)
 
     x = mrb_to_flo(mrb, self);
     switch (mrb_type(other)) {
-    case MRB_TT_FIXNUM:
-        y = (mrb_float)mrb_fixnum(other);
-        break;
-    case MRB_TT_FLOAT:
-        y = mrb_float(other);
-        break;
-    default:
-        return mrb_nil_value();
+        case MRB_TT_FIXNUM:
+            y = (mrb_float)mrb_fixnum(other);
+            break;
+        case MRB_TT_FLOAT:
+            y = mrb_float(other);
+            break;
+        default:
+            return mrb_nil_value();
     }
     if (x > y)
         return mrb_fixnum_value(1);
@@ -1275,5 +1273,6 @@ mrb_init_numeric(mrb_state *mrb)
             .define_method("divmod",   flo_divmod,       MRB_ARGS_REQ(1))
             .define_method("to_s",      flo_to_s,         MRB_ARGS_NONE()) /* 15.2.9.3.16(x) */
             .define_method("inspect",   flo_to_s,         MRB_ARGS_NONE())
+            .define_method("nan?",      flo_nan_p,        MRB_ARGS_NONE())
             ;
 }

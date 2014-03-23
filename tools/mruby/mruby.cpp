@@ -1,15 +1,12 @@
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include "mruby.h"
-#include "mruby/proc.h"
 #include "mruby/array.h"
-#include "mruby/string.h"
 #include "mruby/compile.h"
 #include "mruby/dump.h"
 #include "mruby/variable.h"
+
 
 #ifndef ENABLE_STDIO
 static void
@@ -207,7 +204,7 @@ main(int argc, char **argv)
         v = mrb_load_irep_file_cxt(mrb, args.rfp, c);
     }
     else {
-        mrb_sym zero_sym = mrb_intern2(mrb, "$0", 2);
+        mrb_sym zero_sym = mrb_intern(mrb, "$0", 2);
 
         if (args.rfp) {
             const char *cmdline;
@@ -218,7 +215,7 @@ main(int argc, char **argv)
         }
         else {
             mrbc_filename(mrb, c, "-e");
-            mrb_gv_set(mrb, zero_sym, mrb_str_new(mrb, "-e", 2));
+            mrb_gv_set(mrb, zero_sym, mrb_str_new_lit(mrb, "-e"));
             v = mrb_load_string_cxt(mrb, args.cmdline, c);
         }
 

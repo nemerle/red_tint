@@ -33,6 +33,7 @@ SET(MRUBY_SRC_C
     symbol.cpp
     variable.cpp
     vm.cpp
+    version
     debug
     ../include/mrbconf.h
     ../include/mruby.h

@@ -307,7 +307,7 @@ void mrb_parser_state::yywarn(const char *s)
 
 mrb_sym mrb_parser_state::new_strsym( StrNode * sn)
 {
-    return mrb_intern2(m_mrb, sn->m_str, sn->m_length);
+    return mrb_intern(m_mrb, sn->m_str, sn->m_length);
 }
 // (m o r m2 b)
 // m: (a b c)

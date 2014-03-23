@@ -13,6 +13,8 @@
 #include "mruby.h"
 #include "mruby/node.h"
 
+#define SET_LINENO(c,n) ((c)->lineno = (n))
+
 struct mrb_parser_state;
 
 /* load context */
@@ -84,9 +86,7 @@ struct mrb_parser_heredoc_info {
     mrb_ast_node *doc;
 };
 
-#ifndef MRB_PARSER_BUF_SIZE
 # define MRB_PARSER_BUF_SIZE 1024
-#endif
 //struct mrb_pool;
 /* parser structure */
 struct mrb_lexer_state {
@@ -276,7 +276,7 @@ public:
     template<typename T, typename... Args >
     T *             new_t(Args... args) {
         T *res = new(parser_palloc(sizeof(T))) T(args...);
-        res->locationInit(this->m_lineno,this->current_filename_index);
+        res->locationInit(m_lineno,this->current_filename_index);
         return res;
     }
     template<typename T, typename... Args >

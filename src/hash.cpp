@@ -25,7 +25,6 @@ static inline mrb_value mrb_hash_ht_key(mrb_state *mrb, mrb_value key)
 
 void mrb_gc_mark_hash(mrb_state *mrb, RHash *hash)
 {
-    khiter_t k;
     auto *h = hash->ht;
 
     if (!hash->ht)
@@ -34,7 +33,7 @@ void mrb_gc_mark_hash(mrb_state *mrb, RHash *hash)
         if ( !h->exist(k))
             continue;
         mrb_value key = h->key(k);
-        mrb_value val = h->key(k);
+        mrb_value val = h->value(k);
         mrb_gc_mark_value(mrb, key);
         mrb_gc_mark_value(mrb, val);
     }
@@ -128,7 +127,7 @@ mrb_hash_dup(mrb_state *mrb, mrb_value hash)
 {
     RHash* ret;
     RHash::kh_ht_t *h;
-    khiter_t k, ret_k;
+    khiter_t k;
 
     h = RHASH_TBL(hash);
     ret = mrb->gc().obj_alloc<RHash>(mrb->hash_class);
@@ -232,7 +231,7 @@ mrb_hash_init_core(mrb_state *mrb, mrb_value hash)
         RHASH(hash)->flags |= MRB_HASH_PROC_DEFAULT;
         ifnone = block;
     }
-    mrb_iv_set(mrb, hash, mrb_intern2(mrb, "ifnone", 6), ifnone);
+  mrb_iv_set(mrb, hash, mrb_intern_lit(mrb, "ifnone"), ifnone);
     return hash;
 }
 
@@ -383,8 +382,7 @@ static mrb_value mrb_hash_set_default(mrb_state *mrb, mrb_value hash)
 {
     mrb_value ifnone = mrb->get_arg<mrb_value>();
     mrb_hash_modify(mrb, hash);
-    mrb_hash_ptr(hash)->iv_set(mrb->intern2("ifnone", 6), ifnone);
-    //mrb_iv_set(mrb, hash, mrb_intern2(mrb, "ifnone", 6), ifnone);
+    mrb_hash_ptr(hash)->iv_set(mrb_intern_lit(mrb,"ifnone"), ifnone);
     RHASH(hash)->flags &= ~(MRB_HASH_PROC_DEFAULT);
 
     return ifnone;
@@ -725,69 +723,6 @@ mrb_value mrb_hash_empty_p(mrb_state *mrb, mrb_value self)
     return mrb_true_value();
 }
 
-/* 15.2.13.4.11 */
-/*
- *  call-seq:
- *     hsh.each_value {| value | block } -> hsh
- *     hsh.each_value                    -> an_enumerator
- *
- *  Calls <i>block</i> once for each key in <i>hsh</i>, passing the
- *  value as a parameter.
- *
- *  If no block is given, an enumerator is returned instead.
- *
- *     h = { "a" => 100, "b" => 200 }
- *     h.each_value {|value| puts value }
- *
- *  <em>produces:</em>
- *
- *     100
- *     200
- */
-
-/* 15.2.13.4.10 */
-/*
- *  call-seq:
- *     hsh.each_key {| key | block } -> hsh
- *     hsh.each_key                  -> an_enumerator
- *
- *  Calls <i>block</i> once for each key in <i>hsh</i>, passing the key
- *  as a parameter.
- *
- *  If no block is given, an enumerator is returned instead.
- *
- *     h = { "a" => 100, "b" => 200 }
- *     h.each_key {|key| puts key }
- *
- *  <em>produces:</em>
- *
- *     a
- *     b
- */
-
-/* 15.2.13.4.9  */
-/*
- *  call-seq:
- *     hsh.each      {| key, value | block } -> hsh
- *     hsh.each_pair {| key, value | block } -> hsh
- *     hsh.each                              -> an_enumerator
- *     hsh.each_pair                         -> an_enumerator
- *
- *  Calls <i>block</i> once for each key in <i>hsh</i>, passing the key-value
- *  pair as parameters.
- *
- *  If no block is given, an enumerator is returned instead.
- *
- *     h = { "a" => 100, "b" => 200 }
- *     h.each {|key, value| puts "#{key} is #{value}" }
- *
- *  <em>produces:</em>
- *
- *     a is 100
- *     b is 200
- *
- */
-
 static mrb_value inspect_hash(mrb_value hash, bool recur)
 {
     mrb_value str, str2;
@@ -795,9 +730,9 @@ static mrb_value inspect_hash(mrb_value hash, bool recur)
     RHash::kh_ht_t *h = hsh->ht;
 
     if (recur)
-        return mrb_str_new(hsh->m_vm, "{...}", 5);
+        return mrb_str_new_lit(hsh->m_vm, "{...}");
 
-    str = mrb_str_new(hsh->m_vm, "{", 1);
+    str = mrb_str_new_lit(hsh->m_vm, "{");
     if (h && h->size() > 0) {
         for (auto k = h->begin(); k != h->end(); k++) {
             int ai;
@@ -841,7 +776,7 @@ static mrb_value mrb_hash_inspect(mrb_state *mrb, mrb_value hash)
     RHash::kh_ht_t *h = RHASH_TBL(hash);
 
     if (!h || h->size() == 0)
-        return mrb_str_new(mrb, "{}", 2);
+        return mrb_str_new_lit(mrb, "{}");
     return inspect_hash(hash, 0);
 }
 

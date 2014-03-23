@@ -283,7 +283,7 @@ mrb_f_block_given_p_m(mrb_state *mrb, mrb_value self)
     mrb_value *bp;
     mrb_bool given_p = false;
 
-    bp = mrb->m_ctx->m_stbase + ci->stackidx + 1;
+    bp = ci->stackent + 1;
     ci--;
     if (ci > mrb->m_ctx->cibase) {
         /* block_given? called within block; check upper scope */
@@ -338,7 +338,7 @@ RClass* mrb_singleton_class_clone(mrb_state *mrb, mrb_value obj)
     clone->super = klass->super;
     if (klass->iv) {
         mrb_iv_copy(mrb, mrb_obj_value(clone), mrb_obj_value(klass));
-        clone->iv_set(mrb_intern2(mrb, "__attached__", 12), obj);
+        clone->iv_set(mrb_intern(mrb, "__attached__", 12), obj);
     }
     if (klass->mt) {
         clone->mt = klass->mt->copy(mrb->gc());
@@ -349,13 +349,22 @@ RClass* mrb_singleton_class_clone(mrb_state *mrb, mrb_value obj)
     clone->tt = MRB_TT_SCLASS;
     return clone;
 }
+static void
+copy_class(mrb_state *mrb, mrb_value dst, mrb_value src)
+{
+    RClass *dc = mrb_class_ptr(dst);
+    RClass *sc = mrb_class_ptr(src);
 
+    dc->mt = sc->mt->copy(mrb->gc());
+    dc->super = sc->super;
+}
 static void init_copy(mrb_state *mrb, mrb_value dest, mrb_value obj)
 {
     switch (mrb_type(obj)) {
-        case MRB_TT_OBJECT:
         case MRB_TT_CLASS:
         case MRB_TT_MODULE:
+            copy_class(mrb, dest, obj);
+        case MRB_TT_OBJECT:
         case MRB_TT_SCLASS:
         case MRB_TT_HASH:
         case MRB_TT_DATA:
@@ -870,7 +879,7 @@ mrb_value mrb_f_raise(mrb_state *mrb, mrb_value self)
             /* fall through */
         default:
             exc = mrb_make_exception(mrb, argc, a);
-            mrb_ptr(exc)->iv_set(mrb_intern2(mrb, "lastpc", 6), mrb_cptr_value(mrb,mrb->m_ctx->m_ci->pc));
+            mrb_ptr(exc)->iv_set(mrb_intern(mrb, "lastpc", 6), mrb_cptr_value(mrb,mrb->m_ctx->m_ci->pc));
             mrb_exc_raise(mrb, exc);
             break;
     }
@@ -973,7 +982,7 @@ mrb_value obj_respond_to(mrb_state *mrb, mrb_value self)
     }
 
     if (!respond_to_p) {
-        mrb_sym rtm_id = mrb_intern2(mrb, "respond_to_missing?", 19);
+        mrb_sym rtm_id = mrb_intern(mrb, "respond_to_missing?", 19);
         if (basic_obj_respond_to(mrb, self, rtm_id, !mrb_test(priv))) {
             return mrb_funcall_argv(mrb, self, rtm_id, argc, argv);
         }
@@ -1020,7 +1029,22 @@ mrb_value mrb_obj_singleton_methods_m(mrb_state *mrb, mrb_value self)
     mrb_get_args(mrb, "|b", &recur);
     return mrb_obj_singleton_methods(mrb, recur, self);
 }
+static mrb_value
+mrb_obj_ceqq(mrb_state *mrb, mrb_value self)
+{
+    mrb_value v;
+    mrb_int i, len;
+    mrb_sym eqq = mrb_intern_lit(mrb, "===");
+    mrb_value ary = RArray::splat(mrb, self);
 
+    mrb_get_args(mrb, "o", &v);
+    len = RARRAY_LEN(ary);
+    for (i=0; i<len; i++) {
+        mrb_value c = mrb_funcall_argv(mrb, RARRAY(ary)->entry(i), eqq, 1, &v);
+        if (mrb_test(c)) return mrb_true_value();
+    }
+    return mrb_false_value();
+}
 void mrb_init_kernel(mrb_state *mrb)
 {
     mrb->kernel_module = &mrb->define_module("Kernel")
@@ -1069,6 +1093,7 @@ void mrb_init_kernel(mrb_state *mrb)
             .define_method("send",                       mrb_f_send,                      MRB_ARGS_ANY())     /* 15.3.1.3.44 */
             .define_method("singleton_methods",          mrb_obj_singleton_methods_m,     MRB_ARGS_OPT(1))    /* 15.3.1.3.45 */
             .define_method("to_s",                       mrb_any_to_s,                    MRB_ARGS_NONE())    /* 15.3.1.3.46 */
+            .define_method("__case_eqq",                 mrb_obj_ceqq,                    MRB_ARGS_REQ(1))    /* internal */
             ;
     mrb->object_class->include_module(mrb->kernel_module);
     mrb->module_class->alias_method(mrb->intern2("dup",3), mrb->intern2("clone",5));

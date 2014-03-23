@@ -57,33 +57,6 @@ void * mrb_data_check_and_get_ptr(mrb_state *mrb, mrb_value obj, const mrb_data_
     return DATA_PTR(obj);
 }
 
-mrb_value mrb_lastline_get(mrb_state *mrb)
-{
-    mrb_value *argv;
-    int argc;
-
-    mrb_get_args(mrb, "*", &argv, &argc);
-    if (argc < 1) {
-        return mrb_nil_value();
-    }
-    else
-    {
-        return argv[0];
-    }
-}
-
-/* ------------------------------------------------ */
-/*
- * Calls func(obj, arg, recursive), where recursive is non-zero if the
- * current method is called recursively on obj
- */
-
-mrb_value
-mrb_exec_recursive(mrb_state *mrb, mrb_value (*func) (mrb_state *, mrb_value, mrb_value, int), mrb_value obj, void *arg)
-{
-    return func(mrb, obj, *(mrb_value*)arg, 0);
-}
-
 mrb_sym mrb_obj_to_sym(mrb_state *mrb, mrb_value name)
 {
     mrb_value tmp;
@@ -105,18 +78,6 @@ mrb_sym mrb_obj_to_sym(mrb_state *mrb, mrb_value name)
             return mrb_symbol(name);
     }
     return id;
-}
-
-/*
- * call-seq:
- *   proc   { |...| block }  -> a_proc
- *
- * Equivalent to <code>Proc.new</code>.
- */
-
-mrb_value mrb_block_proc(void)
-{
-    return mrb_nil_value();
 }
 
 static mrb_int float_id(mrb_float f)

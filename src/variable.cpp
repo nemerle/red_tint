@@ -10,8 +10,7 @@
 #include "mruby/class.h"
 #include "mruby/proc.h"
 #include "mruby/string.h"
-#include "mruby/variable.h"
-#include "error.h"
+
 namespace {
 typedef int (iv_foreach_func)(mrb_sym,mrb_value,void*);
 struct csym_arg {
@@ -441,15 +440,15 @@ void mrb_vm_special_set(mrb_state *mrb, mrb_sym i, mrb_value v)
 static mrb_bool obj_iv_p(mrb_value obj)
 {
     switch (mrb_type(obj)) {
-    case MRB_TT_OBJECT:
-    case MRB_TT_CLASS:
-    case MRB_TT_MODULE:
-    case MRB_TT_SCLASS:
-    case MRB_TT_HASH:
-    case MRB_TT_DATA:
-        return true;
-    default:
-        return false;
+        case MRB_TT_OBJECT:
+        case MRB_TT_CLASS:
+        case MRB_TT_MODULE:
+        case MRB_TT_SCLASS:
+        case MRB_TT_HASH:
+        case MRB_TT_DATA:
+            return true;
+        default:
+            return false;
     }
 }
 
@@ -550,7 +549,14 @@ static int inspect_i(mrb_sym sym, mrb_value v, void *p)
     const char *s = mrb_sym2name_len(p_str->m_vm, sym, len);
     p_str->str_cat(s,len);
     p_str->str_cat("=",1);
-    p_str->str_append(mrb_inspect(p_str->m_vm, v));
+    mrb_value ins;
+    if (mrb_type(v) == MRB_TT_OBJECT) {
+        ins = mrb_any_to_s(p_str->m_vm, v);
+    }
+    else {
+        ins = mrb_inspect(p_str->m_vm, v);
+    }
+    p_str->str_append(ins);
     return 0;
 }
 
@@ -564,7 +570,7 @@ mrb_value mrb_obj_iv_inspect(mrb_state *mrb, struct RObject *obj)
         mrb_value str = mrb_str_buf_new(mrb, 30);
 
         mrb_str_buf_cat(str, "-<", 2);
-        mrb_str_cat2(mrb, str, cn);
+         mrb_str_cat_cstr(mrb, str, cn);
         mrb_str_cat(mrb, str, ":", 1);
         mrb_str_concat(mrb, str, mrb_ptr_to_str(mrb, obj));
 
@@ -759,7 +765,7 @@ mrb_bool mrb_cv_defined(mrb_state *mrb, mrb_value mod, mrb_sym sym)
 
 mrb_value mrb_vm_cv_get(mrb_state *mrb, mrb_sym sym)
 {
-    RClass *c = mrb->m_ctx->m_ci->proc->target_class;
+    RClass *c = mrb->m_ctx->m_ci->proc->m_target_class;
 
     if (!c)
         c = mrb->m_ctx->m_ci->target_class;
@@ -770,27 +776,11 @@ mrb_value mrb_vm_cv_get(mrb_state *mrb, mrb_sym sym)
 void
 mrb_vm_cv_set(mrb_state *mrb, mrb_sym sym, mrb_value v)
 {
-    RClass *c = mrb->m_ctx->m_ci->proc->target_class;
+    RClass *c = mrb->m_ctx->m_ci->proc->m_target_class;
 
-    if (!c) c = mrb->m_ctx->m_ci->target_class;
-    while (c) {
-        if (c->iv) {
-            iv_tbl *t = c->iv;
-
-            if (t->iv_get(sym)) {
-                mrb->gc().mrb_write_barrier(c);
-                t->iv_put(sym, v);
-                return;
-            }
-        }
-        c = c->super;
-    }
-    c = mrb->m_ctx->m_ci->target_class;
-    if (!c->iv) {
-        c->iv = iv_tbl::iv_new(mrb);
-    }
-    mrb->gc().mrb_write_barrier(c);
-    c->iv->iv_put(sym, v);
+    if (!c)
+        c = mrb->m_ctx->m_ci->target_class;
+    mrb_mod_cv_set(mrb, c, sym, v);
 }
 
 bool mrb_const_defined(mrb_state *mrb, const mrb_value &mod, mrb_sym sym)
@@ -806,13 +796,13 @@ static void
 mod_const_check(mrb_state *mrb, const mrb_value &mod)
 {
     switch (mrb_type(mod)) {
-    case MRB_TT_CLASS:
-    case MRB_TT_MODULE:
-    case MRB_TT_SCLASS:
-        break;
-    default:
-        mrb->mrb_raise(E_TYPE_ERROR, "constant look-up for non class/module");
-        break;
+        case MRB_TT_CLASS:
+        case MRB_TT_MODULE:
+        case MRB_TT_SCLASS:
+            break;
+        default:
+            mrb->mrb_raise(E_TYPE_ERROR, "constant look-up for non class/module");
+            break;
     }
 }
 
@@ -855,7 +845,7 @@ mrb_value mrb_state::const_get(mrb_value mod, mrb_sym sym)
 
 mrb_value mrb_vm_const_get(mrb_state *mrb, mrb_sym sym)
 {
-    RClass *c = mrb->m_ctx->m_ci->proc->target_class;
+    RClass *c = mrb->m_ctx->m_ci->proc->m_target_class;
 
     if (!c)
         c = mrb->m_ctx->m_ci->target_class;
@@ -876,8 +866,9 @@ mrb_value mrb_vm_const_get(mrb_state *mrb, mrb_sym sym)
             }
         }
     }
-    assert(c);
-    return c->const_get(sym);
+    if(c)
+        return c->const_get(sym);
+    return mrb_nil_value();
 }
 
 void mrb_const_set(mrb_state *mrb, mrb_value mod, mrb_sym sym, mrb_value v)
@@ -888,7 +879,7 @@ void mrb_const_set(mrb_state *mrb, mrb_value mod, mrb_sym sym, mrb_value v)
 
 void mrb_vm_const_set(mrb_state *mrb, mrb_sym sym, mrb_value v)
 {
-    RClass *c = mrb->m_ctx->m_ci->proc->target_class;
+    RClass *c = mrb->m_ctx->m_ci->proc->m_target_class;
 
     if (!c)
         c = mrb->m_ctx->m_ci->target_class;
@@ -916,7 +907,7 @@ static int const_i(mrb_sym sym, mrb_value v, void *p)
 
     RArray *arr = mrb_ary_ptr(*(mrb_value*)p);
     const char* s = mrb_sym2name_len(arr->m_vm, sym, len);
-    if (len > 1 && ISUPPER(s[0])) {
+    if (len >= 1 && ISUPPER(s[0])) {
         arr->push(mrb_symbol_value(sym));
     }
     return 0;
@@ -1001,7 +992,7 @@ mrb_value mrb_f_global_variables(mrb_state *mrb, mrb_value self)
     buf[2] = 0;
     for (i = 1; i <= 9; ++i) {
         buf[1] = (char)(i + '0');
-        arr->push(mrb_symbol_value(mrb_intern2(mrb, buf, 2)));
+        arr->push(mrb_symbol_value(mrb_intern(mrb, buf, 2)));
     }
     return mrb_obj_value(arr);
 }

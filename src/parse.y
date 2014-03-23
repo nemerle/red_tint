@@ -1237,7 +1237,11 @@ primary		: literal
                     {
                       $$ = p->new_t<ForNode>($2, $5, $8);
                     }
-                | keyword_class cpath superclass
+                | keyword_class
+                    {
+                      $<num>$ = p->m_lineno;
+                    }
+                  cpath superclass
                     {
                         if (p->in_def || p->in_single)
                             p->yyerror("class definition in method body");
@@ -1246,10 +1250,15 @@ primary		: literal
                   bodystmt
                   keyword_end
                     {
-                      $$ = p->new_t<ClassNode>($2, $3, p->new_scope($5));
+                      $$ = p->new_t<ClassNode>($3, $4, p->new_scope($6));
+                      SET_LINENO($$, $<num>2);
                       p->local_resume($<locals_ctx>ctx_idx);
                     }
-                | keyword_class tLSHFT expr
+                | keyword_class
+                    {
+                      $<num>$ = p->m_lineno;
+                    }
+                tLSHFT expr
                     {
                       $<num>$ = p->in_def;
                       p->in_def = 0;
@@ -1262,12 +1271,17 @@ primary		: literal
                   bodystmt
                   keyword_end
                     {
-                      $$ = p->new_t<SclassNode>($3, p->new_scope($7));
+                      $$ = p->new_t<SclassNode>($4, p->new_scope($8));
+                      SET_LINENO($$, $<num>2);
                       p->local_resume($<l_s>[in_single].idx);
                       p->in_def = $<num>in_def;
                       p->in_single = $<l_s>[in_single].single;
                     }
-                | keyword_module cpath
+                | keyword_module
+                    {
+                      $<num>$ = p->m_lineno;
+                    }
+                cpath
                     {
                       if (p->in_def || p->in_single)
                         p->yyerror("module definition in method body");
@@ -1276,7 +1290,8 @@ primary		: literal
                   bodystmt
                   keyword_end
                     {
-                      $$ = p->new_t<ModuleNode>($2, p->new_scope($4));
+                      $$ = p->new_t<ModuleNode>($3, p->new_scope($5));
+                      SET_LINENO($$, $<num>2);
                       p->local_resume($<locals_ctx>ctx_idx);
                     }
                 | keyword_def fname
@@ -1631,21 +1646,25 @@ method_call	: operation paren_args
 brace_block	: '{'
                     {
                       p->local_nest();
+                      $<num>$ = p->m_lineno;
                     }
                   opt_block_param
                   compstmt '}'
                     {
                       $$ = p->new_block($3,$4);
+                      SET_LINENO($$, $<num>2);
                       p->local_unnest();
                     }
                 | keyword_do
                     {
                       p->local_nest();
+                      $<num>$ = p->m_lineno;
                     }
                   opt_block_param
                   compstmt keyword_end
                     {
                       $$ = p->new_block($3,$4);
+                      SET_LINENO($$, $<num>2);
                       p->local_unnest();
                     }
                 ;

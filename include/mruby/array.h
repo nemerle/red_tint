@@ -77,6 +77,7 @@ static  mrb_value   splat(mrb_state *mrb, const mrb_value &v);
         mrb_value   inspect();
         void        splice(mrb_int head, mrb_int len, const mrb_value &rpl);
         void mrb_ary_modify();
+        mrb_value mrb_ary_ceqq();
 protected:
         mrb_value * base_ptr() {
             return (flags & MRB_ARY_SHARED) ? m_aux.shared->ptr : m_ptr;
@@ -99,6 +100,7 @@ static  RArray *    ary_new_capa(mrb_state *mrb, size_t capa);
                         return m_ptr[offset];
                     }
         mrb_value & unchecked_ref(mrb_int offset) { return m_ptr[offset];}
+        mrb_int aget_index(mrb_value index);
 };
 
 void mrb_ary_decref(mrb_state*, mrb_shared_array*);

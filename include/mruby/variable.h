@@ -7,10 +7,6 @@
 #ifndef MRUBY_VARIABLE_H
 #define MRUBY_VARIABLE_H
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
-
 typedef struct global_variable {
     int   counter;
     mrb_value *data;
@@ -69,9 +65,5 @@ void mrb_gc_free_gv(mrb_state*);
 void mrb_gc_mark_iv(mrb_state*, struct RObject*);
 size_t mrb_gc_mark_iv_size(mrb_state*, struct RObject*);
 void mrb_gc_free_iv(mrb_state*, struct RObject*);
-
-#if defined(__cplusplus)
-}  /* extern "C" { */
-#endif
 
 #endif  /* MRUBY_VARIABLE_H */

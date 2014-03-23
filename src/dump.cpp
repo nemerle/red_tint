@@ -4,14 +4,14 @@
 ** See Copyright Notice in mruby.h
 */
 
+#include <ctype.h>
 #include <string.h>
 #include "mruby/dump.h"
-#include <ctype.h>
-
 #include "mruby/string.h"
 #include "mruby/irep.h"
 #include "mruby/numeric.h"
 #include "mruby/debug.h"
+
 
 static size_t get_irep_record_size_1(mrb_state *mrb, mrb_irep *irep);
 
@@ -110,20 +110,22 @@ static int write_pool_block(mrb_state *mrb, mrb_irep *irep, uint8_t *buf)
     for (pool_no = 0; pool_no < irep->plen; pool_no++) {
         int ai = mrb->gc().arena_save();
 
-        cur += uint8_to_bin(mrb_type(irep->pool[pool_no]), cur); /* data type */
         switch (mrb_type(irep->pool[pool_no])) {
             case MRB_TT_FIXNUM:
+                cur += uint8_to_bin(IREP_TT_FIXNUM, cur); /* data type */
                 str = mrb_fixnum_to_str(mrb, irep->pool[pool_no], 10);
                 char_ptr = RSTRING_PTR(str);
                 len = RSTRING_LEN(str);
                 break;
 
             case MRB_TT_FLOAT:
+                cur += uint8_to_bin(IREP_TT_FLOAT, cur); /* data type */
                 len = mrb_float_to_str(char_buf, mrb_float(irep->pool[pool_no]));
                 char_ptr = &char_buf[0];
                 break;
 
-             case MRB_TT_STRING:
+            case MRB_TT_STRING:
+                cur += uint8_to_bin(IREP_TT_STRING, cur); /* data type */
                 char_ptr = RSTRING_PTR(irep->pool[pool_no]);
                 len = RSTRING_LEN(irep->pool[pool_no]);
                 break;
@@ -465,6 +467,7 @@ get_filename_table_size(mrb_state *mrb, mrb_irep *irep, mrb_sym **fp, size_t *lp
         }
         for (i=0; i<irep->rlen; i++) {
             size += get_filename_table_size(mrb, irep->reps[i], fp, lp);
+            filenames = *fp;
         }
     }
     return size;
@@ -510,7 +513,6 @@ write_debug_record_1(mrb_state* mrb, mrb_irep *irep, uint8_t * const bin, mrb_sy
     size_t ret = cur - bin;
     uint32_to_bin(ret, bin);
 
-    mrb_assert((cur - bin) == (int)get_debug_record_size(mrb, irep));
 
     return ret;
 }
@@ -527,6 +529,7 @@ write_debug_record(mrb_state *mrb, mrb_irep *irep, uint8_t *bin, mrb_sym const* 
         bin += len;
         size += len;
     }
+    mrb_assert(size == (int)get_debug_record_size(mrb, irep));
     return size;
 }
 
@@ -557,6 +560,9 @@ write_filename_table(mrb_state *mrb, mrb_irep *irep, uint8_t **cp, mrb_sym **fp,
 
         size += sizeof(uint16_t) + fn_len;
     }
+    for (int file_i=0; file_i<irep->rlen; file_i++) {
+        size += write_filename_table(mrb, irep->reps[file_i], &cur, fp, lp);
+    }
     *cp = cur;
     return size;
 }
@@ -585,9 +591,6 @@ write_section_debug(mrb_state *mrb, mrb_irep *irep, uint8_t *cur)
     cur += sizeof(uint16_t);
     section_size += sizeof(uint16_t);
     section_size += write_filename_table(mrb, irep, &cur, &filenames, &filenames_len);
-    for (size_t i=0; i<irep->rlen; i++) {
-        section_size += write_filename_table(mrb, irep->reps[i], &cur, &filenames, &filenames_len);
-    }
     uint16_to_bin(filenames_len, filenames_len_out);
 
     // debug records

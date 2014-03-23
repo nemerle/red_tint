@@ -45,7 +45,7 @@ mrb_value mrb_struct_iv_get(mrb_state *mrb, mrb_value c, const char *name)
 
 mrb_value mrb_struct_s_members(mrb_state *mrb, mrb_value klass)
 {
-    mrb_value members = struct_ivar_get(mrb, klass, mrb_intern2(mrb, "__members__", 11));
+    mrb_value members = struct_ivar_get(mrb, klass, mrb_intern(mrb, "__members__", 11));
 
     if (mrb_nil_p(members)) {
         mrb->mrb_raise(E_TYPE_ERROR, "uninitialized struct");
@@ -171,7 +171,7 @@ mrb_id_attrset(mrb_state *mrb, mrb_sym id)
     buf[len] = '=';
     buf[len+1] = '\0';
 
-    mid = mrb_intern2(mrb, buf, len+1);
+    mid = mrb_intern(mrb, buf, len+1);
     mrb->gc()._free(buf);
     return mid;
 }
@@ -187,7 +187,7 @@ mrb_struct_set(mrb_state *mrb, mrb_value obj, mrb_value val)
 
     /* get base id */
     name = mrb_sym2name_len(mrb, mrb->m_ctx->m_ci->mid, len);
-    mid = mrb_intern2(mrb, name, len-1); /* omit last "=" */
+    mid = mrb_intern(mrb, name, len-1); /* omit last "=" */
 
     members = mrb_struct_members(mrb, obj);
     ptr_members = RARRAY_PTR(members);
@@ -253,7 +253,7 @@ make_struct(mrb_state *mrb, mrb_value name, mrb_value members, struct RClass * k
     }
     MRB_SET_INSTANCE_TT(c, MRB_TT_ARRAY);
     nstr = mrb_obj_value(c);
-    c->iv_set(mrb_intern2(mrb, "__members__", 11), members);
+    c->iv_set(mrb_intern(mrb, "__members__", 11), members);
     c->define_class_method("new", mrb_instance_new, MRB_ARGS_ANY())
         .define_class_method("[]", mrb_instance_new, MRB_ARGS_ANY())
         .define_class_method("members", mrb_struct_s_members_m, MRB_ARGS_NONE())
@@ -389,7 +389,7 @@ static int num_members(mrb_state *mrb, RClass *klass)
 {
     mrb_value members;
 
-    members = struct_ivar_get(mrb, mrb_obj_value(klass), mrb_intern2(mrb, "__members__", 11));
+    members = struct_ivar_get(mrb, mrb_obj_value(klass), mrb_intern(mrb, "__members__", 11));
     if (!mrb_is_a_array(members)) {
         mrb->mrb_raise(E_TYPE_ERROR, "broken members");
     }
@@ -448,7 +448,7 @@ inspect_struct(mrb_state *mrb, mrb_value s, int recur)
         mrb_str_append(mrb, str, mrb_str_new_cstr(mrb, cn));
     }
     if (recur) {
-        return mrb_str_cat2(mrb, str, ":...>");
+        return  mrb_str_cat_cstr(mrb, str, ":...>");
     }
 
     members = mrb_struct_members(mrb, s);
@@ -460,10 +460,10 @@ inspect_struct(mrb_state *mrb, mrb_value s, int recur)
         mrb_sym id;
 
         if (i > 0) {
-            mrb_str_cat2(mrb, str, ", ");
+             mrb_str_cat_cstr(mrb, str, ", ");
         }
         else if (cn) {
-            mrb_str_cat2(mrb, str, " ");
+             mrb_str_cat_cstr(mrb, str, " ");
         }
         slot = ptr_members[i];
         id = mrb_symbol(slot);
@@ -477,10 +477,10 @@ inspect_struct(mrb_state *mrb, mrb_value s, int recur)
         else {
             mrb_str_append(mrb, str, mrb_inspect(mrb, slot));
         }
-        mrb_str_cat2(mrb, str, "=");
+         mrb_str_cat_cstr(mrb, str, "=");
         mrb_str_append(mrb, str, mrb_inspect(mrb, ptr[i]));
     }
-    mrb_str_cat2(mrb, str, ">");
+     mrb_str_cat_cstr(mrb, str, ">");
 
     return str;
 }

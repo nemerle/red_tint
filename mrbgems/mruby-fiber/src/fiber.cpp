@@ -94,10 +94,11 @@ static mrb_value fiber_init(mrb_state *mrb, mrb_value self)
     c->cibase = (mrb_callinfo *)mrb->gc()._calloc(FIBER_CI_INIT_SIZE, sizeof(mrb_callinfo));
     c->ciend = c->cibase + FIBER_CI_INIT_SIZE;
     c->m_ci = c->cibase;
+    c->m_ci->stackent = c->m_stack;
 
     /* adjust return callinfo */
     ci = c->m_ci;
-    ci->target_class = p->target_class;
+    ci->target_class = p->m_target_class;
     ci->proc = p;
     ci->pc = p->body.irep->iseq;
     ci->nregs = p->body.irep->nregs;
@@ -213,9 +214,14 @@ static mrb_value fiber_alive_p(mrb_state *mrb, mrb_value self)
 static mrb_value fiber_yield(mrb_state *mrb, mrb_value self)
 {
     struct mrb_context *c = mrb->m_ctx;
+    mrb_callinfo *ci;
     mrb_value *a;
     int len;
-
+    for (ci = c->m_ci; ci >= c->cibase; ci--) {
+        if (ci->acc < 0) {
+            mrb->mrb_raise(E_ARGUMENT_ERROR, "can't cross C function boundary");
+        }
+    }
     if (!c->prev) {
         mrb->mrb_raise(E_ARGUMENT_ERROR, "can't yield from root fiber");
     }
@@ -237,13 +243,13 @@ static mrb_value fiber_yield(mrb_state *mrb, mrb_value self)
 static mrb_value
 fiber_current(mrb_state *mrb, mrb_value self)
 {
-  if (!mrb->m_ctx->fib) {
-    RFiber *f = mrb->gc().obj_alloc<RFiber>(MRB_TT_FIBER, mrb_class_ptr(self));
+    if (!mrb->m_ctx->fib) {
+        RFiber *f = mrb->gc().obj_alloc<RFiber>(MRB_TT_FIBER, mrb_class_ptr(self));
 
-    f->cxt = mrb->m_ctx;
-    mrb->m_ctx->fib = f;
-  }
-  return mrb_obj_value(mrb->m_ctx->fib);
+        f->cxt = mrb->m_ctx;
+        mrb->m_ctx->fib = f;
+    }
+    return mrb_obj_value(mrb->m_ctx->fib);
 }
 void
 mrb_mruby_fiber_gem_init(mrb_state* mrb)

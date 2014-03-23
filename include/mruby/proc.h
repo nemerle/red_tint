@@ -28,7 +28,10 @@ struct RProc : public RBasic {
         mrb_irep *irep;
         mrb_func_t func;
     } body;
-    RClass *target_class;
+//protected:
+    RClass *m_target_class;
+public:
+    RClass *target_class() {return m_target_class;}
     REnv *env;
     void copy_from(RProc *src) {
         flags = src->flags;
@@ -36,7 +39,7 @@ struct RProc : public RBasic {
         if (!(this->flags & MRB_PROC_CFUNC)) {
             body.irep->refcnt++;
         };
-        target_class = src->target_class;
+        m_target_class = src->m_target_class;
         env   = src->env;
     }
     static RProc *alloc(mrb_state *mrb);

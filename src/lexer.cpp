@@ -33,6 +33,7 @@ static bool identchar(int c) { return (isalnum(c) || (c) == '_' || !isascii(c));
 #define CMDARG_LEXPOP() BITSTACK_LEXPOP(this->cmdarg_stack)
 #define CMDARG_P()      BITSTACK_SET_P(this->cmdarg_stack)
 
+
 void mrb_lexer_state::tokadd(int c)
 {
     if (bidx < MRB_PARSER_BUF_SIZE) {
@@ -151,7 +152,7 @@ int mrb_parser_state::read_escape()
             l_buf[0] = c;
             for (i=1; i<3; i++) {
                 l_buf[i] = nextc();
-                if (l_buf[i] == -1) goto eof;
+                if (l_buf[i] < 0) goto eof;
                 if (l_buf[i] < '0' || '7' < l_buf[i]) {
                     pushback(l_buf[i]);
                     break;
@@ -168,7 +169,7 @@ int mrb_parser_state::read_escape()
 
             for (i=0; i<2; i++) {
                 buf[i] = nextc();
-                if (buf[i] == -1) goto eof;
+                if (buf[i] < 0) goto eof;
                 if (!ISXDIGIT(buf[i])) {
                     pushback(buf[i]);
                     break;
@@ -197,7 +198,7 @@ int mrb_parser_state::read_escape()
             if ((c = nextc()) == '\\') {
                 return read_escape() | 0x80;
             }
-            else if (c == -1) goto eof;
+            else if (c < 0) goto eof;
             else {
                 return ((c & 0xff) | 0x80);
             }
@@ -214,11 +215,12 @@ int mrb_parser_state::read_escape()
             }
             else if (c == '?')
                 return 0177;
-            else if (c == -1) goto eof;
+            else if (c < 0) goto eof;
             return c & 0x9f;
 
 eof:
         case -1:
+        case -2:
             yyerror("Invalid escape character syntax");
             return '\0';
 
@@ -266,13 +268,9 @@ int mrb_parser_state::nextc()
 eof:
     if (!m_cxt)
         return -1;
-    mrbc_context *cxt = m_cxt;
-    if (cxt->partial_hook(this) < 0)
+    if (m_cxt->partial_hook(this) < 0)
         return -1;
-    c = '\n';
-    m_lineno = 1;
-    m_cxt = cxt;
-    return c;
+    return -2;
 }
 void mrb_parser_state::skip(char term)
 {
@@ -347,19 +345,19 @@ int mrb_parser_state::heredoc_identifier()
         if (c == '\'')
             quote = true;
         newtok();
-        while ((c = nextc()) != -1 && c != term) {
+        while ((c = nextc()) >= 0 && c != term) {
             if (c == '\n') {
                 c = -1;
                 break;
             }
             m_lexer.tokadd(c);
         }
-        if (c == -1) {
+        if (c < 0) {
             this->yyerror("unterminated here document identifier");
             return 0;
         }
     } else {
-        if (c == -1) {
+        if (c < 0) {
             return 0;                 /* missing here document identifier */
         }
         if (! identchar(c)) {
@@ -370,7 +368,7 @@ int mrb_parser_state::heredoc_identifier()
         newtok();
         do {
             m_lexer.tokadd(c);
-        } while ((c = nextc()) != -1 && identchar(c));
+        } while ((c = nextc()) >= 0 && identchar(c));
         pushback(c);
     }
     if( false==m_lexer.tokfix() )
@@ -415,7 +413,7 @@ int mrb_parser_state::parse_string()
 
     newtok();
     while ((c = nextc()) != end || nest_level != 0) {
-        if (hinf && (c == '\n' || c == -1)) {
+        if (hinf && (c == '\n' || c < 0)) {
             int line_head;
             m_lexer.tokadd('\n');
             if(false==m_lexer.tokfix())
@@ -438,7 +436,7 @@ int mrb_parser_state::parse_string()
                     return tHEREDOC_END;
                 }
             }
-            if (c == -1) {
+            if (c < 0) {
                 char buf[256];
                 snprintf(buf, sizeof(buf), "can't find heredoc delimiter \"%s\" anywhere before EOF", hinf->term);
                 this->yyerror(buf);
@@ -447,7 +445,7 @@ int mrb_parser_state::parse_string()
             yylval.nd = new_str(m_lexer.tok(), m_lexer.toklen());
             return tHD_STRING_MID;
         }
-        if (c == -1) {
+        if (c < 0) {
             this->yyerror("unterminated string meets end of file");
             return 0;
         }
@@ -473,7 +471,7 @@ int mrb_parser_state::parse_string()
                 else {
                     if(type & STR_FUNC_REGEXP) {
                         m_lexer.tokadd('\\');
-                        if (c != -1)
+                        if (c >=0 )
                             m_lexer.tokadd(c);
                     }
                     else {
@@ -567,7 +565,7 @@ int mrb_parser_state::parse_string()
         char *flag = flags;
         char *dup;
         newtok();
-        while (c = nextc(), c != -1 && ISALPHA(c)) {
+        while (c = nextc(), c >= 0 && ISALPHA(c)) {
             switch (c) {
                 case 'i': f |= 1; break;
                 case 'x': f |= 2; break;
@@ -584,9 +582,6 @@ int mrb_parser_state::parse_string()
                      m_lexer.toklen() > 1 ? "s" : "", m_lexer.tok());
             yyerror(msg);
         }
-        if (f & 1) strcat(flag, "i");
-        if (f & 2) strcat(flag, "x");
-        if (f & 4) strcat(flag, "m");
         if (f != 0) {
             if (f & 1) *flag++ = 'i';
             if (f & 2) *flag++ = 'x';
@@ -643,8 +638,9 @@ retry:
         case '#':     /* it's a comment */
             this->skip('\n');
             /* fall through */
+        case -2:      /* end of partial script. */
         case '\n':
-            maybe_heredoc:
+maybe_heredoc:
             heredoc_treat_nextline();
             switch (m_lstate) {
                 case EXPR_BEG:
@@ -676,6 +672,7 @@ retry:
                             goto retry;
                         }
                     case -1:			/* EOF */
+                    case -2:			/* end of partial script */
                         goto normal_newline;
                     default:
                         this->pushback(c);
@@ -859,7 +856,7 @@ normal_newline:
                 return '?';
             }
             c = this->nextc();
-            if (c == -1) {
+            if (c < 0) {
                 this->yyerror("incomplete character syntax");
                 return 0;
             }
@@ -1008,7 +1005,7 @@ ternary:
             if (IS_BEG() || (IS_SPCARG(c) && this->arg_ambiguous())) {
                 m_lstate = EXPR_BEG;
                 this->pushback(c);
-                if (c != -1 && ISDIGIT(c)) {
+                if (c >= 0 && ISDIGIT(c)) {
                     c = '+';
                     goto start_num;
                 }
@@ -1040,7 +1037,7 @@ ternary:
             if (IS_BEG() || (IS_SPCARG(c) && this->arg_ambiguous())) {
                 m_lstate = EXPR_BEG;
                 this->pushback(c);
-                if (c != -1 && ISDIGIT(c)) {
+                if ((c >= 0) && ISDIGIT(c)) {
                     return tUMINUS_NUM;
                 }
                 return tUMINUS;
@@ -1059,7 +1056,7 @@ ternary:
                 return tDOT2;
             }
             this->pushback(c);
-            if (c != -1 && ISDIGIT(c)) {
+            if (c >= 0 && ISDIGIT(c)) {
                 this->yyerror("no .<digit> floating literal anymore; put 0 before dot");
             }
             m_lstate = EXPR_DOT;
@@ -1085,7 +1082,7 @@ start_num:
                 if (c == 'x' || c == 'X') {
                     /* hexadecimal */
                     c = this->nextc();
-                    if (c != -1 && ISXDIGIT(c)) {
+                    if (c >= 0 && ISXDIGIT(c)) {
                         do {
                             if (c == '_') {
                                 if (nondigit) break;
@@ -1095,7 +1092,7 @@ start_num:
                             if (!ISXDIGIT(c)) break;
                             nondigit = 0;
                             m_lexer.tokadd(tolower(c));
-                        } while ((c = this->nextc()) != -1);
+                        } while ((c = this->nextc()) >= 0);
                     }
                     this->pushback(c);
                     if(false==m_lexer.tokfix())
@@ -1123,7 +1120,7 @@ start_num:
                                 break;
                             nondigit = 0;
                             m_lexer.tokadd(c);
-                        } while ((c = this->nextc()) != -1);
+                        } while ((c = this->nextc()) >= 0);
                     }
                     this->pushback(c);
                     if(false==m_lexer.tokfix())
@@ -1139,7 +1136,7 @@ start_num:
                 if (c == 'd' || c == 'D') {
                     /* decimal */
                     c = this->nextc();
-                    if (c != -1 && ISDIGIT(c)) {
+                    if (c >= 0 && ISDIGIT(c)) {
                         do {
                             if (c == '_') {
                                 if (nondigit) break;
@@ -1149,7 +1146,7 @@ start_num:
                             if (!ISDIGIT(c)) break;
                             nondigit = 0;
                             m_lexer.tokadd(c);
-                        } while ((c = this->nextc()) != -1);
+                        } while ((c = this->nextc()) >= 0);
                     }
                     this->pushback(c);
                     if(false==m_lexer.tokfix())
@@ -1169,7 +1166,7 @@ start_num:
                 if (c == 'o' || c == 'O') {
                     /* prefixed octal */
                     c = this->nextc();
-                    if (c == -1 || c == '_' || !ISDIGIT(c)) {
+                    if (c < 0 || c == '_' || !ISDIGIT(c)) {
                         no_digits();
                     }
                 }
@@ -1186,7 +1183,7 @@ octal_number:
                         if (c > '7') goto invalid_octal;
                         nondigit = 0;
                         m_lexer.tokadd(c);
-                    } while ((c = this->nextc()) != -1);
+                    } while ((c = this->nextc()) >= 0);
 
                     if (m_lexer.toklen() > start) {
                         this->pushback(c);
@@ -1231,7 +1228,7 @@ invalid_octal:
                         }
                         else {
                             int c0 = this->nextc();
-                            if (c0 == -1 || !ISDIGIT(c0)) {
+                            if (c0 < 0 || !ISDIGIT(c0)) {
                                 this->pushback(c0);
                                 goto decode_num;
                             }
@@ -1462,7 +1459,7 @@ trailing_uc:
 
                 c = this->nextc();
 quotation:
-                if (c == -1 || !ISALNUM(c)) {
+                if (c < 0 || !ISALNUM(c)) {
                     term = c;
                     c = 'Q';
                 }
@@ -1473,7 +1470,7 @@ quotation:
                         return 0;
                     }
                 }
-                if (c == -1 || term == -1) {
+                if (c < 0 || term < 0) {
                     this->yyerror("unterminated quoted string meets end of file");
                     return 0;
                 }
@@ -1546,14 +1543,14 @@ quotation:
             m_lstate = EXPR_END;
             token_column = this->newtok();
             c = this->nextc();
-            if (c == -1) {
+            if (c < 0) {
                 yyerror("incomplete global variable syntax");
                 return 0;
             }
             switch (c) {
                 case '_':     /* $_: last read line string */
                     c = this->nextc();
-                    if (c != -1 && identchar(c)) { /* if there is more after _ it is a variable */
+                    if (c >= 0 && identchar(c)) { /* if there is more after _ it is a variable */
                         m_lexer.tokadd('$');
                         m_lexer.tokadd(c);
                         break;
@@ -1615,7 +1612,7 @@ gvar:
                     do {
                         m_lexer.tokadd(c);
                         c = this->nextc();
-                    } while (c != -1 && isdigit(c));
+                    } while (c >= 0 && isdigit(c));
                     this->pushback(c);
                     if (last_state == EXPR_FNAME) goto gvar;
                     if(false==m_lexer.tokfix())
@@ -1642,7 +1639,7 @@ gvar:
                 m_lexer.tokadd('@');
                 c = nextc();
             }
-            if (c == -1) {
+            if (c < 0) {
                 if (m_lexer.bidx == 1) {
                     yyerror("incomplete instance variable syntax");
                 }

@@ -9,11 +9,11 @@
 #include <stdio.h>
 #endif
 #include "mruby.h"
+#include "mruby/variable.h"
 #include "mruby/proc.h"
 #include "mruby/array.h"
 #include "mruby/string.h"
 #include "mruby/class.h"
-#include "mruby/variable.h"
 #include "mruby/debug.h"
 
 typedef void (*output_stream_func)(mrb_state*, void*, int, const char*, ...);
@@ -62,9 +62,8 @@ mrb_output_backtrace(mrb_state *mrb, RObject *exc, output_stream_func func, void
     mrb_callinfo *ci;
     mrb_int ciidx;
     const char *filename, *method, *sep;
-    int i, line;
+    int i, lineno, tracehead = 1;;
 
-    func(mrb, stream, 1, "trace:\n");
     ciidx = mrb_fixnum(exc->iv_get(mrb->intern2("ciidx", 5)));
     if (ciidx >= mrb->m_ctx->ciend - mrb->m_ctx->cibase)
         ciidx = 10; /* ciidx is broken... */
@@ -72,12 +71,12 @@ mrb_output_backtrace(mrb_state *mrb, RObject *exc, output_stream_func func, void
     for (i = ciidx; i >= 0; i--) {
         ci = &mrb->m_ctx->cibase[i];
         filename = nullptr;
-        line = -1;
+        lineno = -1;
         if (MRB_PROC_CFUNC_P(ci->proc)) {
             continue;
         }
         else {
-
+            //assert(mrb_type(*ci->proc)==MRB_TT_PROC);
             mrb_irep *irep = ci->proc->body.irep;
             mrb_code *pc;
             if (ci->err) {
@@ -90,37 +89,46 @@ mrb_output_backtrace(mrb_state *mrb, RObject *exc, output_stream_func func, void
                 pc = (mrb_code*)mrb_cptr(exc->iv_get(mrb->intern2("lastpc", 6)));
             }
             filename = mrb_debug_get_filename(irep, pc - irep->iseq);
-            line = mrb_debug_get_line(irep, pc - irep->iseq);
+            lineno = mrb_debug_get_line(irep, pc - irep->iseq);
         }
-        if (line == -1) continue;
-        if (ci->target_class == ci->proc->target_class)
+        if (lineno == -1) continue;
+        if (ci->target_class == ci->proc->target_class())
             sep = ".";
         else
             sep = "#";
         if (!filename) {
             filename = "(unknown)";
         }
+        if (tracehead) {
+            func(mrb, stream, 1, "trace:\n");
+            tracehead = 0;
+        }
         method = mrb_sym2name(mrb, ci->mid);
         if (method) {
-            const char *cn = ci->proc->target_class->class_name();
+            const char *cn = ci->proc->target_class()->class_name();
             if (cn) {
                 func(mrb, stream, 1, "\t[%d] ", i);
-                func(mrb, stream, 0, "%s:%d:in %s%s%s", filename, line, cn, sep, method);
+                func(mrb, stream, 0, "%s:%d:in %s%s%s", filename, lineno, cn, sep, method);
                 func(mrb, stream, 1, "\n");
             }
             else {
                 func(mrb, stream, 1, "\t[%d] ", i);
-                func(mrb, stream, 0, "%s:%d:in %s", filename, line, method);
+                func(mrb, stream, 0, "%s:%d:in %s", filename, lineno, method);
                 func(mrb, stream, 1, "\n");            }
         }
         else {
             func(mrb, stream, 1, "\t[%d] ", i);
-            func(mrb, stream, 0, "%s:%d", filename, line);
+            func(mrb, stream, 0, "%s:%d", filename, lineno);
             func(mrb, stream, 1, "\n");
         }
     }
 }
+/* mrb_print_backtrace/mrb_get_backtrace:
 
+   function to retrieve backtrace information from the exception.
+   note that if you call method after the exception, call stack will be
+   overwritten.  So invoke these functions just after detecting exceptions.
+*/
 void mrb_print_backtrace(mrb_state *mrb)
 {
 #ifdef ENABLE_STDIO

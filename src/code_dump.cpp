@@ -170,7 +170,7 @@ void mrb_state::codedump(mrb_irep *irep)
                 break;
 
             case OP_LAMBDA:
-                sys.print_f("OP_LAMBDA\tR%d\tI(%+d)\t%d\n", GETARG_A(c), GETARG_b(c), GETARG_c(c));
+                sys.print_f("OP_LAMBDA\tR%d\tI(%+d)\t%d\n", GETARG_A(c), GETARG_b(c)+1, GETARG_c(c));
                 break;
             case OP_RANGE:
                 sys.print_f("OP_RANGE\tR%d\tR%d\t%d\n", GETARG_A(c), GETARG_B(c), GETARG_C(c));
@@ -279,7 +279,7 @@ void mrb_state::codedump(mrb_irep *irep)
                             mrb_sym2name(this, irep->syms[GETARG_B(c)]));
                 break;
             case OP_EXEC:
-                sys.print_f("OP_EXEC\tR%d\tI(%+d)\n", GETARG_A(c), GETARG_Bx(c));
+                sys.print_f("OP_EXEC\tR%d\tI(%+d)\n", GETARG_A(c), GETARG_Bx(c)+1);
                 break;
             case OP_SCLASS:
                 sys.print_f("OP_SCLASS\tR%d\tR%d\n", GETARG_A(c), GETARG_B(c));
@@ -288,10 +288,14 @@ void mrb_state::codedump(mrb_irep *irep)
                 sys.print_f("OP_TCLASS\tR%d\n", GETARG_A(c));
                 break;
             case OP_ERR:
-                sys.print_f("OP_ERR\tL(%d)\n", GETARG_Bx(c));
+            {
+                mrb_value v = irep->pool[GETARG_Bx(c)];
+                mrb_value s = mrb_str_dump(this, mrb_str_new(this, RSTRING_PTR(v), RSTRING_LEN(v)));
+                sys.print_f("OP_ERR\t%s\n", RSTRING_PTR(s));
+            }
                 break;
             case OP_EPUSH:
-                sys.print_f("OP_EPUSH\t:I(%+d)\n", GETARG_Bx(c));
+                sys.print_f("OP_EPUSH\t:I(%+d)\n", GETARG_Bx(c)+1);
                 break;
             case OP_ONERR:
                 sys.print_f("OP_ONERR\t%03d\n", i+GETARG_sBx(c));
