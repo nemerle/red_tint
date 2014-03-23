@@ -17,6 +17,9 @@
 #define ARY_SHRINK_RATIO  5 /* must be larger than 2 */
 #define ARY_C_MAX_SIZE (SIZE_MAX / sizeof(mrb_value))
 #define ARY_MAX_SIZE ((ARY_C_MAX_SIZE < (size_t)MRB_INT_MAX) ? (mrb_int)ARY_C_MAX_SIZE : MRB_INT_MAX-1)
+#define ARY_SHARED_P(a) ((a)->flags & MRB_ARY_SHARED)
+#define ARY_SET_SHARED_FLAG(a) ((a)->flags |= MRB_ARY_SHARED)
+#define ARY_UNSET_SHARED_FLAG(a) ((a)->flags &= ~MRB_ARY_SHARED)
 #define ARY_SHIFT_SHARED_MIN 10
 size_t gAllocatedSize=0;
 RArray* RArray::ary_new_capa(mrb_state *mrb, size_t capa)
@@ -86,7 +89,7 @@ static void ary_fill_with_nil(mrb_value *ptr, mrb_int size)
 
 void RArray::ary_modify()
 {
-    if (0==(this->flags & MRB_ARY_SHARED))
+    if (!ARY_SHARED_P(this))
         return;
     mrb_shared_array *shared = m_aux.shared;
 
@@ -106,7 +109,7 @@ void RArray::ary_modify()
         m_aux.capa = m_len;
         mrb_ary_decref(m_vm, shared);
     }
-    this->flags &= ~MRB_ARY_SHARED; // the array contents are no longer shared
+    ARY_UNSET_SHARED_FLAG(this); // the array contents are no longer shared
 }
 void RArray::mrb_ary_modify()
 {
@@ -116,7 +119,7 @@ void RArray::mrb_ary_modify()
 
 void RArray::ary_make_shared()
 {
-    if (0!=(this->flags & MRB_ARY_SHARED))
+    if (ARY_SHARED_P(this))
         return;
     mrb_shared_array *shared = (mrb_shared_array *)m_vm->gc()._malloc(sizeof(mrb_shared_array));
 
@@ -127,25 +130,23 @@ void RArray::ary_make_shared()
     shared->ptr = m_ptr;
     shared->len = m_len;
     m_aux.shared = shared;
-    this->flags |= MRB_ARY_SHARED;
+    ARY_SET_SHARED_FLAG(this);
 }
 
 void RArray::ary_expand_capa(mrb_state *mrb, size_t _len)
 {
-    assert((flags&MRB_ARY_SHARED)==0); // will not work if in shared mode
+    assert(!ARY_SHARED_P(this)); // will not work if in shared mode
     mrb_int capa = m_aux.capa;
 
     if (_len > ARY_MAX_SIZE) {
         mrb_raise(E_ARGUMENT_ERROR, "array size too big");
     }
 
+    if (capa == 0) {
+        capa = ARY_DEFAULT_LEN;
+    }
     while(capa < _len) {
-        if (capa == 0) {
-            capa = ARY_DEFAULT_LEN;
-        }
-        else {
-            capa *= 2;
-        }
+        capa *= 2;
     }
 
     if (capa > ARY_MAX_SIZE)
@@ -165,7 +166,7 @@ void RArray::ary_expand_capa(mrb_state *mrb, size_t _len)
 
 void RArray::ary_shrink_capa()
 {
-    assert((flags&MRB_ARY_SHARED)==0); // will not work if in shared mode
+    assert(!ARY_SHARED_P(this)); // will not work if in shared mode
     mrb_int capa = m_aux.capa;
 
     if (capa < ARY_DEFAULT_LEN * 2)
@@ -445,7 +446,7 @@ mrb_value RArray::shift()
    p self #=> [0, 1, 2, 3] */
 void RArray::unshift(const mrb_value &item)
 {
-    if ((this->flags & MRB_ARY_SHARED)
+    if (ARY_SHARED_P(this)
             && m_aux.shared->refcnt == 1 /* shared only referenced from this array */
             && m_ptr - base_ptr() >= 1) /* there's room for unshifted item */ {
         m_ptr--;
@@ -467,7 +468,7 @@ void RArray::unshift_m()
     int len;
 
     mrb_get_args(m_vm, "*", &vals, &len);
-    if ((this->flags & MRB_ARY_SHARED)
+    if (ARY_SHARED_P(this)
             && m_aux.shared->refcnt == 1 /* shared only referenced from this array */
             && m_ptr - base_ptr() >= len) /* there's room for unshifted item */ {
         m_ptr -= len;
@@ -581,7 +582,7 @@ mrb_value RArray::ary_subseq(mrb_int beg, mrb_int len)
     b->m_len = len;
     b->m_aux.shared = m_aux.shared;
     b->m_aux.shared->refcnt++;
-    b->flags |= MRB_ARY_SHARED;
+    ARY_SET_SHARED_FLAG(b);
 
     return mrb_obj_value(b);
 }
@@ -777,7 +778,7 @@ mrb_value RArray::first()
 
     if (_size > m_len)
         _size = m_len;
-    if (this->flags & MRB_ARY_SHARED) {
+    if (ARY_SHARED_P(this)) {
         return ary_subseq(0, _size);
     }
     return RArray::new_from_values(m_vm, _size, m_ptr);
@@ -803,7 +804,7 @@ mrb_value RArray::last()
             }
             if (_size > m_len)
                 _size = m_len;
-            if ((this->flags & MRB_ARY_SHARED) || (_size > ARY_DEFAULT_LEN)) {
+            if (ARY_SHARED_P(this) || (_size > ARY_DEFAULT_LEN)) {
                 return ary_subseq(m_len - _size, _size);
             }
             assert((_size>=0) && _size <= ARY_DEFAULT_LEN);
@@ -1137,7 +1138,6 @@ void mrb_init_array(mrb_state *mrb)
 {
     RClass *a = mrb->array_class = mrb_define_class(mrb, "Array", mrb->object_class);
     a->instance_tt(MRB_TT_ARRAY)
-            .include_module("Enumerable")
             .define_class_method("[]",        RArray::s_create,       MRB_ARGS_ANY())    /* 15.2.12.4.1 */
             .define_method("+",               plus,           MRB_ARGS_REQ(1)) /* 15.2.12.5.1  */
             .define_method("*",               times,          MRB_ARGS_REQ(1)) /* 15.2.12.5.2  */

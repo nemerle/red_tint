@@ -44,6 +44,7 @@ SET(MRUBY_SRC_C
     ../include/mruby/data.h
     ../include/mruby/debug
     ../include/mruby/dump.h
+    ../include/mruby/error.h
     ../include/mruby/khash.h
     ../include/mruby/hash.h
     ../include/mruby/irep.h
@@ -57,7 +58,6 @@ SET(MRUBY_SRC_C
 
 )
 SET(MRUBY_SRC_H
-    error.h
     opcode.h
     re.h
     value_array.h

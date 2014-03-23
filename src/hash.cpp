@@ -235,40 +235,10 @@ mrb_hash_init_core(mrb_state *mrb, mrb_value hash)
     return hash;
 }
 
-/*
- *  call-seq:
- *     Hash[ key, value, ... ]         -> new_hash
- *     Hash[ [ [key, value], ... ] ]   -> new_hash
- *     Hash[ object ]                  -> new_hash
- *
- *  Creates a new hash populated with the given objects. Equivalent to
- *  the literal <code>{ <i>key</i> => <i>value</i>, ... }</code>. In the first
- *  form, keys and values occur in pairs, so there must be an even number of arguments.
- *  The second and third form take a single argument which is either
- *  an array of key-value pairs or an object convertible to a hash.
- *
- *     Hash["a", 100, "b", 200]             #=> {"a"=>100, "b"=>200}
- *     Hash[ [ ["a", 100], ["b", 200] ] ]   #=> {"a"=>100, "b"=>200}
- *     Hash["a" => 100, "b" => 200]         #=> {"a"=>100, "b"=>200}
- */
-
-static mrb_value
-to_hash(mrb_state *mrb, mrb_value hash)
+static mrb_value to_hash(mrb_state *mrb, mrb_value hash)
 {
     return mrb_convert_type(mrb, hash, MRB_TT_HASH, "Hash", "to_hash");
 }
-
-/*
- *  call-seq:
- *     Hash.try_convert(obj) -> hash or nil
- *
- *  Try to convert <i>obj</i> into a hash, using to_hash method.
- *  Returns converted hash or nil if <i>obj</i> cannot be converted
- *  for any reason.
- *
- *     Hash.try_convert({1=>2})   # => {1=>2}
- *     Hash.try_convert("1=>2")   # => nil
- */
 
 /* 15.2.13.4.2  */
 /*
@@ -289,35 +259,6 @@ mrb_value mrb_hash_aget(mrb_state *mrb, mrb_value self)
     mrb_value key = mrb->get_arg<mrb_value>();
     return mrb_hash_get(self, key);
 }
-
-/*
- *  call-seq:
- *     hsh.fetch(key [, default] )       -> obj
- *     hsh.fetch(key) {| key | block }   -> obj
- *
- *  Returns a value from the hash for the given key. If the key can't be
- *  found, there are several options: With no other arguments, it will
- *  raise an <code>KeyError</code> exception; if <i>default</i> is
- *  given, then that will be returned; if the optional code block is
- *  specified, then that will be run and its result returned.
- *
- *     h = { "a" => 100, "b" => 200 }
- *     h.fetch("a")                            #=> 100
- *     h.fetch("z", "go fish")                 #=> "go fish"
- *     h.fetch("z") { |el| "go fish, #{el}"}   #=> "go fish, z"
- *
- *  The following example shows that an exception is raised if the key
- *  is not found and a default value is not supplied.
- *
- *     h = { "a" => 100, "b" => 200 }
- *     h.fetch("z")
- *
- *  <em>produces:</em>
- *
- *     prog.rb:2:in `fetch': key not found (KeyError)
- *      from prog.rb:2
- *
- */
 
 /* 15.2.13.4.5  */
 /*
@@ -520,75 +461,6 @@ mrb_hash_shift(mrb_state *mrb, mrb_value hash)
     }
 }
 
-/*
- *  call-seq:
- *     hsh.delete_if {| key, value | block }  -> hsh
- *     hsh.delete_if                          -> an_enumerator
- *
- *  Deletes every key-value pair from <i>hsh</i> for which <i>block</i>
- *  evaluates to <code>true</code>.
- *
- *  If no block is given, an enumerator is returned instead.
- *
- *     h = { "a" => 100, "b" => 200, "c" => 300 }
- *     h.delete_if {|key, value| key >= "b" }   #=> {"a"=>100}
- *
- */
-
-/*
- *  call-seq:
- *     hsh.reject! {| key, value | block }  -> hsh or nil
- *     hsh.reject!                          -> an_enumerator
- *
- *  Equivalent to <code>Hash#delete_if</code>, but returns
- *  <code>nil</code> if no changes were made.
- */
-
-/*
- *  call-seq:
- *     hsh.reject {| key, value | block }  -> a_hash
- *
- *  Same as <code>Hash#delete_if</code>, but works on (and returns) a
- *  copy of the <i>hsh</i>. Equivalent to
- *  <code><i>hsh</i>.dup.delete_if</code>.
- *
- */
-
-/*
- *  call-seq:
- *     hsh.select {|key, value| block}   -> a_hash
- *     hsh.select                        -> an_enumerator
- *
- *  Returns a new hash consisting of entries for which the block returns true.
- *
- *  If no block is given, an enumerator is returned instead.
- *
- *     h = { "a" => 100, "b" => 200, "c" => 300 }
- *     h.select {|k,v| k > "a"}  #=> {"b" => 200, "c" => 300}
- *     h.select {|k,v| v < 200}  #=> {"a" => 100}
- */
-
-/*
- *  call-seq:
- *     hsh.select! {| key, value | block }  -> hsh or nil
- *     hsh.select!                          -> an_enumerator
- *
- *  Equivalent to <code>Hash#keep_if</code>, but returns
- *  <code>nil</code> if no changes were made.
- */
-
-/*
- *  call-seq:
- *     hsh.keep_if {| key, value | block }  -> hsh
- *     hsh.keep_if                          -> an_enumerator
- *
- *  Deletes every key-value pair from <i>hsh</i> for which <i>block</i>
- *  evaluates to false.
- *
- *  If no block is given, an enumerator is returned instead.
- *
- */
-
 /* 15.2.13.4.4  */
 /*
  *  call-seq:
@@ -743,7 +615,7 @@ static mrb_value inspect_hash(mrb_value hash, bool recur)
             ai = hsh->m_vm->gc().arena_save();
 
             if (RSTRING_LEN(str) > 1)
-                mrb_str_cat(hsh->m_vm, str, ", ", 2);
+                mrb_str_cat_lit(hsh->m_vm, str, ", ");
 
             str2 = mrb_inspect(hsh->m_vm, h->key(k));
             mrb_str_append(hsh->m_vm, str, str2);
@@ -939,8 +811,8 @@ hash_equal(mrb_state *mrb, mrb_value hash1, mrb_value hash2, int eql)
             return mrb_false_value();
         }
         if (eql)
-            return mrb_fixnum_value(mrb_eql(mrb, hash2, hash1));
-        return mrb_fixnum_value(mrb_equal(mrb, hash2, hash1));
+            return mrb_bool_value(mrb_eql(mrb, hash2, hash1));
+        return mrb_bool_value(mrb_equal(mrb, hash2, hash1));
     }
     h1 = RHASH_TBL(hash1);
     h2 = RHASH_TBL(hash2);
@@ -954,18 +826,35 @@ hash_equal(mrb_state *mrb, mrb_value hash1, mrb_value hash2, int eql)
 
     RHash::kh_ht_t::iterator k1, k2;
     mrb_value key;
-
-    for (k1 = h1->begin(); k1 != h1->end(); k1++) {
-        if (!h1->exist(k1))
-            continue;
-        key = h1->key(k1);
-        k2 = h2->get(key);
-        if (k2 != h2->end()) {
-            if (mrb_equal(mrb, h1->value(k1), h2->value(k2))) {
-                continue; /* next key */
+    bool eq;
+    if(eql)
+    {
+        for (k1 = h1->begin(); k1 != h1->end(); k1++) {
+            if (!h1->exist(k1))
+                continue;
+            key = h1->key(k1);
+            k2 = h2->get(key);
+            if (k2 != h2->end()) {
+                if (mrb_eql(mrb, h1->value(k1), h2->value(k2))) {
+                    continue; /* next key */
+                }
             }
+            return mrb_false_value();
         }
-        return mrb_false_value();
+    }
+    else {
+        for (k1 = h1->begin(); k1 != h1->end(); k1++) {
+            if (!h1->exist(k1))
+                continue;
+            key = h1->key(k1);
+            k2 = h2->get(key);
+            if (k2 != h2->end()) {
+                if (mrb_equal(mrb, h1->value(k1), h2->value(k2))) {
+                    continue; /* next key */
+                }
+            }
+            return mrb_false_value();
+        }
     }
     return mrb_true_value();
 }
@@ -1011,123 +900,6 @@ static mrb_value mrb_hash_eql(mrb_state *mrb, mrb_value hash1)
     mrb_value hash2 = mrb->get_arg<mrb_value>();
     return hash_equal(mrb, hash1, hash2, true);
 }
-
-/*
- *  call-seq:
- *     hsh.merge!(other_hash)                                 -> hsh
- *     hsh.update(other_hash)                                 -> hsh
- *     hsh.merge!(other_hash){|key, oldval, newval| block}    -> hsh
- *     hsh.update(other_hash){|key, oldval, newval| block}    -> hsh
- *
- *  Adds the contents of <i>other_hash</i> to <i>hsh</i>.  If no
- *  block is specified, entries with duplicate keys are overwritten
- *  with the values from <i>other_hash</i>, otherwise the value
- *  of each duplicate key is determined by calling the block with
- *  the key, its value in <i>hsh</i> and its value in <i>other_hash</i>.
- *
- *     h1 = { "a" => 100, "b" => 200 }
- *     h2 = { "b" => 254, "c" => 300 }
- *     h1.merge!(h2)   #=> {"a"=>100, "b"=>254, "c"=>300}
- *
- *     h1 = { "a" => 100, "b" => 200 }
- *     h2 = { "b" => 254, "c" => 300 }
- *     h1.merge!(h2) { |key, v1, v2| v1 }
- *                     #=> {"a"=>100, "b"=>200, "c"=>300}
- */
-
-/* 15.2.13.4.22 */
-/*
- *  call-seq:
- *     hsh.merge(other_hash)                              -> new_hash
- *     hsh.merge(other_hash){|key, oldval, newval| block} -> new_hash
- *
- *  Returns a new hash containing the contents of <i>other_hash</i> and
- *  the contents of <i>hsh</i>. If no block is specified, the value for
- *  entries with duplicate keys will be that of <i>other_hash</i>. Otherwise
- *  the value for each duplicate key is determined by calling the block
- *  with the key, its value in <i>hsh</i> and its value in <i>other_hash</i>.
- *
- *     h1 = { "a" => 100, "b" => 200 }
- *     h2 = { "b" => 254, "c" => 300 }
- *     h1.merge(h2)   #=> {"a"=>100, "b"=>254, "c"=>300}
- *     h1.merge(h2){|key, oldval, newval| newval - oldval}
- *                    #=> {"a"=>100, "b"=>54,  "c"=>300}
- *     h1             #=> {"a"=>100, "b"=>200}
- *
- */
-
-/*
- *  call-seq:
- *     hash.assoc(obj)   ->  an_array  or  nil
- *
- *  Searches through the hash comparing _obj_ with the key using <code>==</code>.
- *  Returns the key-value pair (two elements array) or +nil+
- *  if no match is found.  See <code>Array#assoc</code>.
- *
- *     h = {"colors"  => ["red", "blue", "green"],
- *          "letters" => ["a", "b", "c" ]}
- *     h.assoc("letters")  #=> ["letters", ["a", "b", "c"]]
- *     h.assoc("foo")      #=> nil
- */
-
-mrb_value mrb_hash_assoc(mrb_state *mrb, mrb_value hash)
-{
-    mrb_value value, has_key;
-
-    mrb_value key = mrb->get_arg<mrb_value>();
-    if (mrb_nil_p(key))
-        mrb->mrb_raise(E_ARGUMENT_ERROR, "wrong number of arguments");
-
-    has_key = mrb_hash_has_keyWithKey(hash, key);
-    if (mrb_test(has_key)) {
-        value = mrb_hash_get(hash, key);
-        return mrb_assoc_new(mrb, key, value);
-    }
-    return mrb_nil_value();
-}
-
-/*
- *  call-seq:
- *     hash.rassoc(key) -> an_array or nil
- *
- *  Searches through the hash comparing _obj_ with the value using <code>==</code>.
- *  Returns the first key-value pair (two-element array) that matches. See
- *  also <code>Array#rassoc</code>.
- *
- *     a = {1=> "one", 2 => "two", 3 => "three", "ii" => "two"}
- *     a.rassoc("two")    #=> [2, "two"]
- *     a.rassoc("four")   #=> nil
- */
-
-mrb_value
-mrb_hash_rassoc(mrb_state *mrb, mrb_value hash)
-{
-    mrb_value value, has_key;
-    mrb_value key = mrb->get_arg<mrb_value>();
-    has_key = mrb_hash_has_keyWithKey(hash, key);
-    if (mrb_test(has_key)) {
-        value = mrb_hash_get(hash, key);
-        return mrb_assoc_new(mrb, value, key);
-    }
-    return mrb_nil_value();
-}
-
-/*
- *  call-seq:
- *     hash.flatten -> an_array
- *     hash.flatten(level) -> an_array
- *
- *  Returns a new array that is a one-dimensional flattening of this
- *  hash. That is, for every key or value that is an array, extract
- *  its elements into the new array.  Unlike Array#flatten, this
- *  method does not flatten recursively by default.  The optional
- *  <i>level</i> argument determines the level of recursion to flatten.
- *
- *     a =  {1=> "one", 2 => [2,"two"], 3 => "three"}
- *     a.flatten    # => [1, "one", 2, [2, "two"], 3, "three"]
- *     a.flatten(2) # => [1, "one", 2, 2, "two", 3, "three"]
- */
-
 /*
  *  A <code>Hash</code> is a collection of key-value pairs. It is
  *  similar to an <code>Array</code>, except that indexing is done via
@@ -1145,7 +917,6 @@ mrb_init_hash(mrb_state *mrb)
 {
     mrb->hash_class = &mrb->define_class("Hash", mrb->object_class)
             .instance_tt(MRB_TT_HASH)
-            .include_module("Enumerable")
             .define_method("==",              mrb_hash_equal,       MRB_ARGS_REQ(1)) /* 15.2.13.4.1  */
             .define_method("[]",              mrb_hash_aget,        MRB_ARGS_REQ(1)) /* 15.2.13.4.2  */
             .define_method("[]=",             mrb_hash_aset,        MRB_ARGS_REQ(2)) /* 15.2.13.4.3  */
@@ -1171,6 +942,7 @@ mrb_init_hash(mrb_state *mrb)
             // "merge"                                                                            15.2.13.4.22 move to mrblib/hash.rb
             .define_method("replace",         mrb_hash_replace,     MRB_ARGS_REQ(1)) /* 15.2.13.4.23 */
             .define_method("shift",           mrb_hash_shift,       MRB_ARGS_NONE()) /* 15.2.13.4.24 */
+            .define_method("dup",             mrb_hash_dup,         MRB_ARGS_NONE())
             .define_method("size",            mrb_hash_size_m,      MRB_ARGS_NONE()) /* 15.2.13.4.25 */
             .define_method("store",           mrb_hash_aset,        MRB_ARGS_REQ(2)) /* 15.2.13.4.26 */
             .define_method("value?",          mrb_hash_has_value,   MRB_ARGS_REQ(1)) /* 15.2.13.4.27 */

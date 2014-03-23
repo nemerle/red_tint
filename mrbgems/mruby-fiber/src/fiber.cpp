@@ -151,7 +151,13 @@ static mrb_value fiber_resume(mrb_state *mrb, mrb_value self)
     mrb_context *c = fiber_check(mrb, self);
     mrb_value *a;
     int len;
+    mrb_callinfo *ci;
 
+    for (ci = c->m_ci; ci >= c->cibase; ci--) {
+        if (ci->acc < 0) {
+            mrb->mrb_raise(E_ARGUMENT_ERROR, "can't cross C function boundary");
+        }
+    }
     if (c->status == MRB_FIBER_RESUMED) {
         mrb->mrb_raise(E_RUNTIME_ERROR, "double resume");
     }

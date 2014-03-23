@@ -34,6 +34,13 @@ assert('Hash#clear', '15.2.13.4.4') do
   assert_equal({ }, a)
 end
 
+assert('Hash#dup') do
+  a = { 'a' => 1 }
+  b = a.dup
+  a['a'] = 2
+  assert_equal(b, {'a' => 1})
+end
+
 assert('Hash#default', '15.2.13.4.5') do
   a = Hash.new
   b = Hash.new('abc')
@@ -261,6 +268,14 @@ assert('Hash#values', '15.2.13.4.28') do
 end
 
 # Not ISO specified
+
+assert('Hash#eql?') do
+  a = { 'a' => 1, 'b' => 2, 'c' => 3 }
+  b = { 'a' => 1, 'b' => 2, 'c' => 3 }
+  c = { 'a' => 1.0, 'b' => 2, 'c' => 3 }
+  assert_true(a.eql?(b))
+  assert_false(a.eql?(c))
+end
 
 assert('Hash#reject') do
   h = {:one => 1, :two => 2, :three => 3, :four => 4}

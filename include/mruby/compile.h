@@ -6,7 +6,6 @@
 #pragma once
 
 #include <string>
-#include <setjmp.h>
 #include <vector>
 #include <memory>
 
@@ -14,7 +13,7 @@
 #include "mruby/node.h"
 
 #define SET_LINENO(c,n) ((c)->lineno = (n))
-
+struct mrb_jmpbuf;
 struct mrb_parser_state;
 
 /* load context */
@@ -142,7 +141,7 @@ struct mrb_parser_state {
     size_t nwarn;
     mrb_ast_node *m_tree;
 
-    int m_capture_errors;
+    bool m_capture_errors;
     mrb_parser_message error_buffer[10];
     mrb_parser_message warn_buffer[10];
 
@@ -170,7 +169,7 @@ struct mrb_parser_state {
         return new_call(recv, intern(m), new_simple<CommandArgs>(list1(arg1),nullptr));
     }
 
-    jmp_buf jmp;
+    mrb_jmpbuf* jmp;
 
 public:
     void mrb_parser_set_filename(char const* n);

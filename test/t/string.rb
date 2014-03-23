@@ -36,6 +36,10 @@ end
 
 assert('String#*', '15.2.10.5.5') do
   assert_equal 'aaaaa', 'a' * 5
+  assert_equal '', 'a' * 0
+  assert_raise(ArgumentError) do
+    'a' * -1
+  end
 end
 
 assert('String#[]', '15.2.10.5.6') do
@@ -125,6 +129,7 @@ assert('String#capitalize!', '15.2.10.5.8') do
   a.capitalize!
 
   assert_equal 'Abc', a
+  assert_equal nil, 'Abc'.capitalize!
 end
 
 assert('String#chomp', '15.2.10.5.9') do
@@ -204,6 +209,7 @@ assert('String#downcase!', '15.2.10.5.14') do
   a.downcase!
 
   assert_equal 'abc', a
+  assert_equal nil, 'abc'.downcase!
 end
 
 assert('String#each_line', '15.2.10.5.15') do
@@ -324,6 +330,9 @@ assert('String#rindex', '15.2.10.5.31') do
   assert_nil 'abc'.rindex('d')
   assert_equal 0, 'abcabc'.rindex('a', 1)
   assert_equal 3, 'abcabc'.rindex('a', 4)
+
+  assert_equal 3,   'abcabc'.rindex(97)
+  assert_equal nil, 'abcabc'.rindex(0)
 end
 
 # 'String#scan', '15.2.10.5.32' will be tested in mrbgems.
@@ -442,6 +451,7 @@ assert('String#upcase!', '15.2.10.5.43') do
   a.upcase!
 
   assert_equal 'ABC', a
+  assert_equal nil, 'ABC'.upcase!
 end
 
 # Not ISO specified

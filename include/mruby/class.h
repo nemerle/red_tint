@@ -86,7 +86,7 @@ RClass *mrb_vm_define_class(mrb_state*, mrb_value, mrb_value, mrb_sym);
 RClass *mrb_vm_define_module(mrb_state*, const mrb_value &, mrb_sym);
 
 RClass *mrb_class_outer_module(mrb_state*, RClass *);
-RProc *mrb_method_search_vm(mrb_state*, RClass**, mrb_sym);
+//RProc *mrb_method_search_vm(mrb_state*, RClass**, mrb_sym);
 RProc *mrb_method_search(mrb_state*, RClass*, mrb_sym);
 
 RClass* mrb_class_real(RClass* cl);

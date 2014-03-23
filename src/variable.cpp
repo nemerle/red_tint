@@ -330,7 +330,7 @@ public:
     }
     size_t iv_size(mrb_state *mrb)
     {
-        if(!this)
+        if(!this || !this->h)
             return 0;
         return h->size();
     }
@@ -570,12 +570,12 @@ mrb_value mrb_obj_iv_inspect(mrb_state *mrb, struct RObject *obj)
         mrb_value str = mrb_str_buf_new(mrb, 30);
 
         mrb_str_buf_cat(str, "-<", 2);
-         mrb_str_cat_cstr(mrb, str, cn);
-        mrb_str_cat(mrb, str, ":", 1);
+        mrb_str_cat_cstr(mrb, str, cn);
+        mrb_str_cat_lit(mrb, str, ":");
         mrb_str_concat(mrb, str, mrb_ptr_to_str(mrb, obj));
 
         t->iv_foreach(mrb, inspect_i, &str);
-        mrb_str_cat(mrb, str, ">", 1);
+        mrb_str_cat_lit(mrb, str, ">");
         return str;
     }
     return mrb_any_to_s(mrb, mrb_obj_value(obj));

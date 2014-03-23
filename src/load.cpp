@@ -15,6 +15,7 @@
 #include "mruby/proc.h"
 #include "mruby/string.h"
 #include "mruby/debug.h"
+#include "mruby/error.h"
 
 #if !defined(_WIN32) && SIZE_MAX < UINT32_MAX
 # define SIZE_ERROR_MUL(x, y) ((x) > SIZE_MAX / (y))

@@ -58,6 +58,7 @@ typedef uint16_t mrb_sym;
 # define snprintf _snprintf
 # define isnan _isnan
 # define isinf(n) (!_finite(n) && !_isnan(n))
+# define signbit(n) (_copysign(1.0, (n)) < 0.0)
 # define strtoll _strtoi64
 # define PRId32 "I32d"
 # define PRIi32 "I32i"

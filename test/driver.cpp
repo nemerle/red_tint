@@ -24,8 +24,6 @@ static void
 print_hint(void)
 {
   printf("mrbtest - Embeddable Ruby Test\n");
-  printf("\nThis is a very early version, please test and report errors.\n");
-  printf("Thanks :)\n\n");
 }
 
 static int

@@ -14,8 +14,8 @@
 #include "mruby/string.h"
 #include "mruby/variable.h"
 #include "mruby/debug.h"
-#include "error.h"
-
+#include "mruby/error.h"
+#include "mrb_throw.h"
 
 mrb_value mrb_exc_new(RClass *c, const char *ptr, long len)
 {
@@ -120,25 +120,25 @@ static mrb_value exc_inspect(mrb_state *mrb, mrb_value exc)
 
     if (!mrb_nil_p(file) && !mrb_nil_p(line)) {
         str = file;
-        mrb_str_cat(mrb, str, ":", 1);
+        mrb_str_cat_lit(mrb, str, ":");
         mrb_str_append(mrb, str, line);
-        mrb_str_cat(mrb, str, ": ", 2);
+        mrb_str_cat_lit(mrb, str, ": ");
         if (!mrb_nil_p(mesg) && RSTRING_LEN(mesg) > 0) {
             mrb_str_append(mrb, str, mesg);
-            mrb_str_cat(mrb, str, " (", 2);
+            mrb_str_cat_lit(mrb, str, " (");
         }
         mrb_str_cat_cstr(mrb, str, mrb_obj_classname(mrb, exc));
         if (!mrb_nil_p(mesg) && RSTRING_LEN(mesg) > 0) {
-            mrb_str_cat(mrb, str, ")", 1);
+            mrb_str_cat_lit(mrb, str, ")");
         }
     }
     else {
         str = mrb_str_new_cstr(mrb, mrb_obj_classname(mrb, exc));
         if (!mrb_nil_p(mesg) && RSTRING_LEN(mesg) > 0) {
-            mrb_str_cat(mrb, str, ": ", 2);
+            mrb_str_cat_lit(mrb, str, ": ");
             mrb_str_append(mrb, str, mesg);
         } else {
-            mrb_str_cat(mrb, str, ": ", 2);
+            mrb_str_cat_lit(mrb, str, ": ");
             mrb_str_cat_cstr(mrb, str, mrb_obj_classname(mrb, exc));
         }
     }
@@ -207,7 +207,7 @@ void mrb_exc_raise(mrb_state *mrb, mrb_value exc)
         mrb_p(mrb, exc);
         abort();
     }
-    mrb_longjmp(mrb);
+    MRB_THROW(mrb->jmp);
 }
 
 void mrb_raise(RClass *c, const char *msg)
@@ -347,40 +347,40 @@ mrb_value make_exception(mrb_state *mrb, int argc, mrb_value *argv, int isstr)
 
     mesg = mrb_nil_value();
     switch (argc) {
-    case 0:
-        break;
-    case 1:
-        if (mrb_nil_p(argv[0]))
+        case 0:
             break;
-        if (isstr) {
-            mesg = mrb_check_string_type(mrb, argv[0]);
-            if (!mrb_nil_p(mesg)) {
-                mesg = mrb_exc_new_str(E_RUNTIME_ERROR, mesg);
+        case 1:
+            if (mrb_nil_p(argv[0]))
                 break;
+            if (isstr) {
+                mesg = mrb_check_string_type(mrb, argv[0]);
+                if (!mrb_nil_p(mesg)) {
+                    mesg = mrb_exc_new_str(E_RUNTIME_ERROR, mesg);
+                    break;
+                }
+            }
+            n = 0;
+            goto exception_call;
+
+        case 2:
+        case 3:
+            n = 1;
+exception_call:
+        {
+            mrb_sym exc = mrb_intern(mrb, "exception", 9);
+            if (mrb_respond_to(mrb, argv[0], exc)) {
+                mesg = mrb_funcall_argv(mrb, argv[0], exc, n, argv+1);
+            }
+            else {
+                /* undef */
+                mrb->mrb_raise(E_TYPE_ERROR, "exception class/object expected");
             }
         }
-        n = 0;
-        goto exception_call;
 
-    case 2:
-    case 3:
-        n = 1;
-exception_call:
-    {
-        mrb_sym exc = mrb_intern(mrb, "exception", 9);
-        if (mrb_respond_to(mrb, argv[0], exc)) {
-            mesg = mrb_funcall_argv(mrb, argv[0], exc, n, argv+1);
-        }
-        else {
-            /* undef */
-            mrb->mrb_raise(E_TYPE_ERROR, "exception class/object expected");
-        }
-    }
-
-        break;
-    default:
-        mrb->mrb_raisef(E_ARGUMENT_ERROR, "wrong number of arguments (%S for 0..3)", mrb_fixnum_value(argc));
-        break;
+            break;
+        default:
+            mrb->mrb_raisef(E_ARGUMENT_ERROR, "wrong number of arguments (%S for 0..3)", mrb_fixnum_value(argc));
+            break;
     }
     if (argc > 0) {
         if (!mrb_obj_is_kind_of(mrb, mesg, mrb->eException_class))
@@ -413,7 +413,10 @@ void mrb_sys_fail(mrb_state *mrb, const char *mesg)
         mrb->mrb_raise(E_RUNTIME_ERROR, mesg);
     }
 }
-extern mrb_value mrb_get_backtrace(mrb_state *mrb, mrb_value self);
+#ifdef MRB_ENABLE_CXX_EXCEPTION
+mrb_int mrb_jmpbuf::jmpbuf_id = 0;
+#endif
+extern mrb_value mrb_exc_backtrace(mrb_state *mrb, mrb_value self);
 void mrb_init_exception(mrb_state *mrb)
 {
     RClass *e;
@@ -426,7 +429,7 @@ void mrb_init_exception(mrb_state *mrb)
             .define_method("to_s", exc_to_s, MRB_ARGS_NONE())
             .define_method("message", exc_message, MRB_ARGS_NONE())
             .define_method("inspect", exc_inspect, MRB_ARGS_NONE())
-            .define_method("backtrace", mrb_get_backtrace, MRB_ARGS_NONE())
+            .define_method("backtrace", mrb_exc_backtrace, MRB_ARGS_NONE())
             .fin();
 
     mrb->eStandardError_class = &mrb->define_class("StandardError",       mrb->eException_class);       /* 15.2.23 */

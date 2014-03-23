@@ -394,7 +394,6 @@ mrb_init_range(mrb_state *mrb)
 {
     mrb->define_class("Range", mrb->object_class)
             .instance_tt(MRB_TT_RANGE)
-            .include_module("Enumerable")
             .define_method("begin",           mrb_range_beg,         MRB_ARGS_NONE())      /* 15.2.14.4.3  */
             .define_method("end",             mrb_range_end,         MRB_ARGS_NONE())      /* 15.2.14.4.5  */
             .define_method("==",              mrb_range_eq,          MRB_ARGS_REQ(1))      /* 15.2.14.4.1  */

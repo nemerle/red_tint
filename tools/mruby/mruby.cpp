@@ -199,7 +199,7 @@ main(int argc, char **argv)
     if (args.verbose)
         c->dump_result = 1;
     if (args.check_syntax)
-        c->no_exec = 1;
+        c->no_exec = true;
     if (args.mrbfile) {
         v = mrb_load_irep_file_cxt(mrb, args.rfp, c);
     }

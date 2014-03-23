@@ -29,6 +29,9 @@ struct mrb_shared_string {
 };
 #define MRB_STR_SHARED    1
 #define MRB_STR_NOFREE    2
+#define STR_SHARED_P(s) ((s)->flags & MRB_STR_SHARED)
+#define STR_SET_SHARED_FLAG(s) ((s)->flags |= MRB_STR_SHARED)
+#define STR_UNSET_SHARED_FLAG(s) ((s)->flags &= ~MRB_STR_SHARED)
 
 #define RESIZE_CAPA(s,capacity) do {\
     s->m_ptr = (char *)mrb->gc()._realloc(s->m_ptr, (capacity)+1);\
@@ -60,7 +63,7 @@ RString *RString::create(mrb_state *mrb, mrb_int capa) {
 
 void RString::str_modify()
 {
-    if (this->flags & MRB_STR_SHARED) {
+    if (STR_SHARED_P(this)) {
         mrb_shared_string *shared = this->aux.shared;
 
         if (shared->refcnt == 1 && this->m_ptr == shared->ptr) {
@@ -84,7 +87,7 @@ void RString::str_modify()
             this->aux.capa = len;
             str_decref(m_vm, shared);
         }
-        this->flags &= ~MRB_STR_SHARED;
+        STR_UNSET_SHARED_FLAG(this);
         return;
     }
     if (this->flags & MRB_STR_NOFREE) {
@@ -203,6 +206,9 @@ mrb_value mrb_str_buf_cat(mrb_value str, const char *ptr, size_t len)
 
 mrb_value mrb_str_new(mrb_state *mrb, const char *p, size_t len)
 {
+    if ((mrb_int)len < 0) {
+        mrb->mrb_raise(E_ARGUMENT_ERROR, "negative string size (or size too big)");
+    }
     RString *s = RString::create(mrb, p, len);
     return mrb_obj_value(s);
 }
@@ -221,7 +227,7 @@ mrb_value mrb_str_new_cstr(mrb_state *mrb, const char *p)
     if (p) {
         len = strlen(p);
         if ((mrb_int)len < 0) {
-            mrb->mrb_raise(E_ARGUMENT_ERROR, "argument too big");
+            mrb->mrb_raise(E_ARGUMENT_ERROR, "negative string size (or size too big)");
         }
     }
     else {
@@ -232,6 +238,9 @@ mrb_value mrb_str_new_cstr(mrb_state *mrb, const char *p)
 }
 
 mrb_value mrb_str_new_static(mrb_state *mrb, const char *p, size_t len) {
+    if ((mrb_int)len < 0) {
+        mrb->mrb_raise(E_ARGUMENT_ERROR, "negative string size (or size too big)");
+    }
     RString *s = mrb_obj_alloc_string(mrb);
     s->len=len;
     s->aux.capa = 0; /* nofree */
@@ -242,7 +251,7 @@ mrb_value mrb_str_new_static(mrb_state *mrb, const char *p, size_t len) {
 
 void mrb_gc_free_str(mrb_state *mrb, struct RString *str)
 {
-    if (str->flags & MRB_STR_SHARED)
+    if (STR_SHARED_P(str))
         str_decref(mrb, str->aux.shared);
     else if ((str->flags & MRB_STR_NOFREE) == 0)
         mrb->gc()._free(str->m_ptr);
@@ -263,7 +272,7 @@ char * mrb_str_to_cstr(mrb_state *mrb, mrb_value str0)
 
 static void str_make_shared(mrb_state *mrb, RString *s)
 {
-    if (!(s->flags & MRB_STR_SHARED)) {
+    if (!(STR_SHARED_P(s))) {
         mrb_shared_string *shared = (mrb_shared_string *)mrb->gc()._malloc(sizeof(mrb_shared_string));
 
         shared->refcnt = 1;
@@ -283,7 +292,7 @@ static void str_make_shared(mrb_state *mrb, RString *s)
         }
         shared->len = s->len;
         s->aux.shared = shared;
-        s->flags |= MRB_STR_SHARED;
+        STR_SET_SHARED_FLAG(s);
     }
 }
 
@@ -1111,7 +1120,7 @@ mrb_str_subseq(mrb_state *mrb, mrb_value str, mrb_int beg, mrb_int len)
     s->m_ptr = orig->m_ptr + beg;
     s->len = len;
     s->aux.shared = shared;
-    s->flags |= MRB_STR_SHARED;
+    STR_SET_SHARED_FLAG(s);
     shared->refcnt++;
 
     return mrb_obj_value(s);
@@ -1303,9 +1312,9 @@ mrb_str_index_m(mrb_state *mrb, mrb_value str)
 static mrb_value
 str_replace(mrb_state *mrb, RString *s1, RString *s2)
 {
-    if (s2->flags & MRB_STR_SHARED) {
+    if (STR_SHARED_P(s2)) {
 L_SHARE:
-        if (s1->flags & MRB_STR_SHARED){
+        if (STR_SHARED_P(s1)){
             str_decref(mrb, s1->aux.shared);
         }
         else {
@@ -1314,7 +1323,7 @@ L_SHARE:
         s1->m_ptr = s2->m_ptr;
         s1->len = s2->len;
         s1->aux.shared = s2->aux.shared;
-        s1->flags |= MRB_STR_SHARED;
+        STR_SET_SHARED_FLAG(s1);
         s1->aux.shared->refcnt++;
     }
     else if (s2->len > STR_REPLACE_SHARED_MIN) {
@@ -1322,9 +1331,9 @@ L_SHARE:
         goto L_SHARE;
     }
     else {
-        if (s1->flags & MRB_STR_SHARED) {
+        if (STR_SHARED_P(s1)) {
             str_decref(mrb, s1->aux.shared);
-            s1->flags &= ~MRB_STR_SHARED;
+            STR_UNSET_SHARED_FLAG(s1);
             s1->m_ptr = (char *)mrb->gc()._malloc(s2->len+1);
         }
         else {
@@ -1617,7 +1626,7 @@ mrb_str_rindex_m(mrb_state *mrb, mrb_value str)
             mrb_int len = RSTRING_LEN(str);
             uint8_t *p = (uint8_t*)RSTRING_PTR(str);
 
-            for (pos=len;pos>=0;pos--) {
+            for ( pos=len-1; pos>=0; pos--) {
                 if (p[pos] == c) return mrb_fixnum_value(pos);
             }
             return mrb_nil_value();
@@ -2012,7 +2021,7 @@ mrb_str_to_i(mrb_state *mrb, mrb_value self)
     if (base < 0) {
         mrb->mrb_raisef(E_ARGUMENT_ERROR, "illegal radix %S", mrb_fixnum_value(base));
     }
-    return mrb_str_to_inum(mrb, self, base, 0/*Qfalse*/);
+    return mrb_str_to_inum(mrb, self, base, false);
 }
 
 double
@@ -2121,7 +2130,7 @@ double mrb_str_to_dbl(mrb_state *mrb, mrb_value str, int badcheck)
 static mrb_value
 mrb_str_to_f(mrb_state *mrb, mrb_value self)
 {
-    return mrb_float_value(mrb_str_to_dbl(mrb, self, 0/*Qfalse*/));
+    return mrb_float_value(mrb_str_to_dbl(mrb, self, false));
 }
 
 /* 15.2.10.5.40 */
@@ -2306,7 +2315,7 @@ mrb_str_dump(mrb_state *mrb, mrb_value str)
                 }
         }
     }
-    *q++ = '"';
+    *q = '"';
     return mrb_obj_value(result);
 }
 
@@ -2441,7 +2450,6 @@ mrb_init_string(mrb_state *mrb)
     mrb->string_class =
             &mrb->define_class("String", mrb->object_class)
             .instance_tt(MRB_TT_STRING)
-            .include_module(mrb->class_get("Comparable"))
 
             .define_method("bytesize",        mrb_str_bytesize,        MRB_ARGS_NONE())
             .define_method("*",               mrb_str_times,           MRB_ARGS_REQ(1))              /* 15.2.10.5.1  */

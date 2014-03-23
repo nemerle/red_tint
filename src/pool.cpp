@@ -44,7 +44,7 @@ struct mrb_pool_page {
 
 mrb_pool* MemManager::mrb_pool_open()
 {
-    mrb_pool *pool = (mrb_pool *)_malloc(sizeof(mrb_pool));
+    mrb_pool *pool = (mrb_pool *)mrb_malloc_simple(sizeof(mrb_pool));
 
     if (pool) {
         pool->mrb = m_vm;
@@ -75,7 +75,7 @@ mrb_pool_page* mrb_pool::page_alloc(size_t len)
 
     if (len < POOL_PAGE_SIZE)
         len = POOL_PAGE_SIZE;
-    page = (mrb_pool_page *)mrb->gc()._malloc(sizeof(mrb_pool_page)+len);
+    page = (mrb_pool_page *)mrb->gc().mrb_malloc_simple(sizeof(mrb_pool_page)+len);
     if (page) {
         page->offset = 0;
         page->len = len;

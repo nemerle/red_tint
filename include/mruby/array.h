@@ -17,8 +17,8 @@
 struct mrb_state;
 struct mrb_shared_array {
     int refcnt;
-    mrb_value *ptr;
     mrb_int len;
+    mrb_value *ptr;
 };
 
 struct RArray : public RBasic {

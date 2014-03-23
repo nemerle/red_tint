@@ -63,6 +63,7 @@ mrb_value mrb_str_dup(mrb_state *mrb, mrb_value str); /* mrb_str_dup */
 mrb_value mrb_str_pool(mrb_state *mrb, mrb_value str); /* mrb_str_dup */
 mrb_value mrb_str_intern(mrb_state *mrb, mrb_value self);
 mrb_value mrb_str_cat_cstr(mrb_state *, mrb_value, const char *);
+#define mrb_str_cat_lit(mrb, str, lit) mrb_str_cat(mrb, str, (lit), sizeof(lit) - 1)
 mrb_value mrb_str_to_inum(mrb_state *mrb, mrb_value str, int base, int badcheck);
 double mrb_str_to_dbl(mrb_state *mrb, mrb_value str, int badcheck);
 mrb_value mrb_str_to_str(mrb_state *mrb, mrb_value str);

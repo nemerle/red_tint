@@ -12,7 +12,7 @@
 #include "mruby/string.h"
 #include "mruby/variable.h"
 #include "mruby/class.h"
-#include "error.h"
+#include "mruby/error.h"
 
 mrb_value class_instance_method_list(mrb_state*, mrb_bool, RClass*, int);
 namespace {
@@ -88,13 +88,12 @@ static void check_iv_name(mrb_state *mrb, mrb_sym iv_name_id)
     const char *s = mrb_sym2name_len(mrb, iv_name_id, len);
     valid_iv_name(mrb, iv_name_id, s, len);
 }
-static mrb_sym
-get_valid_iv_sym(mrb_state *mrb, mrb_value iv_name)
+static mrb_sym get_valid_iv_sym(mrb_state *mrb, mrb_value iv_name)
 {
     mrb_sym iv_name_id;
     mrb_assert(mrb_symbol_p(iv_name) || mrb_is_a_string(iv_name));
     if (mrb_is_a_string(iv_name)) {
-        iv_name_id = mrb_intern_cstr(mrb, RSTRING_PTR(iv_name));
+        iv_name_id = mrb_intern(mrb, RSTRING_PTR(iv_name),RSTRING_LEN(iv_name));
         valid_iv_name(mrb, iv_name_id, RSTRING_PTR(iv_name), RSTRING_LEN(iv_name));
     } else { //if(mrb_symbol_p(val))
         iv_name_id = mrb_symbol(iv_name);
@@ -222,35 +221,6 @@ static mrb_value mrb_obj_id_m(mrb_state *mrb, mrb_value self)
     return mrb_fixnum_value(mrb_obj_id(self));
 }
 
-/* 15.3.1.3.4  */
-/* 15.3.1.3.44 */
-/*
- *  call-seq:
- *     obj.send(symbol [, args...])        -> obj
- *     obj.__send__(symbol [, args...])      -> obj
- *
- *  Invokes the method identified by _symbol_, passing it any
- *  arguments specified. You can use <code>__send__</code> if the name
- *  +send+ clashes with an existing method in _obj_.
- *
- *     class Klass
- *       def hello(*args)
- *         "Hello " + args.join(' ')
- *       end
- *     end
- *     k = Klass.new
- *     k.send :hello, "gentle", "readers"   #=> "Hello gentle readers"
- */
-static mrb_value
-mrb_f_send(mrb_state *mrb, mrb_value self)
-{
-    mrb_sym name;
-    mrb_value block, *argv;
-    int argc;
-
-    mrb_get_args(mrb, "n*&", &name, &argv, &argc, &block);
-    return mrb_funcall_with_block(mrb,self, name, argc, argv, block);
-}
 
 /* 15.3.1.2.2  */
 /* 15.3.1.2.5  */
@@ -364,6 +334,7 @@ static void init_copy(mrb_state *mrb, mrb_value dest, mrb_value obj)
         case MRB_TT_CLASS:
         case MRB_TT_MODULE:
             copy_class(mrb, dest, obj);
+            /* fall through */
         case MRB_TT_OBJECT:
         case MRB_TT_SCLASS:
         case MRB_TT_HASH:

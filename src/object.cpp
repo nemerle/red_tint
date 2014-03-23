@@ -551,10 +551,10 @@ mrb_value mrb_Float(mrb_state *mrb, mrb_value val)
 
 mrb_value mrb_inspect(mrb_state *mrb, mrb_value obj)
 {
-    return mrb_obj_as_string(mrb, mrb->funcall(obj, "inspect", 0, 0));
+    return mrb_obj_as_string(mrb, mrb->funcall(obj, "inspect", 0));
 }
 
-int mrb_eql(mrb_state *mrb, mrb_value obj1, mrb_value obj2)
+bool mrb_eql(mrb_state *mrb, mrb_value obj1, mrb_value obj2)
 {
     if (mrb_obj_eq(obj1, obj2))
         return true;

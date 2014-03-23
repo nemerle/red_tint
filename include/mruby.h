@@ -154,8 +154,9 @@ struct ArgStore {
         return *this;
     }
 };
+struct mrb_jmpbuf;
 struct mrb_state {
-    void *jmp;
+    mrb_jmpbuf *jmp;
     MemManager m_gc;
     mrb_context *m_ctx;
     mrb_context *root_c;
@@ -316,7 +317,7 @@ int mrb_equal(mrb_state *mrb, mrb_value obj1, mrb_value obj2);
 mrb_value mrb_Integer(mrb_state *mrb, mrb_value val);
 mrb_value mrb_Float(mrb_state *mrb, mrb_value val);
 mrb_value mrb_inspect(mrb_state *mrb, mrb_value obj);
-int mrb_eql(mrb_state *mrb, mrb_value obj1, mrb_value obj2);
+bool mrb_eql(mrb_state *mrb, mrb_value obj1, mrb_value obj2);
 
 #define mrb_gc_mark_value(mrb,val) do {\
     if (mrb_type(val) >= MRB_TT_OBJECT) (mrb)->gc().mark(mrb_basic_ptr(val));\
@@ -377,8 +378,11 @@ void mrb_define_global_const(mrb_state *mrb, const char *name, mrb_value val);
 mrb_value mrb_block_proc(void);
 mrb_value mrb_attr_get(mrb_value obj, mrb_sym id);
 
-int mrb_respond_to(mrb_state *mrb, const mrb_value &obj, mrb_sym mid);
+bool mrb_respond_to(mrb_state *mrb, const mrb_value &obj, mrb_sym mid);
 bool mrb_obj_is_instance_of(mrb_state *mrb, mrb_value obj, struct RClass* c);
+
+/* fiber functions (you need to link mruby-fiber mrbgem to use) */
+mrb_value mrb_fiber_yield(mrb_state *mrb, int argc, mrb_value *argv);
 
 /* memory pool implementation */
 struct mrb_pool {

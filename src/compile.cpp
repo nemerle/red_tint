@@ -7,6 +7,7 @@
 #include "mruby/compile.h"
 #include "mruby/node.h"
 #include "parse.hpp"
+#include "mrb_throw.h"
 
 mrb_sym mrb_parser_state::intern(const char *s)
 {
@@ -30,7 +31,7 @@ void* mrb_parser_state::parser_palloc(size_t size)
     void *m = pool->mrb_pool_alloc(size);
 
     if (!m) {
-        longjmp(jmp, 1);
+        MRB_THROW(jmp);
     }
     return m;
 }
@@ -428,28 +429,34 @@ void mrbc_partial_hook(mrb_state *mrb, mrbc_context *c, int (*func)(mrb_parser_s
 }
 
 void mrb_parser_parse(mrb_parser_state *p, mrbc_context *c) {
-    if (setjmp(p->jmp) != 0) {
+    struct mrb_jmpbuf buf;
+    p->jmp = &buf;
+
+    MRB_TRY(p->jmp) {
+        p->m_cmd_start = true;
+        p->in_def = 0;
+        p->in_single = 0;
+        p->nerr = p->nwarn = 0;
+        p->m_lex_strterm = nullptr;
+
+        p->parser_init_cxt(c);
+        yyparse(p);
+        if (!p->m_tree) {
+            p->m_tree = p->new_nil();
+        }
+        p->parser_update_cxt(c);
+        if (c && c->dump_result) {
+            parser_dump(p->m_mrb, p->m_tree, 0);
+        }
+
+    }
+    MRB_CATCH(p->jmp) {
         p->yyerror("memory allocation error");
         p->nerr++;
         p->m_tree = 0;
         return;
     }
-
-    p->m_cmd_start = true;
-    p->in_def = 0;
-    p->in_single = 0;
-    p->nerr = p->nwarn = 0;
-    p->m_lex_strterm = nullptr;
-
-    p->parser_init_cxt(c);
-    yyparse(p);
-    if (!p->m_tree) {
-        p->m_tree = p->new_nil();
-    }
-    p->parser_update_cxt(c);
-    if (c && c->dump_result) {
-        parser_dump(p->m_mrb, p->m_tree, 0);
-    }
+    MRB_END_EXC(p->jmp);
 }
 
 

@@ -20,6 +20,7 @@
 #include "mruby/debug.h"
 #include "opcode.h"
 #include "re.h"
+#include "mrb_throw.h"
 
 #define CALL_MAXARGS 127
 
@@ -44,7 +45,7 @@ struct loopinfo {
 struct codegen_scope : public NodeVisitor {
     mrb_state *m_mrb = nullptr;
     mrb_pool *m_mpool  = nullptr;
-    jmp_buf jmp;
+    mrb_jmpbuf jmp;
 
     codegen_scope *m_prev= nullptr;
 
@@ -86,14 +87,14 @@ public:
     }
     static codegen_scope *create(mrb_state *m_mrb, codegen_scope *m_prev, node *lv);
     static codegen_scope *create(mrb_state *mrb, codegen_scope *prev, const tLocals &lv);
-    void genop(eOpEnum op,int a,int b,int c) {
-        genop(MKOP_ABC(op, a, b, c));
+    int genop(eOpEnum op,int a,int b,int c) {
+        return genop(MKOP_ABC(op, a, b, c));
     }
-    void genop(eOpEnum op,int a,int b) {
-        genop(MKOP_AsBx(op, a, b));
+    int genop(eOpEnum op,int a,int b) {
+        return genop(MKOP_AsBx(op, a, b));
     }
 
-    void genop(mrb_code i)
+    int genop(mrb_code i)
     {
         if (m_pc == m_icapa) {
             m_icapa *= 2;
@@ -107,7 +108,7 @@ public:
         if (m_lines) {
             m_lines[m_pc] = m_lineno;
         }
-        m_pc++;
+        return m_pc++;
     }
     void dispatch(int _pc)
     {
@@ -137,7 +138,7 @@ public:
     //void *s_malloc(size_t len);
     void *s_realloc(void *p, size_t len);
     int new_label();
-    void genop_peep(mrb_code i, int val);
+    int genop_peep(mrb_code i, bool val);
     void push_();
     void pop_sp(int v=1) {
         m_sp-=v;
@@ -297,7 +298,7 @@ void codegen_scope::error(const char *message)
     else {
         m_mrb->sys.error_f("codegen error: %s\n", message);
     }
-    longjmp(this->jmp, 1);
+    MRB_THROW(&jmp);
 }
 
 void* codegen_scope::palloc(size_t len)
@@ -323,11 +324,10 @@ int codegen_scope::new_label()
     return m_pc;
 }
 
-void codegen_scope::genop_peep(mrb_code i, int val)
+int codegen_scope::genop_peep(mrb_code i, bool val)
 {
     if (m_lastlabel == m_pc || m_pc <= 0) {
-        genop(i);
-        return;
+        return genop(i);
     }
     /* peephole optimization */
     mrb_code i0 = m_iseq[m_pc-1];
@@ -338,7 +338,7 @@ void codegen_scope::genop_peep(mrb_code i, int val)
         case OP_MOVE:
             if (GETARG_A(i) == GETARG_B(i)) {
                 /* skip useless OP_MOVE */
-                return;
+                return 0;
             }
             if (val)
                 break;
@@ -346,17 +346,17 @@ void codegen_scope::genop_peep(mrb_code i, int val)
                 case OP_MOVE:
                     if (GETARG_B(i) == GETARG_A(i0) && GETARG_A(i) == GETARG_B(i0) && GETARG_A(i) >= m_nlocals) {
                         /* skip swapping OP_MOVE */
-                        return;
+                        return 0;
                     }
                     if (GETARG_B(i) == GETARG_A(i0) && GETARG_A(i0) >= m_nlocals) {
                         m_iseq[m_pc-1] = MKOP_AB(OP_MOVE, GETARG_A(i), GETARG_B(i0));
-                        return;
+                        return 0;
                     }
                     break;
                 case OP_LOADI:
                     if (GETARG_B(i) == GETARG_A(i0) && GETARG_A(i0) >= m_nlocals) {
                         m_iseq[m_pc-1] = MKOP_AsBx(OP_LOADI, GETARG_A(i), GETARG_sBx(i0));
-                        return;
+                        return 0;
                     }
                     break;
                 case OP_ARRAY:
@@ -366,7 +366,7 @@ void codegen_scope::genop_peep(mrb_code i, int val)
                 case OP_GETUPVAR:
                     if (GETARG_B(i) == GETARG_A(i0) && GETARG_A(i0) >= m_nlocals) {
                         m_iseq[m_pc-1] = MKOP_ABC(c0, GETARG_A(i), GETARG_B(i0), GETARG_C(i0));
-                        return;
+                        return 0;
                     }
                     break;
                 case OP_LOADSYM:
@@ -379,13 +379,13 @@ void codegen_scope::genop_peep(mrb_code i, int val)
                 case OP_STRING:
                     if (GETARG_B(i) == GETARG_A(i0) && GETARG_A(i0) >= m_nlocals) {
                         m_iseq[m_pc-1] = MKOP_ABx(c0, GETARG_A(i), GETARG_Bx(i0));
-                        return;
+                        return 0;
                     }
                     break;
                 case OP_SCLASS:
                     if (GETARG_B(i) == GETARG_A(i0) && GETARG_A(i0) >= m_nlocals) {
                         m_iseq[m_pc-1] = MKOP_AB(c0, GETARG_A(i), GETARG_B(i0));
-                        return;
+                        return 0;
                     }
                     break;
                 case OP_LOADNIL:
@@ -395,7 +395,7 @@ void codegen_scope::genop_peep(mrb_code i, int val)
                 case OP_OCLASS:
                     if (GETARG_B(i) == GETARG_A(i0) && GETARG_A(i0) >= m_nlocals) {
                         m_iseq[m_pc-1] = MKOP_A(c0, GETARG_A(i));
-                        return;
+                        return 0;
                     }
                     break;
                 default:
@@ -412,7 +412,7 @@ void codegen_scope::genop_peep(mrb_code i, int val)
             if (c0 == OP_MOVE) {
                 if (GETARG_A(i) == GETARG_A(i0)) {
                     m_iseq[m_pc-1] = MKOP_ABx(c1, GETARG_B(i0), GETARG_Bx(i));
-                    return;
+                    return 0;
                 }
             }
             break;
@@ -422,29 +422,29 @@ void codegen_scope::genop_peep(mrb_code i, int val)
             if (c0 == OP_MOVE) {
                 if (GETARG_A(i) == GETARG_A(i0)) {
                     m_iseq[m_pc-1] = MKOP_ABC(c1, GETARG_B(i0), GETARG_B(i), GETARG_C(i));
-                    return;
+                    return 0;
                 }
             }
             break;
         case OP_EPOP:
             if (c0 == OP_EPOP) {
                 m_iseq[m_pc-1] = MKOP_A(OP_EPOP, GETARG_A(i0)+GETARG_A(i));
-                return;
+                return 0;
             }
             break;
         case OP_POPERR:
             if (c0 == OP_POPERR) {
                 m_iseq[m_pc-1] = MKOP_A(OP_POPERR, GETARG_A(i0)+GETARG_A(i));
-                return;
+                return 0;
             }
             break;
         case OP_RETURN:
             switch (c0) {
                 case OP_RETURN:
-                    return;
+                    return 0;
                 case OP_MOVE:
                     m_iseq[m_pc-1] = MKOP_AB(OP_RETURN, GETARG_B(i0), OP_R_NORMAL);
-                    return;
+                    return 0;
                 case OP_SETIV:
                 case OP_SETCV:
                 case OP_SETCONST:
@@ -454,13 +454,12 @@ void codegen_scope::genop_peep(mrb_code i, int val)
                     m_pc--;
                     genop_peep(i0, false);
                     i0 = m_iseq[m_pc-1];
-                    genop(MKOP_AB(OP_RETURN, GETARG_A(i0), OP_R_NORMAL));
-                    return;
+                    return genop(MKOP_AB(OP_RETURN, GETARG_A(i0), OP_R_NORMAL));
 #if 0
                 case OP_SEND:
                     if (GETARG_B(i) == OP_R_NORMAL && GETARG_A(i) == GETARG_A(i0)) {
                         m_iseq[m_pc-1] = MKOP_ABC(OP_TAILCALL, GETARG_A(i0), GETARG_B(i0), GETARG_C(i0));
-                        return;
+                        return 0;
                     }
                     break;
 #endif
@@ -479,21 +478,28 @@ void codegen_scope::genop_peep(mrb_code i, int val)
                     m_iseq[m_pc-1] = MKOP_ABC(OP_ADDI, GETARG_A(i), GETARG_B(i), c);
                 else
                     m_iseq[m_pc-1] = MKOP_ABC(OP_SUBI, GETARG_A(i), GETARG_B(i), -c);
-                return;
+                return 0;
             }
         case OP_STRCAT:
             if (c0 == OP_STRING) {
                 int i = GETARG_Bx(i0);
                 if (mrb_type(m_irep->pool[i]) == MRB_TT_STRING && RSTRING_LEN(m_irep->pool[i]) == 0) {
                     m_pc--;
-                    return;
+                    return 0;
                 }
+            }
+            break;
+        case OP_JMPIF:
+        case OP_JMPNOT:
+            if (c0 == OP_MOVE && GETARG_A(i) == GETARG_A(i0)) {
+                m_iseq[m_pc-1] = MKOP_AsBx(c1, GETARG_B(i0), GETARG_sBx(i));
+                return m_pc-1;
             }
             break;
         default:
             break;
     }
-    genop(i);
+    return genop(i);
 }
 
 void codegen_scope::scope_error()
@@ -793,7 +799,7 @@ mrb_sym codegen_scope::attrsym(mrb_sym a)
     char *name2;
 
     name = mrb_sym2name_len(m_mrb, a, len);
-    name2 = (char *)palloc(len+1);
+    name2 = (char *)palloc(len+2); // '=' + '\0'
     memcpy(name2, name, len);
     name2[len] = '=';
     name2[len+1] = '\0';
@@ -1505,8 +1511,7 @@ void codegen_scope::visit_loop(BinaryNode *n,eOpEnum op) {
 
     loopinfo *lp = loop_push(LOOP_NORMAL);
 
-    lp->pc1 = new_label();
-    genop(MKOP_sBx(OP_JMP, 0));
+    lp->pc1 = genop(MKOP_sBx(OP_JMP, 0));
     lp->pc2 = new_label();
     codegen(n->rhs(), false);
     dispatch(lp->pc1);
@@ -1688,8 +1693,7 @@ void codegen_scope::visit(IfNode *node) {
 
     codegen(node->cond(), true);
     pop_sp();
-    pos1 = new_label();
-    genop(MKOP_AsBx(OP_JMPNOT, m_sp, 0));
+    pos1 = genop_peep(MKOP_AsBx(OP_JMPNOT, m_sp, 0),val);
 
     codegen(node->true_body(), val);
     if (val ) {
@@ -1700,16 +1704,14 @@ void codegen_scope::visit(IfNode *node) {
         pop_sp(); // both cases 'e' and '!e' pop_sp if 'val'
     }
     if (false_body) {
-        pos2 = new_label();
-        genop(MKOP_sBx(OP_JMP, 0));
+        pos2 = genop(MKOP_sBx(OP_JMP, 0));
         dispatch(pos1);
         codegen(false_body, val);
         dispatch(pos2);
     }
     else {
         if (val) {
-            pos2 = new_label();
-            genop(MKOP_sBx(OP_JMP, 0));
+            pos2 = genop(MKOP_sBx(OP_JMP, 0));
             dispatch(pos1);
             genop(MKOP_A(OP_LOADNIL, m_sp));
             dispatch(pos2);
@@ -1734,8 +1736,7 @@ void codegen_scope::visit(OpAsgnNode *node) {
         int pos;
 
         pop_sp();
-        pos = new_label();
-        genop( MKOP_AsBx(name[0] == '|' ? OP_JMPIF : OP_JMPNOT, m_sp, 0));
+        pos = genop_peep( MKOP_AsBx(name[0] == '|' ? OP_JMPIF : OP_JMPNOT, m_sp, 0),val);
         codegen( node->rhs(), true);
         pop_sp();
         gen_assignment(node->lhs(), m_sp, val);
@@ -1828,8 +1829,7 @@ void codegen_scope::visit(RescueNode *node) {
     int onerr, noexc, exend, pos1;
     loopinfo *lp;
 
-    onerr = new_label();
-    genop( MKOP_Bx(OP_ONERR, 0));
+    onerr = genop(MKOP_Bx(OP_ONERR, 0));
     lp = loop_push( LOOP_BEGIN);
     lp->pc1 = onerr;
     if (node->body()) {
@@ -1838,8 +1838,7 @@ void codegen_scope::visit(RescueNode *node) {
             pop_sp();
     }
     lp->type = LOOP_RESCUE;
-    noexc = new_label();
-    genop(MKOP_Bx(OP_JMP, 0));
+    noexc = genop(MKOP_Bx(OP_JMP, 0));
     dispatch(onerr);
     exend = 0;
     pos1 = 0;
@@ -1867,15 +1866,13 @@ void codegen_scope::visit(RescueNode *node) {
                 genop(MKOP_AB(OP_MOVE, m_sp, exc));
                 pop_sp();
                 genop(MKOP_ABC(OP_SEND, m_sp, new_msym(mrb_intern(m_mrb, "===", 3)), 1));
-                int tmp = new_label();
-                genop(MKOP_AsBx(OP_JMPIF, m_sp, pos2));
+                int tmp = genop(MKOP_AsBx(OP_JMPIF, m_sp, pos2));
                 pos2 = tmp;
                 if (n4) {
                     n4 = n4->right();
                 }
             } while (n4);
-            pos1 = new_label();
-            genop(MKOP_sBx(OP_JMP, 0));
+            pos1 = genop(MKOP_sBx(OP_JMP, 0));
             dispatch_linked(pos2);
 
             pop_sp();
@@ -1887,8 +1884,7 @@ void codegen_scope::visit(RescueNode *node) {
                 if (val)
                     pop_sp();
             }
-            int tmp = new_label();
-            genop(MKOP_sBx(OP_JMP, exend));
+            int tmp = genop(MKOP_sBx(OP_JMP, exend));
             exend = tmp;
             n2 = n2->right();
             push_();
@@ -1941,21 +1937,18 @@ void codegen_scope::visit(CaseNode *node) {
             else {
                 pop_sp();
             }
-            int tmp = new_label();
-            genop(MKOP_AsBx(OP_JMPIF, m_sp, pos2));
+            int tmp = genop(MKOP_AsBx(OP_JMPIF, m_sp, pos2));
             pos2 = tmp;
             n = n->right();
         }
         if (tree->left()->left()) {
-            pos1 = new_label();
-            genop(MKOP_sBx(OP_JMP, 0));
+            pos1 = genop(MKOP_sBx(OP_JMP, 0));
             dispatch_linked(pos2);
         }
         codegen(tree->left()->right(), val);
         if (val)
             pop_sp();
-        int tmp = new_label();
-        genop(MKOP_sBx(OP_JMP, pos3));
+        int tmp = genop(MKOP_sBx(OP_JMP, pos3));
         pos3 = tmp;
         if (pos1)
             dispatch(pos1);
@@ -2206,7 +2199,7 @@ void codegen_scope::visit(RegxNode *xn) {
     const char *p2 = xn->m_str;
     int ai = m_mrb->gc().arena_save();
     int sym = new_sym( m_mrb->intern2(REGEXP_CLASS,REGEXP_CLASS_CSTR_LEN));
-    int off = new_lit(mrb_str_new(m_mrb, p1, strlen(p1)));
+    int off = new_lit(mrb_str_new_cstr(m_mrb, p1));
     int argc = 1;
 
     genop( MKOP_A(OP_OCLASS, m_sp));
@@ -2215,7 +2208,7 @@ void codegen_scope::visit(RegxNode *xn) {
     genop( MKOP_ABx(OP_STRING, m_sp, off));
     if (p2) {
         push_();
-        off = new_lit(mrb_str_new(m_mrb, p2, strlen(p2)));
+        off = new_lit(mrb_str_new_cstr(m_mrb, p2));
         genop( MKOP_ABx(OP_STRING, m_sp, off));
         argc++;
         pop_sp();
@@ -2259,7 +2252,7 @@ void codegen_scope::visit(DregxNode *dn) {
     n = dn->m_b->right();
     if (n->left()) {
         const char *p = (const char*)n->left();
-        int off = new_lit(mrb_str_new(m_mrb, p, strlen(p)));
+        int off = new_lit(mrb_str_new_cstr(m_mrb, p));
         codegen( dn->m_a, true);
         genop( MKOP_ABx(OP_STRING, m_sp, off));
         pop_sp();
@@ -2270,7 +2263,7 @@ void codegen_scope::visit(DregxNode *dn) {
         int off;
 
         push_();
-        off = new_lit(mrb_str_new(m_mrb, p2, strlen(p2)));
+        off = new_lit(mrb_str_new_cstr(m_mrb, p2));
         genop( MKOP_ABx(OP_STRING, m_sp, off));
         argc++;
         pop_sp();
@@ -2583,20 +2576,20 @@ RProc *mrb_generate_code (mrb_state *mrb, parser_state *p) {
     scope->parser = p;
     scope->m_filename = p->m_filename;
     scope->filename_index = p->current_filename_index;
-    if(setjmp(scope->jmp) == 0) {
+    MRB_TRY(&scope->jmp) {
         // prepare irep
         scope->codegen(p->m_tree, false);
         RProc *proc = mrb_proc_new(mrb, scope->m_irep);
         mrb_irep_decref(mrb, scope->m_irep);
         scope->m_mpool->mrb_pool_close();
         return proc;
-    } else {
+    } MRB_CATCH(&scope->jmp) {
         if (scope->m_filename == scope->m_irep->filename) {
             scope->m_irep->filename = nullptr;
         }
         mrb_irep_decref(mrb, scope->m_irep);
         scope->m_mpool->mrb_pool_close();
         return nullptr;
-    }
+    } MRB_END_EXC(&scope->jmp);
     return 0;
 }
