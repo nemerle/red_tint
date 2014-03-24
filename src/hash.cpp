@@ -16,7 +16,7 @@ static void mrb_hash_modify(mrb_state *mrb, mrb_value hash);
 
 static inline mrb_value mrb_hash_ht_key(mrb_state *mrb, mrb_value key)
 {
-    if (mrb_is_a_string(key))
+    if (key.is_string())
         return mrb_str_dup(mrb, key);
     return key;
 }
@@ -215,7 +215,7 @@ mrb_hash_init_core(mrb_state *mrb, mrb_value hash)
 
     mrb_get_args(mrb, "o*", &block, &argv, &argc);
     mrb_hash_modify(mrb, hash);
-    if (mrb_nil_p(block)) {
+    if (block.is_nil()) {
         if (argc > 0) {
             if (argc != 1) mrb->mrb_raise(E_ARGUMENT_ERROR, "wrong number of arguments");
             ifnone = argv[0];
@@ -806,7 +806,7 @@ hash_equal(mrb_state *mrb, mrb_value hash1, mrb_value hash2, int eql)
 
     if (mrb_obj_equal(hash1, hash2))
         return mrb_true_value();
-    if (!mrb_hash_p(hash2)) {
+    if (!hash2.is_hash()) {
         if (!mrb_respond_to(mrb, hash2, mrb->intern2("to_hash", 7))) {
             return mrb_false_value();
         }

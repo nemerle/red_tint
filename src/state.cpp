@@ -125,7 +125,7 @@ void mrb_irep_free(mrb_state *mrb, mrb_irep *irep)
             if ((mrb_str_ptr(irep->pool[i])->flags & MRB_STR_NOFREE) == 0) {
                 mm._free(mrb_str_ptr(irep->pool[i])->m_ptr);
             }
-            mm._free(mrb_basic_ptr(irep->pool[i]));
+            mm._free(irep->pool[i].basic_ptr());
         }
 #ifdef MRB_WORD_BOXING
     else if (mrb_type(irep->pool[i]) == MRB_TT_FLOAT) {

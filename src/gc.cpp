@@ -352,9 +352,9 @@ void MemManager::gc_protect(RBasic *p)
 
 void mrb_gc_protect(mrb_state *mrb, mrb_value obj)
 {
-    if (mrb_special_const_p(obj))
+    if (obj.is_special_const())
         return;
-    mrb->gc().gc_protect(mrb_basic_ptr(obj));
+    mrb->gc().gc_protect(obj.basic_ptr());
 }
 
 RBasic* MemManager::mrb_obj_alloc(enum mrb_vtype ttype, RClass *cls)

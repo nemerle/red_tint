@@ -803,13 +803,13 @@ load_exec(mrb_state *mrb, mrb_parser_state *p, mrbc_context *c)
 
             int n = snprintf(buf, sizeof(buf), "line %d: %s\n",
                              p->error_buffer[0].lineno, p->error_buffer[0].message);
-            mrb->m_exc = mrb_ptr(mrb_exc_new(E_SYNTAX_ERROR, buf, n));
+            mrb->m_exc = mrb_exc_new(E_SYNTAX_ERROR, buf, n).object_ptr();
             mrb_parser_free(p);
             return mrb_undef_value();
         }
         else {
             static const char msg[] = "syntax error";
-            mrb->m_exc = mrb_ptr(mrb_exc_new(E_SYNTAX_ERROR, msg, sizeof(msg) - 1));
+            mrb->m_exc = mrb_exc_new(E_SYNTAX_ERROR, msg, sizeof(msg) - 1).object_ptr();
             mrb_parser_free(p);
             return mrb_undef_value();
         }
@@ -818,7 +818,7 @@ load_exec(mrb_state *mrb, mrb_parser_state *p, mrbc_context *c)
     mrb_parser_free(p);
     if (nullptr == proc) {
         static const char msg[] = "codegen error";
-        mrb->m_exc = mrb_ptr(mrb_exc_new(E_SCRIPT_ERROR, msg, sizeof(msg) - 1));
+        mrb->m_exc = mrb_exc_new(E_SCRIPT_ERROR, msg, sizeof(msg) - 1).object_ptr();
         return mrb_undef_value();
     }
     if (c) {

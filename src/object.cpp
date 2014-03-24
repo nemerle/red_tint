@@ -26,7 +26,7 @@ bool mrb_obj_eq(mrb_value v1, mrb_value v2)
             return (mrb_float(v1) == mrb_float(v2));
 
         default:
-            return (mrb_ptr(v1) == mrb_ptr(v2));
+            return (v1.basic_ptr() == v2.basic_ptr());
     }
 }
 
@@ -36,15 +36,13 @@ bool mrb_obj_equal(mrb_value v1, mrb_value v2)
     return mrb_obj_eq(v1, v2);
 }
 
-int mrb_equal(mrb_state *mrb, mrb_value obj1, mrb_value obj2)
+bool mrb_equal(mrb_state *mrb, mrb_value obj1, mrb_value obj2)
 {
 
     if (mrb_obj_eq(obj1, obj2))
         return true;
     mrb_value result = mrb->funcall(obj1, "==", 1, obj2);
-    if (mrb_test(result))
-        return true;
-    return false;
+    return result.to_bool();
 }
 
 /*
@@ -301,7 +299,7 @@ mrb_value mrb_check_to_integer(mrb_state *mrb, mrb_value val, const char *method
     if (mrb_type(val) == MRB_TT_FIXNUM)
         return val;
     mrb_value v = convert_type(mrb, val, "Integer", method, false);
-    if (mrb_nil_p(v) || mrb_type(v) != MRB_TT_FIXNUM)
+    if (v.is_nil() || mrb_type(v) != MRB_TT_FIXNUM)
         return mrb_nil_value();
     return v;
 }
@@ -323,8 +321,8 @@ mrb_check_convert_type(mrb_state *mrb, const mrb_value &val, mrb_vtype type, con
 {
     if (mrb_type(val) == type && type != MRB_TT_DATA)
         return val;
-    mrb_value v = convert_type(mrb, val, tname, method, 0/*Qfalse*/);
-    if (mrb_nil_p(v) || mrb_type(v) != type)
+    mrb_value v = convert_type(mrb, val, tname, method, false);
+    if (v.is_nil() || mrb_type(v) != type)
         return mrb_nil_value();
     return v;
 }
@@ -368,16 +366,16 @@ void mrb_check_type(mrb_state *mrb, mrb_value x, mrb_vtype t)
         if (type->type == t) {
             const char *etype;
 
-            if (mrb_nil_p(x)) {
+            if (x.is_nil()) {
                 etype = "nil";
             }
-            else if (mrb_type(x) == MRB_TT_FIXNUM) {
+            else if (x.is_fixnum()) {
                 etype = "Fixnum";
             }
-            else if (mrb_type(x) == MRB_TT_SYMBOL) {
+            else if (x.is_symbol()) {
                 etype = "Symbol";
             }
-            else if (mrb_special_const_p(x)) {
+            else if (x.is_special_const()) {
                 s = mrb_str_ptr(mrb_obj_as_string(mrb, x));
                 etype = s->m_ptr;
             }
@@ -468,7 +466,7 @@ int mrb_obj_is_kind_of(mrb_state *mrb, mrb_value obj, RClass *c)
 static mrb_value mrb_to_integer(mrb_state *mrb, mrb_value val, const char *method)
 {
 
-    if (mrb_fixnum_p(val))
+    if (val.is_fixnum())
         return val;
     mrb_value v = convert_type(mrb, val, "Integer", method, true);
     if (!mrb_obj_is_kind_of(mrb, v, mrb->fixnum_class)) {
@@ -488,7 +486,7 @@ static mrb_value mrb_convert_to_integer(mrb_state *mrb, mrb_value val, int base)
 {
     mrb_value tmp;
 
-    if (mrb_nil_p(val)) {
+    if (val.is_nil()) {
         if (base != 0)
             goto arg_error;
         mrb->mrb_raise(E_TYPE_ERROR, "can't convert nil into Integer");
@@ -512,13 +510,13 @@ static mrb_value mrb_convert_to_integer(mrb_state *mrb, mrb_value val, int base)
     }
     if (base != 0) {
         tmp = mrb_check_string_type(mrb, val);
-        if (!mrb_nil_p(tmp))
+        if (!tmp.is_nil())
             return mrb_str_to_inum(mrb, val, base, true);
 arg_error:
         mrb->mrb_raise(E_ARGUMENT_ERROR, "base specified for non string value");
     }
     tmp = convert_type(mrb, val, "Integer", "to_int", false);
-    if (mrb_nil_p(tmp)) {
+    if (tmp.is_nil()) {
         return mrb_to_integer(mrb, val, "to_i");
     }
     return tmp;
@@ -531,7 +529,7 @@ mrb_value mrb_Integer(mrb_state *mrb, mrb_value val)
 
 mrb_value mrb_Float(mrb_state *mrb, mrb_value val)
 {
-    if (mrb_nil_p(val)) {
+    if (val.is_nil()) {
         mrb->mrb_raise(E_TYPE_ERROR, "can't convert nil into Float");
     }
     switch (mrb_type(val)) {
@@ -558,12 +556,12 @@ bool mrb_eql(mrb_state *mrb, mrb_value obj1, mrb_value obj2)
 {
     if (mrb_obj_eq(obj1, obj2))
         return true;
-    return mrb_test(mrb->funcall(obj1, "eql?", 1, obj2));
+    return mrb->funcall(obj1, "eql?", 1, obj2).to_bool();
 }
 mrb_value mrb_value::check_type(mrb_state *mrb, mrb_vtype t, const char *c, const char *m) const {
 
     mrb_value tmp = mrb_check_convert_type(mrb, *this, t, c, m);
-    if (mrb_nil_p(tmp)) {
+    if (tmp.is_nil()) {
         mrb->mrb_raisef(E_TYPE_ERROR, "expected %S", mrb_str_new_cstr(mrb, c));
     }
     return tmp;
@@ -613,7 +611,7 @@ void mrb_state::get_arg(const mrb_value &arg, mrb_sym &tgt) {
     if (mrb_type(arg) == MRB_TT_SYMBOL) {
         tgt = mrb_symbol(arg);
     }
-    else if (mrb_is_a_string(arg)) {
+    else if (arg.is_string()) {
         tgt = mrb_intern_str(this, arg.to_str(this));
     }
     else {

@@ -384,8 +384,8 @@ static int iv_mark_i(mrb_sym sym, mrb_value v, void *p)
 {
     if (mrb_type(v) < MRB_TT_OBJECT)
         return 0;
-    RBasic *obj = mrb_basic_ptr(v);
-    obj->m_vm->gc().mark(obj);
+    RBasic *obj = v.basic_ptr();
+    obj->m_vm->gc().mark(v.basic_ptr());
     return 0;
 }
 
@@ -464,7 +464,7 @@ mrb_value RObject::iv_get(mrb_sym sym)
 mrb_value mrb_iv_get(const mrb_value &obj, mrb_sym sym)
 {
     if (obj_iv_p(obj)) {
-        return mrb_ptr(obj)->iv_get(sym);
+        return obj.object_ptr()->iv_get(sym);
     }
     return mrb_nil_value();
 }
@@ -495,7 +495,7 @@ void mrb_obj_iv_ifnone(mrb_state *mrb, RObject *obj, mrb_sym sym, mrb_value v)
 void mrb_iv_set(mrb_state *mrb, mrb_value obj, mrb_sym sym, const mrb_value &v)
 {
     if (obj_iv_p(obj)) {
-        mrb_ptr(obj)->iv_set(sym, v);
+        obj.object_ptr()->iv_set(sym, v);
     }
     else {
         mrb->mrb_raise(E_ARGUMENT_ERROR, "cannot set instance variable");
@@ -516,13 +516,13 @@ mrb_bool mrb_obj_iv_defined(mrb_state *mrb, struct RObject *obj, mrb_sym sym)
 mrb_bool mrb_iv_defined(mrb_state *mrb, mrb_value obj, mrb_sym sym)
 {
     if (!obj_iv_p(obj)) return false;
-    return mrb_obj_iv_defined(mrb, mrb_ptr(obj), sym);
+    return mrb_obj_iv_defined(mrb, obj.object_ptr(), sym);
 }
 
 void mrb_iv_copy(mrb_state *mrb, mrb_value dest, mrb_value src)
 {
-    RObject *d = mrb_ptr(dest);
-    RObject *s = mrb_ptr(src);
+    RObject *d = dest.object_ptr();
+    RObject *s = src.object_ptr();
 
     if (d->iv) {
         d->iv->iv_free(mrb);
@@ -584,7 +584,7 @@ mrb_value mrb_obj_iv_inspect(mrb_state *mrb, struct RObject *obj)
 mrb_value mrb_iv_remove(mrb_value obj, mrb_sym sym)
 {
     if (obj_iv_p(obj)) {
-        iv_tbl *t = mrb_ptr(obj)->iv;
+        iv_tbl *t = obj.object_ptr()->iv;
         mrb_value val;
 
         if (t && t->iv_del(sym, &val)) {
@@ -642,8 +642,8 @@ mrb_value mrb_obj_instance_variables(mrb_state *mrb, mrb_value self)
     mrb_value ary;
 
     ary = mrb_ary_new(mrb);
-    if (obj_iv_p(self) && mrb_ptr(self)->iv) {
-        mrb_ptr(self)->iv->iv_foreach(mrb, iv_i, &ary);
+    if (obj_iv_p(self) && self.object_ptr()->iv) {
+        self.object_ptr()->iv->iv_foreach(mrb, iv_i, &ary);
     }
     return ary;
 }
@@ -1044,13 +1044,11 @@ static int csym_i(mrb_sym sym, mrb_value v, void *p)
 mrb_sym mrb_class_sym(mrb_state *mrb, RClass *c, RClass *outer)
 {
     mrb_value name = c->iv_get(mrb->intern2("__classid__", 11));
-    if (mrb_nil_p(name)) {
-
-        if (!outer)
-            return 0;
-        csym_arg arg {c,0};
-        outer->iv->iv_foreach(mrb, csym_i, &arg);
-        return arg.sym;
-    }
-    return mrb_symbol(name);
+    if (!name.is_nil())
+        return mrb_symbol(name);
+    if (!outer)
+        return 0;
+    csym_arg arg {c,0};
+    outer->iv->iv_foreach(mrb, csym_i, &arg);
+    return arg.sym;
 }

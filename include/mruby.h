@@ -313,14 +313,14 @@ mrb_sym mrb_obj_to_sym(mrb_state *mrb, mrb_value name);
 
 bool mrb_obj_eq(mrb_value , mrb_value );
 bool mrb_obj_equal(mrb_value , mrb_value );
-int mrb_equal(mrb_state *mrb, mrb_value obj1, mrb_value obj2);
+bool mrb_equal(mrb_state *mrb, mrb_value obj1, mrb_value obj2);
 mrb_value mrb_Integer(mrb_state *mrb, mrb_value val);
 mrb_value mrb_Float(mrb_state *mrb, mrb_value val);
 mrb_value mrb_inspect(mrb_state *mrb, mrb_value obj);
 bool mrb_eql(mrb_state *mrb, mrb_value obj1, mrb_value obj2);
 
 #define mrb_gc_mark_value(mrb,val) do {\
-    if (mrb_type(val) >= MRB_TT_OBJECT) (mrb)->gc().mark(mrb_basic_ptr(val));\
+    if (mrb_type(val) >= MRB_TT_OBJECT) (mrb)->gc().mark((val).basic_ptr());\
 } while (0)
 #define mrb_field_write_barrier_value(mrb, obj, val) do{\
     if ((val.tt >= MRB_TT_OBJECT)) (mrb)->gc().mrb_field_write_barrier((obj), mrb_basic_ptr(val));\
@@ -391,11 +391,11 @@ struct mrb_pool {
     tPage *pages;
 
 public:
-    tPage *page_alloc(size_t len);
-    void mrb_pool_close();
-    void *mrb_pool_alloc(size_t len);
-    mrb_bool mrb_pool_can_realloc(void *p, size_t len);
-    void *mrb_pool_realloc(void *p, size_t oldlen, size_t newlen);
+    tPage *     page_alloc(size_t len);
+    void        mrb_pool_close();
+    void *      mrb_pool_alloc(size_t len);
+    mrb_bool    mrb_pool_can_realloc(void *p, size_t len);
+    void *      mrb_pool_realloc(void *p, size_t oldlen, size_t newlen);
 };
 // protect given object from GC, used to access mruby values in the external context without fear
 void mrb_lock(mrb_state *mrb, mrb_value obj);

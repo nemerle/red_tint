@@ -20,7 +20,7 @@ RData* mrb_data_object_alloc(mrb_state *mrb, struct RClass *klass, void *ptr, co
 
 void * mrb_data_get_ptr(mrb_state *, const mrb_value &obj, const mrb_data_type *type)
 {
-    if (mrb_special_const_p(obj) || (mrb_type(obj) != MRB_TT_DATA)) {
+    if (obj.is_special_const() || (mrb_type(obj) != MRB_TT_DATA)) {
         return nullptr;
     }
     if (DATA_TYPE(obj) != type) {
@@ -30,7 +30,7 @@ void * mrb_data_get_ptr(mrb_state *, const mrb_value &obj, const mrb_data_type *
 }
 void mrb_data_check_type(mrb_state *mrb, const mrb_value &obj, const mrb_data_type *type)
 {
-    if (mrb_special_const_p(obj) || (mrb_type(obj) != MRB_TT_DATA)) {
+    if (obj.is_special_const() || (mrb_type(obj) != MRB_TT_DATA)) {
         mrb_check_type(mrb, obj, MRB_TT_DATA);
     }
     if (DATA_TYPE(obj) != type) {
@@ -41,13 +41,13 @@ void mrb_data_check_type(mrb_state *mrb, const mrb_value &obj, const mrb_data_ty
         } else {
             const RClass *c = RClass::mrb_class(mrb, obj);
             mrb->mrb_raisef(E_TYPE_ERROR, "uninitialized %S (expected %S)",
-                       mrb_obj_value((void *)c), mrb_str_new_cstr(mrb, type->struct_name));
+                       mrb_obj_value((RClass *)c), mrb_str_new_cstr(mrb, type->struct_name));
         }
     }
 }
 void * mrb_data_check_and_get_ptr(mrb_state *mrb, mrb_value obj, const mrb_data_type *type)
 {
-    if (mrb_special_const_p(obj) || (mrb_type(obj) != MRB_TT_DATA)) {
+    if (obj.is_special_const() || (mrb_type(obj) != MRB_TT_DATA)) {
       return NULL;
     }
     if (DATA_TYPE(obj) != type) {
@@ -65,7 +65,7 @@ mrb_sym mrb_obj_to_sym(mrb_state *mrb, mrb_value name)
     switch (mrb_type(name)) {
         default:
             tmp = mrb_check_string_type(mrb, name);
-            if (mrb_nil_p(tmp)) {
+            if (tmp.is_nil()) {
                 tmp = mrb_inspect(mrb, name);
                 mrb->mrb_raisef(E_TYPE_ERROR, "%S is not a symbol", tmp);
             }
@@ -107,7 +107,7 @@ mrb_int mrb_obj_id(const mrb_value &obj)
         case  MRB_TT_UNDEF:
             return MakeID(0); /* not define */
         case  MRB_TT_FALSE:
-            if (mrb_nil_p(obj))
+            if (obj.is_nil())
                 return MakeID(1);
             return MakeID(0);
         case  MRB_TT_TRUE:
@@ -132,6 +132,6 @@ mrb_int mrb_obj_id(const mrb_value &obj)
         case  MRB_TT_FILE:
         case  MRB_TT_DATA:
         default:
-            return MakeID(mrb_ptr(obj));
+            return MakeID(obj.basic_ptr());
     }
 }

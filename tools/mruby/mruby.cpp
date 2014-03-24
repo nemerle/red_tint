@@ -222,7 +222,7 @@ main(int argc, char **argv)
     }
     mrbc_context_free(mrb, c);
     if (mrb->m_exc) {
-        if (!mrb_undef_p(v)) {
+        if (!v.is_undef()) {
             mrb_print_error(mrb);
         }
         n = -1;

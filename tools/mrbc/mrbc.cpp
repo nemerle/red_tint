@@ -221,7 +221,7 @@ load_file(mrb_state *mrb, struct mrbc_args *args)
     if (need_close)
         fclose(infile);
     mrbc_context_free(mrb, c);
-    if (mrb_undef_p(result)) {
+    if (result.is_undef()) {
         return mrb_nil_value();
     }
     return result;
@@ -284,7 +284,7 @@ main(int argc, char **argv)
 
     args.idx = n;
     load = load_file(mrb, &args);
-    if (mrb_nil_p(load)){
+    if (load.is_nil()){
         cleanup(mrb, &args);
         return EXIT_FAILURE;
     }

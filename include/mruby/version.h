@@ -28,4 +28,4 @@
   "mruby - Copyright (c) "             \
   MRB_STRINGIZE(MRUBY_BIRTH_YEAR)"-"   \
   MRB_STRINGIZE(MRUBY_RELEASE_YEAR)" " \
-  MRUBY_AUTHOR                         \
+  MRUBY_AUTHOR

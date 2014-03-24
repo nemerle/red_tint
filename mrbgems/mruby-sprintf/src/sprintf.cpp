@@ -144,7 +144,7 @@ mrb_fix2binstr(mrb_state *mrb, mrb_value x, int base)
     blen += (l);\
     } while (0)
 
-#define GETARG() (!mrb_undef_p(nextvalue) ? nextvalue : \
+#define GETARG() (!nextvalue.is_undef() ? nextvalue : \
     posarg == -1 ? \
     (mrb->mrb_raisef(E_ARGUMENT_ERROR, "unnumbered(%S) mixed with numbered", mrb_fixnum_value(nextarg)), mrb_undef_value()) : \
     posarg == -2 ? \
@@ -200,12 +200,13 @@ get_hash(mrb_state *mrb, mrb_value *hash, int argc, const mrb_value *argv)
 {
     mrb_value tmp;
 
-    if (!mrb_undef_p(*hash)) return *hash;
+    if (!hash->is_undef())
+        return *hash;
     if (argc != 2) {
         mrb->mrb_raise(E_ARGUMENT_ERROR, "one hash required");
     }
     tmp = mrb_check_convert_type(mrb, argv[1], MRB_TT_HASH, "Hash", "to_hash");
-    if (mrb_nil_p(tmp)) {
+    if (tmp.is_nil()) {
         mrb->mrb_raise(E_ARGUMENT_ERROR, "one hash required");
     }
     return (*hash = tmp);
@@ -589,7 +590,7 @@ retry:
                 n = 0;
                 GETNUM(n, width);
                 if (*p == '$') {
-                    if (!mrb_undef_p(nextvalue)) {
+                    if (!nextvalue.is_undef()) {
                         mrb->mrb_raisef(E_ARGUMENT_ERROR, "value given twice - %S$", mrb_fixnum_value(n));
                     }
                     nextvalue = GETPOSARG(n);
@@ -616,7 +617,7 @@ retry:
                 symname = mrb_str_new(mrb, start + 1, p - start - 1);
                 id = mrb_intern_str(mrb, symname);
                 nextvalue = GETNAMEARG(mrb_symbol_value(id), start, (int)(p - start + 1));
-                if (mrb_undef_p(nextvalue)) {
+                if (nextvalue.is_undef()) {
                     mrb->mrb_raisef(E_KEY_ERROR, "key%S not found", mrb_str_new(mrb, start, p - start + 1));
                 }
                 if (term == '}') goto format_s;
@@ -672,7 +673,7 @@ retry:
                 unsigned int c;
 
                 tmp = mrb_check_string_type(mrb, val);
-                if (!mrb_nil_p(tmp)) {
+                if (!tmp.is_nil()) {
                     if (RSTRING_LEN(tmp) != 1 ) {
                         mrb->mrb_raise(E_ARGUMENT_ERROR, "%c requires a character");
                     }
@@ -804,7 +805,7 @@ bin_retry:
                             goto bin_retry;
                         }
                         val = mrb_flo_to_fixnum(mrb, val);
-                        if (mrb_fixnum_p(val)) goto bin_retry;
+                        if (val.is_fixnum()) goto bin_retry;
                         break;
                     case MRB_TT_STRING:
                         val = mrb_str_to_inum(mrb, val, 0, true);

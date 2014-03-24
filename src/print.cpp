@@ -11,7 +11,7 @@ static void printstr(mrb_state *mrb, const mrb_value &obj)
 {
 
     RString *str;
-    if (mrb_is_a_string(obj)) {
+    if (obj.is_string()) {
         str = mrb_str_ptr(obj);
         mrb->sys.print_f("%s",str->m_ptr);
         //fwrite(str->m_ptr, str->len, 1, stdout);
@@ -32,7 +32,7 @@ void mrb_print_error(mrb_state *mrb)
     mrb_print_backtrace(mrb);
     mrb_value s = mrb->funcall(mrb_obj_value(mrb->m_exc), "inspect", 0);
 
-    if (mrb_is_a_string(s)) {
+    if (s.is_string()) {
         RString *str = mrb_str_ptr(s);
         fwrite(str->m_ptr, str->len, 1, stderr);
         putc('\n', stderr);

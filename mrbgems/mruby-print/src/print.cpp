@@ -6,7 +6,7 @@
 static void printstr(mrb_state *mrb, mrb_value obj)
 {
 
-    if (mrb_is_a_string(obj)) {
+    if (obj.is_string()) {
         RString *str = mrb_str_ptr(obj);
         char *s = str->m_ptr;
         int len = str->len;

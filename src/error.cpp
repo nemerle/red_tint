@@ -84,7 +84,7 @@ static mrb_value exc_to_s(mrb_state *mrb, mrb_value exc)
 {
     mrb_value mesg = mrb_attr_get(exc, mrb_intern(mrb, "mesg", 4));
 
-    if (mrb_nil_p(mesg))
+    if (mesg.is_nil())
         return mrb_str_new_cstr(mrb, mrb_obj_classname(mrb, exc));
     return mesg;
 }
@@ -118,23 +118,23 @@ static mrb_value exc_inspect(mrb_state *mrb, mrb_value exc)
     mrb_value file = mrb_attr_get(exc, mrb->intern2("file", 4));
     mrb_value line = mrb_attr_get(exc, mrb->intern2("line", 4));
 
-    if (!mrb_nil_p(file) && !mrb_nil_p(line)) {
+    if (!file.is_nil() && !line.is_nil()) {
         str = file;
         mrb_str_cat_lit(mrb, str, ":");
         mrb_str_append(mrb, str, line);
         mrb_str_cat_lit(mrb, str, ": ");
-        if (!mrb_nil_p(mesg) && RSTRING_LEN(mesg) > 0) {
+        if (!mesg.is_nil() && RSTRING_LEN(mesg) > 0) {
             mrb_str_append(mrb, str, mesg);
             mrb_str_cat_lit(mrb, str, " (");
         }
         mrb_str_cat_cstr(mrb, str, mrb_obj_classname(mrb, exc));
-        if (!mrb_nil_p(mesg) && RSTRING_LEN(mesg) > 0) {
+        if (!mesg.is_nil() && RSTRING_LEN(mesg) > 0) {
             mrb_str_cat_lit(mrb, str, ")");
         }
     }
     else {
         str = mrb_str_new_cstr(mrb, mrb_obj_classname(mrb, exc));
-        if (!mrb_nil_p(mesg) && RSTRING_LEN(mesg) > 0) {
+        if (!mesg.is_nil() && RSTRING_LEN(mesg) > 0) {
             mrb_str_cat_lit(mrb, str, ": ");
             mrb_str_append(mrb, str, mesg);
         } else {
@@ -201,7 +201,7 @@ static void exc_debug_info(mrb_state *mrb, RObject *exc)
 
 void mrb_exc_raise(mrb_state *mrb, mrb_value exc)
 {
-    mrb->m_exc = mrb_ptr(exc);
+    mrb->m_exc = exc.object_ptr();
     exc_debug_info(mrb, mrb->m_exc);
     if (!mrb->jmp) {
         mrb_p(mrb, exc);
@@ -350,11 +350,11 @@ mrb_value make_exception(mrb_state *mrb, int argc, mrb_value *argv, int isstr)
         case 0:
             break;
         case 1:
-            if (mrb_nil_p(argv[0]))
+            if (argv[0].is_nil())
                 break;
             if (isstr) {
                 mesg = mrb_check_string_type(mrb, argv[0]);
-                if (!mrb_nil_p(mesg)) {
+                if (!mesg.is_nil()) {
                     mesg = mrb_exc_new_str(E_RUNTIME_ERROR, mesg);
                     break;
                 }

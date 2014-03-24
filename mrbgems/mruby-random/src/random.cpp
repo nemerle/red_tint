@@ -44,7 +44,7 @@ static double mt_g_rand_real()
 
 static mrb_value mrb_random_mt_g_srand(mrb_state *mrb, mrb_value seed)
 {
-    if (mrb_nil_p(seed)) {
+    if (seed.is_nil()) {
         seed = mrb_fixnum_value(time(NULL) + mt_g_rand());
         if (mrb_fixnum(seed) < 0) {
             seed = mrb_fixnum_value( 0 - mrb_fixnum(seed));
@@ -86,7 +86,7 @@ static double mt_rand_real(mt_state *t)
 
 static mrb_value mrb_random_mt_srand(mrb_state *mrb, mt_state *t, mrb_value seed)
 {
-    if (mrb_nil_p(seed)) {
+    if (seed.is_nil()) {
         seed = mrb_fixnum_value(time(NULL) + mt_rand(t));
         if (mrb_fixnum(seed) < 0) {
             seed = mrb_fixnum_value( 0 - mrb_fixnum(seed));
@@ -116,8 +116,8 @@ static mrb_value get_opt(mrb_state* mrb)
     mrb_value arg = mrb_fixnum_value(0);
     mrb_get_args(mrb, "|o", &arg);
 
-    if (!mrb_nil_p(arg)) {
-        if (!mrb_fixnum_p(arg)) {
+    if (!arg.is_nil()) {
+        if (!arg.is_fixnum()) {
             mrb->mrb_raise(E_ARGUMENT_ERROR, "invalid argument type");
         }
         arg = mrb_check_convert_type(mrb, arg, MRB_TT_FIXNUM, "Fixnum", "to_int");
@@ -135,7 +135,7 @@ static mrb_value mrb_random_g_rand(mrb_state *mrb, mrb_value self)
 
     max = get_opt(mrb);
     seed = mrb_gv_get(mrb, mrb->intern2(GLOBAL_RAND_SEED_KEY,GLOBAL_RAND_SEED_KEY_CSTR_LEN));
-    if (mrb_nil_p(seed)) {
+    if (seed.is_nil()) {
         mrb_random_mt_g_srand(mrb, mrb_nil_value());
     }
     return mrb_random_mt_g_rand(mrb, max);
@@ -183,7 +183,7 @@ mrb_random_rand_seed(mrb_state *mrb, mrb_value self)
     mt_state *t = (mt_state *)DATA_PTR(self);
 
     seed = mrb_iv_get(self, mrb->intern2(INSTANCE_RAND_SEED_KEY, INSTANCE_RAND_SEED_KEY_CSTR_LEN));
-    if (mrb_nil_p(seed)) {
+    if (seed.is_nil()) {
         mrb_random_mt_srand(mrb, t, mrb_nil_value());
     }
 }
@@ -215,7 +215,7 @@ mrb_random_g_rand_seed(mrb_state *mrb)
     mrb_value seed;
 
     seed = mrb_gv_get(mrb, mrb->intern2(GLOBAL_RAND_SEED_KEY, GLOBAL_RAND_SEED_KEY_CSTR_LEN));
-    if (mrb_nil_p(seed)) {
+    if (seed.is_nil()) {
         mrb_random_mt_g_srand(mrb, mrb_nil_value());
     }
 }
@@ -235,7 +235,7 @@ mrb_ary_shuffle_bang(mrb_state *mrb, mrb_value ary)
     mrb_value random = mrb_nil_value();
     if (arr_p->m_len > 1) {
         mrb_get_args(mrb, "|o", &random);
-        if( mrb_nil_p(random) ) {
+        if( random.is_nil() ) {
             mrb_random_g_rand_seed(mrb);
         } else {
             mrb_data_check_type(mrb, random, &mt_state_type);
@@ -244,7 +244,7 @@ mrb_ary_shuffle_bang(mrb_state *mrb, mrb_value ary)
         arr_p->mrb_ary_modify();
         for (i = arr_p->m_len - 1; i > 0; i--)  {
             mrb_int j;
-            if( mrb_nil_p(random) ) {
+            if( random.is_nil() ) {
                 j = mrb_fixnum(mrb_random_mt_g_rand(mrb, mrb_fixnum_value(arr_p->m_len)));
             } else {
                 j = mrb_fixnum(mrb_random_mt_rand(mrb, (mt_state *)DATA_PTR(random), mrb_fixnum_value(arr_p->m_len)));

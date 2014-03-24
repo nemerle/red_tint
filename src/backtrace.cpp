@@ -145,7 +145,7 @@ mrb_value
 mrb_exc_backtrace(mrb_state *mrb, mrb_value self)
 {
     mrb_value ary = mrb_ary_new(mrb);
-    exc_output_backtrace(mrb, mrb_ptr(self), get_backtrace_i, (void*)mrb_ary_ptr(ary));
+    exc_output_backtrace(mrb, self.object_ptr(), get_backtrace_i, (void*)mrb_ary_ptr(ary));
     return ary;
 }
 

@@ -59,7 +59,7 @@ static mrb_value num_pow(mrb_state *mrb, mrb_value x)
     mrb_float d;
     mrb_value y = mrb->get_arg<mrb_value>();
 
-    if (mrb_fixnum_p(x) && mrb_fixnum_p(y))
+    if (x.is_fixnum() && y.is_fixnum())
         both_int = true;
     d = pow(mrb_to_flo(mrb, x), mrb_to_flo(mrb, y));
     if (both_int && FIXABLE(d))
@@ -654,7 +654,7 @@ mrb_fixnum_mul(mrb_state *mrb, mrb_value x, mrb_value y)
     mrb_int a;
 
     a = mrb_fixnum(x);
-    if (mrb_fixnum_p(y)) {
+    if (y.is_fixnum()) {
         mrb_int b, c;
 
         if (a == 0)
@@ -732,7 +732,7 @@ fix_mod(mrb_state *mrb, mrb_value x)
 
     mrb_value y = mrb->get_arg<mrb_value>();
     a = mrb_fixnum(x);
-    if (mrb_fixnum_p(y) && (b=mrb_fixnum(y)) != 0) {
+    if (y.is_fixnum() && (b=mrb_fixnum(y)) != 0) {
         mrb_int mod;
 
         if (mrb_fixnum(y) == 0) {
@@ -759,7 +759,7 @@ static mrb_value fix_divmod(mrb_state *mrb, mrb_value x)
 {
     mrb_value y = mrb->get_arg<mrb_value>();
 
-    if (mrb_fixnum_p(y)) {
+    if (y.is_fixnum()) {
         mrb_int div, mod;
 
         if (mrb_fixnum(y) == 0) {
@@ -838,8 +838,8 @@ static mrb_value fix_rev(mrb_state *mrb, mrb_value num)
 
 static mrb_value bit_coerce(mrb_state *mrb, mrb_value x)
 {
-    while (!mrb_fixnum_p(x)) {
-        if (mrb_float_p(x)) {
+    while (!x.is_fixnum()) {
+        if (x.is_float()) {
             mrb->mrb_raise(E_TYPE_ERROR, "can't convert Float into Integer");
         }
         x = mrb_to_int(mrb, x);
@@ -1047,7 +1047,7 @@ mrb_value mrb_flo_to_fixnum(mrb_state *mrb, mrb_value x)
 {
     mrb_int z;
 
-    if (mrb_float_p(x)) {
+    if (x.is_float()) {
         mrb->mrb_raise(E_TYPE_ERROR, "non float value");
         z = 0; /* not reached. just suppress warnings. */
     }
@@ -1070,7 +1070,7 @@ mrb_value mrb_fixnum_plus(mrb_state *mrb, mrb_value x, mrb_value y)
     mrb_int a;
 
     a = mrb_fixnum(x);
-    if (mrb_fixnum_p(y)) {
+    if (y.is_fixnum()) {
         if (a == 0)
             return y;
         mrb_int b, c;
@@ -1106,7 +1106,7 @@ mrb_value mrb_fixnum_minus(mrb_state *mrb, mrb_value x, mrb_value y)
     mrb_int a;
 
     a = mrb_fixnum(x);
-    if (mrb_fixnum_p(y)) {
+    if (y.is_fixnum()) {
         mrb_int b, c;
 
         b = mrb_fixnum(y);

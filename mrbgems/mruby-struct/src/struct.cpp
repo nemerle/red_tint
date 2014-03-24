@@ -30,7 +30,7 @@ static inline mrb_value struct_ivar_get(mrb_state *mrb, mrb_value c, mrb_sym id)
 
     for (;;) {
         ans = mrb_iv_get(c, id);
-        if (!mrb_nil_p(ans)) return ans;
+        if (!ans.is_nil()) return ans;
         kclass = RCLASS_SUPER(c);
         if (kclass == 0 || kclass == sclass)
             return mrb_nil_value();
@@ -47,10 +47,10 @@ mrb_value mrb_struct_s_members(mrb_state *mrb, mrb_value klass)
 {
     mrb_value members = struct_ivar_get(mrb, klass, mrb_intern(mrb, "__members__", 11));
 
-    if (mrb_nil_p(members)) {
+    if (members.is_nil()) {
         mrb->mrb_raise(E_TYPE_ERROR, "uninitialized struct");
     }
-    if (!mrb_is_a_array(members)) {
+    if (!members.is_array()) {
         mrb->mrb_raise(E_TYPE_ERROR, "corrupted struct");
     }
     return members;
@@ -235,7 +235,7 @@ make_struct(mrb_state *mrb, mrb_value name, mrb_value members, struct RClass * k
     mrb_int i, len;
     RClass *c;
 
-    if (mrb_nil_p(name)) {
+    if (name.is_nil()) {
         c = RClass::create(mrb, klass);
     }
     else {
@@ -354,8 +354,8 @@ mrb_struct_s_def(mrb_state *mrb, mrb_value klass)
     else {
         if (argc > 0) name = argv[0];
         if (argc > 1) rest = argv[1];
-        if (mrb_is_a_array(rest)) {
-            if (!mrb_nil_p(name) && mrb_symbol_p(name)) {
+        if (rest.is_array()) {
+            if (!name.is_nil() && name.is_symbol()) {
                 /* 1stArgument:symbol -> name=nil rest=argv[0]-[n] */
                 RARRAY(rest)->unshift(name);
                 name = mrb_nil_value();
@@ -364,7 +364,7 @@ mrb_struct_s_def(mrb_state *mrb, mrb_value klass)
         else {
             pargv = &argv[1];
             argcnt = argc-1;
-            if (!mrb_nil_p(name) && mrb_symbol_p(name)) {
+            if (!name.is_nil() && name.is_symbol()) {
                 /* 1stArgument:symbol -> name=nil rest=argv[0]-[n] */
                 name = mrb_nil_value();
                 pargv = &argv[0];
@@ -378,7 +378,7 @@ mrb_struct_s_def(mrb_state *mrb, mrb_value klass)
         }
     }
     st = make_struct(mrb, name, rest, struct_class(mrb));
-    if (!mrb_nil_p(b)) {
+    if (!b.is_nil()) {
         mrb->funcall(b, "call", 1, &st);
     }
 
@@ -390,7 +390,7 @@ static int num_members(mrb_state *mrb, RClass *klass)
     mrb_value members;
 
     members = struct_ivar_get(mrb, mrb_obj_value(klass), mrb_intern(mrb, "__members__", 11));
-    if (!mrb_is_a_array(members)) {
+    if (!members.is_array()) {
         mrb->mrb_raise(E_TYPE_ERROR, "broken members");
     }
     return RARRAY_LEN(members);
@@ -512,7 +512,7 @@ mrb_value mrb_struct_init_copy(mrb_state *mrb, mrb_value copy)
     if (!mrb_obj_is_instance_of(mrb, s, mrb_obj_class(mrb, copy))) {
         mrb->mrb_raise(E_TYPE_ERROR, "wrong argument class");
     }
-    if (!mrb_is_a_array(s)) {
+    if (!s.is_array()) {
         mrb->mrb_raise(E_TYPE_ERROR, "corrupted struct");
     }
     if (RSTRUCT_LEN(copy) != RSTRUCT_LEN(s)) {
@@ -568,15 +568,15 @@ mrb_struct_aref_n(mrb_state *mrb, mrb_value s, mrb_value idx)
 {
     mrb_int i;
 
-    if (mrb_is_a_string(idx)) {
+    if (idx.is_string()) {
         mrb_value sym = mrb_check_intern_str(mrb, idx);
 
-        if (mrb_nil_p(sym)) {
+        if (sym.is_nil()) {
             mrb->mrb_raisef(E_INDEX_ERROR, "no member '%S' in struct", idx);
         }
         idx = sym;
     }
-    if (mrb_symbol_p(idx)) {
+    if (idx.is_symbol()) {
         return mrb_struct_aref_id(mrb, s, mrb_symbol(idx));
     }
 
@@ -658,7 +658,7 @@ mrb_struct_aset(mrb_state *mrb, mrb_value s)
 
     mrb_get_args(mrb, "oo", &idx, &val);
 
-    if (mrb_is_a_string(idx) || mrb_symbol_p(idx)) {
+    if (idx.is_string() || idx.is_symbol()) {
         return mrb_struct_aset_id(mrb, s, mrb_obj_to_sym(mrb, idx), val);
     }
 

@@ -263,7 +263,7 @@ mrb_value RArray::cmp() const
     mrb_value r;
 
     ary2 = m_vm->get_arg<mrb_value>();
-    if (!mrb_is_a_array(ary2))
+    if (!ary2.is_array())
         return mrb_nil_value();
     RArray *a2 = RARRAY(ary2);
     if (m_len == a2->m_len && m_ptr == a2->m_ptr)
@@ -538,7 +538,7 @@ void RArray::splice(mrb_int head, mrb_int len, const mrb_value &rpl)
     mrb_int tail = head + len;
 
     /* size check */
-    if (mrb_is_a_array(rpl)) {
+    if (rpl.is_array()) {
         argc = RARRAY_LEN(rpl);
         argv = RARRAY_PTR(rpl);
     }
@@ -588,7 +588,7 @@ mrb_value RArray::ary_subseq(mrb_int beg, mrb_int len)
 }
 mrb_int RArray::aget_index(mrb_value index)
 {
-    if (mrb_fixnum_p(index)) {
+    if (index.is_fixnum()) {
         return mrb_fixnum(index);
     }
     else {
@@ -835,7 +835,7 @@ mrb_value RArray::rindex_m()
 
 mrb_value RArray::splat(mrb_state *mrb, const mrb_value &v)
 {
-    if (mrb_is_a_array(v)) {
+    if (v.is_array()) {
         return v;
     }
     if (mrb_respond_to(mrb, v, mrb_intern_lit(mrb, "to_a"))) {
@@ -911,7 +911,7 @@ mrb_value RArray::inspect_ary(RArray *list_arr)
             strr->str_cat(sep, sizeof(sep));
             //mrb_str_buf_cat(m_vm, arystr, sep, sizeof(sep));
         }
-        if (mrb_is_a_array(m_ptr[i])) {
+        if (m_ptr[i].is_array()) {
             s = RARRAY(m_ptr[i])->inspect_ary(list_arr);
         } else {
             s = mrb_inspect(m_vm, m_ptr[i]);
@@ -956,7 +956,7 @@ mrb_value RArray::join_ary(const mrb_value &sep, RArray *list_arr)
     RString *str  = RString::create(m_vm,64);
 
     for(mrb_int i=0; i<m_len; i++) {
-        if (i > 0 && !mrb_nil_p(sep)) {
+        if (i > 0 && !sep.is_nil()) {
             str->str_buf_cat(RSTRING_PTR(sep), RSTRING_LEN(sep));
         }
 
@@ -972,13 +972,13 @@ mrb_value RArray::join_ary(const mrb_value &sep, RArray *list_arr)
 
             default:
                 tmp = mrb_check_string_type(m_vm, val);
-                if (!mrb_nil_p(tmp)) {
+                if (!tmp.is_nil()) {
                     val = tmp;
                     str->str_buf_cat(RSTRING_PTR(tmp), RSTRING_LEN(tmp));
                     break;
                 }
                 tmp = mrb_check_convert_type(m_vm, val, MRB_TT_ARRAY, "Array", "to_ary");
-                if (!mrb_nil_p(tmp)) {
+                if (!tmp.is_nil()) {
                     val = RARRAY(tmp)->join_ary(sep, list_arr);
                     str->str_buf_cat(RSTRING_PTR(val), RSTRING_LEN(val));
                     break;
@@ -1038,13 +1038,13 @@ mrb_value RArray::mrb_ary_equal()
 {
     mrb_value ary2(m_vm->get_arg<mrb_value>());
 
-    if ( this == mrb_basic_ptr(ary2)) {
+    if ( this == ary2.basic_ptr()) {
         return mrb_true_value();
     }
-    if (mrb_special_const_p(ary2)) {
+    if (ary2.is_special_const()) {
         return mrb_false_value();
     }
-    if (!mrb_is_a_array(ary2)) {
+    if (!ary2.is_array()) {
         if (mrb_respond_to(m_vm, ary2, mrb_intern(m_vm, "to_ary", 6))) {
             return mrb_bool_value(mrb_equal(m_vm, ary2, mrb_obj_value(this)));
         }
@@ -1074,10 +1074,10 @@ mrb_value RArray::mrb_ary_eql()
 {
     mrb_value ary2(m_vm->get_arg<mrb_value>());
 
-    if ( this == mrb_basic_ptr(ary2)) {  //was mrb_obj_equal(m_vm, ary1, ary2)
+    if ( this == ary2.basic_ptr()) {  //was mrb_obj_equal(m_vm, ary1, ary2)
         return mrb_true_value();
     }
-    if (!mrb_is_a_array(ary2)) {
+    if (!ary2.is_array()) {
         return mrb_false_value();
     }
     RArray *ary_2p = RARRAY(ary2);

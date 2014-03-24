@@ -91,11 +91,11 @@ static void check_iv_name(mrb_state *mrb, mrb_sym iv_name_id)
 static mrb_sym get_valid_iv_sym(mrb_state *mrb, mrb_value iv_name)
 {
     mrb_sym iv_name_id;
-    mrb_assert(mrb_symbol_p(iv_name) || mrb_is_a_string(iv_name));
-    if (mrb_is_a_string(iv_name)) {
+    mrb_assert(iv_name.is_symbol() || mrb_is_a_string(iv_name));
+    if (iv_name.is_string()) {
         iv_name_id = mrb_intern(mrb, RSTRING_PTR(iv_name),RSTRING_LEN(iv_name));
         valid_iv_name(mrb, iv_name_id, RSTRING_PTR(iv_name), RSTRING_LEN(iv_name));
-    } else { //if(mrb_symbol_p(val))
+    } else { //if(val.is_symbol())
         iv_name_id = mrb_symbol(iv_name);
         check_iv_name(mrb, iv_name_id);
     }
@@ -129,7 +129,7 @@ mrb_bool mrb_obj_basic_to_s_p(mrb_state *mrb, mrb_value obj)
 mrb_value mrb_obj_inspect(mrb_state *mrb, mrb_value obj)
 {
     if ((mrb_type(obj) == MRB_TT_OBJECT) && mrb_obj_basic_to_s_p(mrb, obj)) {
-        return mrb_obj_iv_inspect(mrb, mrb_ptr(obj));
+        return mrb_obj_iv_inspect(mrb, obj.object_ptr());
     }
     return mrb_any_to_s(mrb, obj);
 }
@@ -258,13 +258,13 @@ mrb_f_block_given_p_m(mrb_state *mrb, mrb_value self)
     if (ci > mrb->m_ctx->cibase) {
         /* block_given? called within block; check upper scope */
         if (ci->proc->env && ci->proc->env->stack) {
-            given_p = !(ci->proc->env->stack == mrb->m_ctx->m_stbase || mrb_nil_p(ci->proc->env->stack[1]));
+            given_p = !(ci->proc->env->stack == mrb->m_ctx->m_stbase || (ci->proc->env->stack[1]).is_nil());
         }
         else {
             if (ci->argc > 0) {
                 bp += ci->argc;
             }
-            given_p = !mrb_nil_p(*bp);
+            given_p = !bp->is_nil();
         }
     }
 
@@ -291,7 +291,7 @@ mrb_obj_class_m(mrb_state *mrb, mrb_value self)
 
 RClass* mrb_singleton_class_clone(mrb_state *mrb, mrb_value obj)
 {
-    RClass *klass = mrb_basic_ptr(obj)->c;
+    RClass *klass = obj.basic_ptr()->c;
 
     if (klass->tt != MRB_TT_SCLASS)
         return klass;
@@ -378,7 +378,7 @@ mrb_value
 mrb_obj_clone(mrb_state *mrb, mrb_value self)
 {
 
-    if (mrb_special_const_p(self)) {
+    if (self.is_special_const()) {
         mrb->mrb_raisef(E_TYPE_ERROR, "can't clone %S", self);
     }
     RObject *p      = mrb->gc().obj_alloc<RObject>(mrb_type(self), mrb_obj_class(mrb, self));
@@ -411,7 +411,7 @@ mrb_obj_clone(mrb_state *mrb, mrb_value self)
 mrb_value mrb_obj_dup(mrb_state *mrb, mrb_value obj)
 {
 
-    if (mrb_special_const_p(obj)) {
+    if (obj.is_special_const()) {
         mrb->mrb_raisef(E_TYPE_ERROR, "can't dup %S", obj);
     }
     RBasic *p = mrb->gc().obj_alloc<RBasic>(mrb_type(obj), mrb_obj_class(mrb, obj));
@@ -591,7 +591,7 @@ static mrb_value obj_is_instance_of(mrb_state *mrb, mrb_value self)
 mrb_value mrb_obj_ivar_defined(mrb_state *mrb, mrb_value self)
 {
     mrb_sym mid=get_valid_iv_sym(mrb,mrb->get_arg<mrb_value>());
-    mrb_bool defined_p = mrb_obj_iv_defined(mrb, mrb_ptr(self), mid);
+    mrb_bool defined_p = mrb_obj_iv_defined(mrb, self.object_ptr(), mid);
 
     return mrb_bool_value(defined_p);
 }
@@ -843,14 +843,14 @@ mrb_value mrb_f_raise(mrb_state *mrb, mrb_value self)
             break;
         case 1:
             a[1] = mrb_check_string_type(mrb, a[0]);
-            if (!mrb_nil_p(a[1])) {
+            if (!a[1].is_nil()) {
                 argc = 2;
                 a[0] = mrb_obj_value(E_RUNTIME_ERROR);
             }
             /* fall through */
         default:
             exc = mrb_make_exception(mrb, argc, a);
-            mrb_ptr(exc)->iv_set(mrb_intern(mrb, "lastpc", 6), mrb_cptr_value(mrb,mrb->m_ctx->m_ci->pc));
+            exc.object_ptr()->iv_set(mrb_intern(mrb, "lastpc", 6), mrb_cptr_value(mrb->m_ctx->m_ci->pc));
             mrb_exc_raise(mrb, exc);
             break;
     }
@@ -887,7 +887,7 @@ mrb_obj_remove_instance_variable(mrb_state *mrb, mrb_value self)
     mrb_sym sym=mrb->get_arg<mrb_sym>();
     check_iv_name(mrb, sym);
     val = mrb_iv_remove(self, sym);
-    if (mrb_undef_p(val)) {
+    if (val.is_undef()) {
         mrb_name_error(mrb, sym, "instance variable %S not defined", mrb_sym2str(mrb, sym));
     }
     return val;
@@ -929,19 +929,19 @@ mrb_value obj_respond_to(mrb_state *mrb, mrb_value self)
     else
         priv = mrb_nil_value();
 
-    if (mrb_symbol_p(mid)) {
+    if (mid.is_symbol()) {
         id = mrb_symbol(mid);
     } else {
         mrb_value tmp;
-        if (!mrb_is_a_string(mid)) {
+        if (!mid.is_string()) {
             tmp = mrb_check_string_type(mrb, mid);
-            if (mrb_nil_p(tmp)) {
+            if (tmp.is_nil()) {
                 tmp = mrb_inspect(mrb, mid);
                 mrb->mrb_raisef(E_TYPE_ERROR, "%S is not a symbol", tmp);
             }
         }
         tmp = mrb_check_intern_str(mrb, mid);
-        if (mrb_nil_p(tmp)) {
+        if (tmp.is_nil()) {
             respond_to_p = false;
         } else {
             id = mrb_intern_str(mrb, mid);
@@ -949,12 +949,12 @@ mrb_value obj_respond_to(mrb_state *mrb, mrb_value self)
     }
 
     if (respond_to_p) {
-        respond_to_p = basic_obj_respond_to(mrb, self, id, !mrb_test(priv));
+        respond_to_p = basic_obj_respond_to(mrb, self, id, !priv.to_bool());
     }
 
     if (!respond_to_p) {
         mrb_sym rtm_id = mrb_intern(mrb, "respond_to_missing?", 19);
-        if (basic_obj_respond_to(mrb, self, rtm_id, !mrb_test(priv))) {
+        if (basic_obj_respond_to(mrb, self, rtm_id, !priv.to_bool())) {
             return mrb_funcall_argv(mrb, self, rtm_id, argc, argv);
         }
     }
@@ -1012,7 +1012,7 @@ mrb_obj_ceqq(mrb_state *mrb, mrb_value self)
     len = RARRAY_LEN(ary);
     for (i=0; i<len; i++) {
         mrb_value c = mrb_funcall_argv(mrb, RARRAY(ary)->entry(i), eqq, 1, &v);
-        if (mrb_test(c)) return mrb_true_value();
+        if (c.to_bool()) return mrb_true_value();
     }
     return mrb_false_value();
 }

@@ -62,7 +62,7 @@ mrb_ary_assoc(mrb_state *mrb, mrb_value ary)
 
   for (i = 0; i < RARRAY_LEN(ary); ++i) {
     v = mrb_check_array_type(mrb, RARRAY_PTR(ary)[i]);
-    if (!mrb_nil_p(v) && RARRAY_LEN(v) > 0 &&
+    if (!v.is_nil() && RARRAY_LEN(v) > 0 &&
         mrb_equal(mrb, RARRAY_PTR(v)[0], k))
       return v;
   }

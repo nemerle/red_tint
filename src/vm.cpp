@@ -445,7 +445,7 @@ mrb_value mrb_yield_internal(mrb_state *mrb, mrb_value b, int argc, mrb_value *a
     mrb_sym mid = mrb->m_ctx->m_ci->mid;
     int n = mrb->m_ctx->m_ci->nregs;
     mrb_value val;
-    if (mrb_nil_p(b)) {
+    if (b.is_nil()) {
         mrb->mrb_raise(E_ARGUMENT_ERROR, "no block given");
     }
     RProc *p = mrb_proc_ptr(b);
@@ -512,7 +512,7 @@ static void localjump_error(mrb_state *mrb, localjump_error_kind kind)
     mrb_str_buf_cat(msg, lead, sizeof(lead) - 1);
     mrb_str_buf_cat(msg, kind_str[kind], kind_str_len[kind]);
     mrb_value exc = mrb_exc_new_str(E_LOCALJUMP_ERROR, msg);
-    mrb->m_exc = mrb_ptr(exc);
+    mrb->m_exc = exc.object_ptr();
 }
 
 static void argnum_error(mrb_state *mrb, int num)
@@ -530,7 +530,7 @@ static void argnum_error(mrb_state *mrb, int num)
                          mrb_fixnum_value(mrb->m_ctx->m_ci->argc), mrb_fixnum_value(num));
     }
     exc = mrb_exc_new_str(E_ARGUMENT_ERROR, str);
-    mrb->m_exc = mrb_ptr(exc);
+    mrb->m_exc = exc.object_ptr();
 }
 #define ERR_PC_SET(mrb, pc) mrb->m_ctx->m_ci->err = pc;
 #define ERR_PC_CLR(mrb)     mrb->m_ctx->m_ci->err = 0;
@@ -797,7 +797,7 @@ RETRY_TRY_BLOCK:
 
             CASE(OP_JMPIF) {
                 /* A sBx  if R(A) pc+=sBx */
-                if (mrb_test(regs[GETARG_A(i)])) {
+                if (regs[GETARG_A(i)].to_bool()) {
                     pc += GETARG_sBx(i);
                     JUMP;
                 }
@@ -806,7 +806,7 @@ RETRY_TRY_BLOCK:
 
             CASE(OP_JMPNOT) {
                 /* A sBx  if R(A) pc+=sBx */
-                if (!mrb_test(regs[GETARG_A(i)])) {
+                if (!regs[GETARG_A(i)].to_bool()) {
                     pc += GETARG_sBx(i);
                     JUMP;
                 }
@@ -842,7 +842,7 @@ RETRY_TRY_BLOCK:
 
             CASE(OP_RAISE) {
                 /* A      raise(R(A)) */
-                m_exc = mrb_ptr(regs[GETARG_A(i)]);
+                m_exc = regs[GETARG_A(i)].object_ptr();
                 goto L_RAISE;
             }
 
@@ -1097,7 +1097,7 @@ L_SEND:
                         mrb_value exc;
                         static const char m[] = "super called outside of method";
                         exc = mrb_exc_new(I_NOMETHOD_ERROR, m, sizeof(m) - 1);
-                        m_exc = mrb_ptr(exc);
+                        m_exc = exc.object_ptr();
                         goto L_RAISE;
                     }
                     stack = e->stack + 1;
@@ -1109,7 +1109,7 @@ L_SEND:
                     mrb_value *pp = nullptr;
                     int len = 0;
 
-                    if (mrb_is_a_array(stack[m1])) {
+                    if (stack[m1].is_array()) {
                         RArray *ary = mrb_ary_ptr(stack[m1]);
 
                         pp = ary->m_ptr;
@@ -1164,7 +1164,7 @@ L_SEND:
                         }
                     }
                 }
-                else if (len > 1 && argc == 1 && mrb_is_a_array(argv[0])) {
+                else if (len > 1 && argc == 1 && argv[0].is_array()) {
                     argc = mrb_ary_ptr(argv[0])->m_len;
                     argv = mrb_ary_ptr(argv[0])->m_ptr;
                 }
@@ -1231,7 +1231,7 @@ L_RETURN:
 
 L_RAISE:
                     _ci = m_ctx->m_ci;
-                    mrb_obj_iv_ifnone(this, m_exc, mrb_intern(this, "lastpc", 6), mrb_cptr_value(this,pc));
+                    mrb_obj_iv_ifnone(this, m_exc, mrb_intern(this, "lastpc", 6), mrb_cptr_value(pc));
                     mrb_obj_iv_ifnone(this, m_exc, mrb_intern(this, "ciidx", 5), mrb_fixnum_value(_ci - m_ctx->cibase));
                     eidx = _ci->eidx;
                     if (_ci == m_ctx->cibase) {
@@ -1311,7 +1311,7 @@ L_RESCUE:
                                 if (m_ctx->prev->m_ci == m_ctx->prev->cibase) {
                                     mrb_value exc = mrb_exc_new_str(A_RUNTIME_ERROR(this),
                                                                     mrb_str_new_lit(this, "double resume"));
-                                    m_exc = mrb_ptr(exc);
+                                    m_exc = exc.object_ptr();
                                     goto L_RAISE;
                                 }
                                 /* automatic yield at the end */
@@ -1835,7 +1835,7 @@ L_RESCUE:
                 int c = GETARG_C(i);
                 mrb_value v = regs[GETARG_B(i)];
 
-                if (!mrb_is_a_array(v)) {
+                if (!v.is_array()) {
                     if (c == 0) {
                         regs[GETARG_A(i)] = v;
                     }
@@ -1862,7 +1862,7 @@ L_RESCUE:
                 int pre  = GETARG_B(i);
                 int post = GETARG_C(i);
 
-                if (!mrb_is_a_array(v)) {
+                if (!v.is_array()) {
                     regs[a++] = RArray::new_capa(this, 0);
                     while (post--) {
                         regs[a] = mrb_nil_value();
@@ -1955,7 +1955,7 @@ L_RESCUE:
 
                 mrb_value base  = regs[a];
                 mrb_value super = regs[a+1];
-                if (mrb_nil_p(base)) {
+                if (base.is_nil()) {
                     base = mrb_obj_value(m_ctx->m_ci->target_class);
                 }
                 RClass *c = mrb_vm_define_class(this, base, super, id);
@@ -1969,7 +1969,7 @@ L_RESCUE:
                 int a = GETARG_A(i);
                 mrb_sym id = syms[GETARG_B(i)];
                 mrb_value base = regs[a];
-                if (mrb_nil_p(base)) {
+                if (base.is_nil()) {
                     base = mrb_obj_value(m_ctx->m_ci->target_class);
                 }
                 RClass *c = mrb_vm_define_module(this, base, id);
@@ -2042,7 +2042,7 @@ L_RESCUE:
                 if (!m_ctx->m_ci->target_class) {
                     static const char msg[] = "no target class or module";
                     mrb_value exc = mrb_exc_new(I_TYPE_ERROR, msg, sizeof(msg) - 1);
-                    m_exc = mrb_ptr(exc);
+                    m_exc = exc.object_ptr();
                     goto L_RAISE;
                 }
                 regs[GETARG_A(i)] = mrb_obj_value(m_ctx->m_ci->target_class);
@@ -2097,7 +2097,7 @@ L_STOP:
                 if (GETARG_A(i) != 0) {
                     excep_class = I_LOCALJUMP_ERROR;
                 }
-                m_exc = mrb_ptr(mrb_exc_new_str(excep_class, msg));
+                m_exc = mrb_exc_new_str(excep_class, msg).object_ptr();
                 goto L_RAISE;
             }
         }

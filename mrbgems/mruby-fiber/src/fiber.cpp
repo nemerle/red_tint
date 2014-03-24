@@ -70,7 +70,7 @@ static mrb_value fiber_init(mrb_state *mrb, mrb_value self)
 
     mrb_get_args(mrb, "&", &blk);
 
-    if (mrb_nil_p(blk)) {
+    if (blk.is_nil()) {
         mrb_raise(E_ARGUMENT_ERROR, "tried to create Fiber object without a block");
     }
     p = mrb_proc_ptr(blk);

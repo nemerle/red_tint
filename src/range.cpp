@@ -26,7 +26,7 @@ range_check(mrb_state *mrb, mrb_value a, mrb_value b)
     }
 
     ans =  mrb->funcall(a, "<=>", 1, b);
-    if (mrb_nil_p(ans)) {
+    if (ans.is_nil()) {
         /* can not be compared */
         mrb->mrb_raise(E_ARGUMENT_ERROR, "bad value for range");
     }

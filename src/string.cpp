@@ -259,7 +259,7 @@ void mrb_gc_free_str(mrb_state *mrb, struct RString *str)
 
 char * mrb_str_to_cstr(mrb_state *mrb, mrb_value str0)
 {
-    if (!mrb_is_a_string(str0)) {
+    if (!str0.is_string()) {
         mrb->mrb_raise(E_TYPE_ERROR, "expected String");
     }
 
@@ -323,7 +323,7 @@ void mrb_str_concat(mrb_state *mrb, mrb_value self, mrb_value other)
     int len;
 
     s1->str_modify();
-    if (!mrb_is_a_string(other)) {
+    if (!other.is_string()) {
         other = mrb_str_to_str(mrb, other);
     }
     s2 = mrb_str_ptr(other);
@@ -506,7 +506,7 @@ mrb_str_cmp_m(mrb_state *mrb, mrb_value str1)
     mrb_int result;
 
     mrb_get_args(mrb, "o", &str2);
-    if (!mrb_is_a_string(str2)) {
+    if (!str2.is_string()) {
         if (!mrb_respond_to(mrb, str2, mrb_intern_lit(mrb, "to_s"))) {
             return mrb_nil_value();
         }
@@ -516,7 +516,8 @@ mrb_str_cmp_m(mrb_state *mrb, mrb_value str1)
         else {
             mrb_value tmp = mrb->funcall(str2, "<=>", 1, str1);
 
-            if (mrb_nil_p(tmp)) return mrb_nil_value();
+            if (tmp.is_nil())
+                return mrb_nil_value();
             if (!mrb_fixnum(tmp)) {
                 return mrb->funcall(mrb_fixnum_value(0), "-", 1, tmp);
             }
@@ -544,8 +545,8 @@ int mrb_str_equal(mrb_state *mrb, mrb_value str1, mrb_value str2)
 {
     if (mrb_obj_equal(str1, str2))
         return true;
-    if (!mrb_is_a_string(str2)) {
-        if (mrb_nil_p(str2))
+    if (!str2.is_string()) {
+        if (str2.is_nil())
             return false;
         if (!mrb_respond_to(mrb, str2, mrb_intern_lit(mrb, "to_str"))) {
             return false;
@@ -579,9 +580,9 @@ mrb_value mrb_str_to_str(mrb_state *mrb, mrb_value str)
 {
     mrb_value s;
 
-    if (!mrb_is_a_string(str)) {
+    if (!str.is_string()) {
         s = mrb_check_convert_type(mrb, str, MRB_TT_STRING, "String", "to_str");
-        if (mrb_nil_p(s)) {
+        if (s.is_nil()) {
             s = mrb_convert_type(mrb, str, MRB_TT_STRING, "String", "to_s");
         }
         return s;
@@ -710,7 +711,7 @@ mrb_str_aref(mrb_state *mrb, mrb_value str, mrb_value indx)
 
 num_index:
             str = mrb_str_substr(mrb, str, idx, 1);
-            if (!mrb_nil_p(str) && RSTRING_LEN(str) == 0) return mrb_nil_value();
+            if (!str.is_nil() && RSTRING_LEN(str) == 0) return mrb_nil_value();
             return str;
 
         case MRB_TT_STRING:
@@ -902,7 +903,7 @@ smart_chomp:
         return str;
     }
 
-    if (len == 0 || mrb_nil_p(rs)) return mrb_nil_value();
+    if (len == 0 || rs.is_nil()) return mrb_nil_value();
     p = s->m_ptr;
     rslen = RSTRING_LEN(rs);
     if (rslen == 0) {
@@ -1292,7 +1293,7 @@ mrb_str_index_m(mrb_state *mrb, mrb_value str)
             mrb_value tmp;
 
             tmp = mrb_check_string_type(mrb, sub);
-            if (mrb_nil_p(tmp)) {
+            if (tmp.is_nil()) {
                 mrb->mrb_raisef(E_TYPE_ERROR, "type mismatch: %S given", sub);
             }
             sub = tmp;
@@ -1419,11 +1420,11 @@ mrb_obj_as_string(mrb_state *mrb, mrb_value obj)
 {
     mrb_value str;
 
-    if (mrb_is_a_string(obj)) {
+    if (obj.is_string()) {
         return obj;
     }
     str = mrb->funcall(obj, "to_s", 0);
-    if (!mrb_is_a_string(str))
+    if (!str.is_string())
         return mrb_any_to_s(mrb, obj);
     return str;
 }
@@ -1636,7 +1637,7 @@ mrb_str_rindex_m(mrb_state *mrb, mrb_value str)
             mrb_value tmp;
 
             tmp = mrb_check_string_type(mrb, sub);
-            if (mrb_nil_p(tmp)) {
+            if (tmp.is_nil()) {
                 mrb->mrb_raisef(E_TYPE_ERROR, "type mismatch: %S given", sub);
             }
             sub = tmp;
@@ -1720,11 +1721,11 @@ mrb_str_split_m(mrb_state *mrb, mrb_value str)
         i = 1;
     }
 
-    if (argc == 0 || mrb_nil_p(spat)) {
+    if (argc == 0 || spat.is_nil()) {
         split_type = split_awk;
     }
     else {
-        if (mrb_is_a_string(spat)) {
+        if (spat.is_string()) {
             split_type = split_string;
             if (RSTRING_LEN(spat) == 1 && RSTRING_PTR(spat)[0] == ' '){
                 split_type = split_awk;
