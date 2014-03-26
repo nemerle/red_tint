@@ -18,7 +18,7 @@ mrb_init_mrbtest(mrb_state *mrb)
   mrbgemtest_init(mrb);
 #endif
   if (mrb->exc) {
-    mrb_p(mrb, mrb_obj_value(mrb->exc));
+    mrb_p(mrb, mrb_value::wrap(mrb->exc));
     exit(0);
   }
 }

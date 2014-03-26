@@ -47,11 +47,12 @@ mrb_value mrb_hash_clear(mrb_state *mrb, mrb_value hash);
 /* RHASH_TBL allocates st_table if not available. */
 #define RHASH(obj)          ((RHash*)((obj).value.p))
 #define RHASH_TBL(h)          (RHASH(h)->ht)
-#define RHASH_IFNONE(h)       mrb_iv_get((h), mrb->intern2("ifnone", 6))
+#define RHASH_IFNONE(h)       (h).mrb_iv_get(mrb->intern2("ifnone", 6))
 #define RHASH_PROCDEFAULT(h)  RHASH_IFNONE(h)
 RHash::kh_ht_t * mrb_hash_tbl(mrb_state *mrb, mrb_value hash);
-
-#define MRB_HASH_PROC_DEFAULT (1<<8)
+enum eHashFlags {
+    MRB_HASH_PROC_DEFAULT = (1<<8)
+};
 #define MRB_RHASH_PROCDEFAULT_P(h) (RHASH(h)->flags & MRB_HASH_PROC_DEFAULT)
 
 /* GC functions */

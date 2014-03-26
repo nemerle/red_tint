@@ -29,12 +29,13 @@ static inline mrb_value struct_ivar_get(mrb_state *mrb, mrb_value c, mrb_sym id)
     mrb_value ans;
 
     for (;;) {
-        ans = mrb_iv_get(c, id);
-        if (!ans.is_nil()) return ans;
-        kclass = RCLASS_SUPER(c);
-        if (kclass == 0 || kclass == sclass)
-            return mrb_nil_value();
-        c = mrb_obj_value(kclass);
+        ans = c.mrb_iv_get(id);
+        if (!ans.is_nil())
+            return ans;
+        kclass = c.ptr<RClass>()->super;
+        if (kclass == nullptr || kclass == sclass)
+            return mrb_value::nil();
+        c = mrb_value::wrap(kclass);
     }
 }
 
@@ -58,7 +59,7 @@ mrb_value mrb_struct_s_members(mrb_state *mrb, mrb_value klass)
 
 mrb_value mrb_struct_members(mrb_state *mrb, mrb_value s)
 {
-    mrb_value members = mrb_struct_s_members(mrb, mrb_obj_value(mrb_obj_class(mrb, s)));
+    mrb_value members = mrb_struct_s_members(mrb, mrb_value::wrap(mrb_obj_class(mrb, s)));
     if (!strcmp(mrb_obj_class(mrb, s)->class_name(), "Struct")) {
         if (RSTRUCT_LEN(s) != RARRAY_LEN(members)) {
             mrb->mrb_raisef(E_TYPE_ERROR,
@@ -82,7 +83,7 @@ mrb_struct_s_members_m(mrb_state *mrb, mrb_value klass)
         arr->push(*p);
         p++;
     }
-    return mrb_obj_value(arr);
+    return mrb_value::wrap(arr);
 }
 
 /* 15.2.18.4.6  */
@@ -101,7 +102,7 @@ mrb_struct_s_members_m(mrb_state *mrb, mrb_value klass)
 static mrb_value
 mrb_struct_members_m(mrb_state *mrb, mrb_value obj)
 {
-    return mrb_struct_s_members_m(mrb, mrb_obj_value(mrb_obj_class(mrb, obj)));
+    return mrb_struct_s_members_m(mrb, mrb_value::wrap(mrb_obj_class(mrb, obj)));
 }
 
 mrb_value
@@ -121,7 +122,7 @@ mrb_struct_getmember(mrb_state *mrb, mrb_value obj, mrb_sym id)
         }
     }
     mrb->mrb_raisef(E_INDEX_ERROR, "%S is not struct member", mrb_sym2str(mrb, id));
-    return mrb_nil_value();       /* not reached */
+    return mrb_value::nil();       /* not reached */
 }
 
 static mrb_value
@@ -200,7 +201,7 @@ mrb_struct_set(mrb_state *mrb, mrb_value obj, mrb_value val)
         }
     }
     mrb->mrb_raisef(E_INDEX_ERROR, "`%S' is not a struct member", mrb_sym2str(mrb, mid));
-    return mrb_nil_value();            /* not reached */
+    return mrb_value::nil();            /* not reached */
 }
 
 static mrb_value
@@ -245,14 +246,14 @@ make_struct(mrb_state *mrb, mrb_value name, mrb_value members, struct RClass * k
         if (!mrb_is_const_id(id)) {
             mrb_name_error(mrb, id, "identifier %S needs to be constant", name);
         }
-        if (mrb_const_defined_at(klass, id)) {
+        if (klass->const_defined_at(id)) {
             mrb_warn(mrb,"redefining constant Struct::%s", mrb_string_value_ptr(mrb, name));
             //?rb_mod_remove_const(klass, mrb_sym2name(mrb, id));
         }
         c = klass->define_class_under(RSTRING_PTR(name), klass);
     }
     MRB_SET_INSTANCE_TT(c, MRB_TT_ARRAY);
-    nstr = mrb_obj_value(c);
+    nstr = mrb_value::wrap(c);
     c->iv_set(mrb_intern(mrb, "__members__", 11), members);
     c->define_class_method("new", mrb_instance_new, MRB_ARGS_ANY())
         .define_class_method("[]", mrb_instance_new, MRB_ARGS_ANY())
@@ -284,7 +285,7 @@ mrb_struct_define(mrb_state *mrb, const char *name, ...)
     char *mem;
 
     if (!name)
-        nm = mrb_nil_value();
+        nm = mrb_value::nil();
     else
         nm = mrb_str_new_cstr(mrb, name);
     RArray *arr = RArray::create(mrb);
@@ -296,7 +297,7 @@ mrb_struct_define(mrb_state *mrb, const char *name, ...)
     }
     va_end(ar);
 
-    return make_struct(mrb, nm, mrb_obj_value(arr), struct_class(mrb));
+    return make_struct(mrb, nm, mrb_value::wrap(arr), struct_class(mrb));
 }
 
 /* 15.2.18.3.1  */
@@ -345,11 +346,11 @@ mrb_struct_s_def(mrb_state *mrb, mrb_value klass)
     mrb_value *argv;
     int argc;
 
-    name = mrb_nil_value();
-    rest = mrb_nil_value();
+    name = mrb_value::nil();
+    rest = mrb_value::nil();
     mrb_get_args(mrb, "*&", &argv, &argc, &b);
     if (argc == 0) { /* special case to avoid crash */
-        rest = mrb_ary_new(mrb);
+        rest = RArray::new_capa(mrb);
     }
     else {
         if (argc > 0) name = argv[0];
@@ -358,7 +359,7 @@ mrb_struct_s_def(mrb_state *mrb, mrb_value klass)
             if (!name.is_nil() && name.is_symbol()) {
                 /* 1stArgument:symbol -> name=nil rest=argv[0]-[n] */
                 RARRAY(rest)->unshift(name);
-                name = mrb_nil_value();
+                name = mrb_value::nil();
             }
         }
         else {
@@ -366,7 +367,7 @@ mrb_struct_s_def(mrb_state *mrb, mrb_value klass)
             argcnt = argc-1;
             if (!name.is_nil() && name.is_symbol()) {
                 /* 1stArgument:symbol -> name=nil rest=argv[0]-[n] */
-                name = mrb_nil_value();
+                name = mrb_value::nil();
                 pargv = &argv[0];
                 argcnt++;
             }
@@ -389,7 +390,7 @@ static int num_members(mrb_state *mrb, RClass *klass)
 {
     mrb_value members;
 
-    members = struct_ivar_get(mrb, mrb_obj_value(klass), mrb_intern(mrb, "__members__", 11));
+    members = struct_ivar_get(mrb, mrb_value::wrap(klass), mrb_intern(mrb, "__members__", 11));
     if (!members.is_array()) {
         mrb->mrb_raise(E_TYPE_ERROR, "broken members");
     }
@@ -415,7 +416,7 @@ mrb_struct_initialize_withArg(mrb_state *mrb, int argc, mrb_value *argv, mrb_val
         p_self->set(i, argv[i]);
     }
     for (i = argc; i < n; i++) {
-        p_self->set(i, mrb_nil_value());
+        p_self->set(i, mrb_value::nil());
     }
     return self;
 }
@@ -509,7 +510,7 @@ mrb_value mrb_struct_init_copy(mrb_state *mrb, mrb_value copy)
 
     if (mrb_obj_equal(copy, s))
         return copy;
-    if (!mrb_obj_is_instance_of(mrb, s, mrb_obj_class(mrb, copy))) {
+    if (!s.is_instance_of(mrb, mrb_obj_class(mrb, copy))) {
         mrb->mrb_raise(E_TYPE_ERROR, "wrong argument class");
     }
     if (!s.is_array()) {
@@ -541,7 +542,7 @@ mrb_struct_aref_id(mrb_state *mrb, mrb_value s, mrb_sym id)
         }
     }
     mrb->mrb_raisef(E_INDEX_ERROR, "no member '%S' in struct", mrb_sym2str(mrb, id));
-    return mrb_nil_value();       /* not reached */
+    return mrb_value::nil();       /* not reached */
 }
 
 /* 15.2.18.4.2  */

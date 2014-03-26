@@ -61,7 +61,7 @@ mrb_value mrb_hash_new_capa(mrb_state *mrb, int capa)
         h->ht->resize(capa);
     }
     h->iv = 0;
-    return mrb_obj_value(h);
+    return mrb_value::wrap(h);
 }
 
 mrb_value mrb_hash_new(mrb_state *mrb)
@@ -146,7 +146,7 @@ mrb_hash_dup(mrb_state *mrb, mrb_value hash)
         }
     }
 
-    return mrb_obj_value(ret);
+    return mrb_value::wrap(ret);
 }
 
 mrb_value mrb_check_hash_type(mrb_state *mrb, mrb_value hash)
@@ -221,7 +221,7 @@ mrb_hash_init_core(mrb_state *mrb, mrb_value hash)
             ifnone = argv[0];
         }
         else {
-            ifnone = mrb_nil_value();
+            ifnone = mrb_value::nil();
         }
     }
     else {
@@ -231,7 +231,7 @@ mrb_hash_init_core(mrb_state *mrb, mrb_value hash)
         RHASH(hash)->flags |= MRB_HASH_PROC_DEFAULT;
         ifnone = block;
     }
-  mrb_iv_set(mrb, hash, mrb_intern_lit(mrb, "ifnone"), ifnone);
+    mrb_iv_set(mrb, hash, mrb_intern_lit(mrb, "ifnone"), ifnone);
     return hash;
 }
 
@@ -291,7 +291,7 @@ mrb_hash_default(mrb_state *mrb, mrb_value hash)
 
     mrb_get_args(mrb, "*", &argv, &argc);
     if (MRB_RHASH_PROCDEFAULT_P(hash)) {
-        if (argc == 0) return mrb_nil_value();
+        if (argc == 0) return mrb_value::nil();
         key = argv[0];
         return mrb->funcall(RHASH_PROCDEFAULT(hash), "call", 2, hash, key);
     }
@@ -348,7 +348,7 @@ static mrb_value mrb_hash_default_proc(mrb_state *mrb, mrb_value hash)
     if (MRB_RHASH_PROCDEFAULT_P(hash)) {
         return RHASH_PROCDEFAULT(hash);
     }
-    return mrb_nil_value();
+    return mrb_value::nil();
 }
 
 /*
@@ -388,7 +388,7 @@ mrb_value mrb_hash_delete_key(mrb_value hash, mrb_value key)
     }
 
     /* not found */
-    return mrb_nil_value();
+    return mrb_value::nil();
 }
 
 /* 15.2.13.4.8  */
@@ -454,7 +454,7 @@ mrb_hash_shift(mrb_state *mrb, mrb_value hash)
     }
 
     if (MRB_RHASH_PROCDEFAULT_P(hash)) {
-        return mrb->funcall(RHASH_PROCDEFAULT(hash), "call", 2, hash, mrb_nil_value());
+        return mrb->funcall(RHASH_PROCDEFAULT(hash), "call", 2, hash, mrb_value::nil());
     }
     else {
         return RHASH_IFNONE(hash);
@@ -678,19 +678,19 @@ static mrb_value mrb_hash_to_hash(mrb_state *mrb, mrb_value hash)
  *
  */
 
-mrb_value
-mrb_hash_keys(mrb_state *mrb, mrb_value hash)
+mrb_value mrb_hash_keys(mrb_state *mrb, mrb_value hash)
 {
     RHash::kh_ht_t *h = RHASH_TBL(hash);
-    if (!h)
-        return mrb_ary_new(mrb);
-    RArray *p_ary = RArray::create(mrb,h->size());
-    for (auto k = h->begin(); k != h->end(); k++) {
-        if (h->exist(k)) {
-            p_ary->push(h->key(k));
+    size_t sz = h ? h->size() : 0;
+    RArray *p_ary = RArray::create(mrb,sz);
+    if (h) {
+        for (auto k = h->begin(); k != h->end(); k++) {
+            if (h->exist(k)) {
+                p_ary->push(h->key(k));
+            }
         }
     }
-    return mrb_obj_value(p_ary);
+    return mrb_value::wrap(p_ary);
 }
 
 /* 15.2.13.4.28 */
@@ -710,7 +710,7 @@ static mrb_value mrb_hash_values(mrb_state *mrb, mrb_value hash)
 {
     RHash::kh_ht_t *h = RHASH_TBL(hash);
     if (!h)
-        return mrb_obj_value(RArray::create(mrb,0));
+        return mrb_value::wrap(RArray::create(mrb,0));
 
     RArray *arr = RArray::create(mrb,h->size());
     for (auto k = h->begin(); k != h->end(); k++) {
@@ -719,7 +719,7 @@ static mrb_value mrb_hash_values(mrb_state *mrb, mrb_value hash)
             arr->push(v);
         }
     }
-    return mrb_obj_value(arr);
+    return mrb_value::wrap(arr);
 }
 
 static mrb_value mrb_hash_has_keyWithKey(mrb_value hash, mrb_value key)
@@ -731,7 +731,7 @@ static mrb_value mrb_hash_has_keyWithKey(mrb_value hash, mrb_value key)
         k = h->get(key);
         return mrb_bool_value(k != h->end());
     }
-    return mrb_false_value();
+    return mrb_value::_false();
 }
 
 /* 15.2.13.4.13 */
@@ -774,7 +774,7 @@ mrb_hash_has_valueWithvalue(mrb_state *mrb, mrb_value hash, mrb_value value)
         }
     }
 
-    return mrb_false_value();
+    return mrb_value::_false();
 }
 
 /* 15.2.13.4.14 */
@@ -807,8 +807,8 @@ hash_equal(mrb_state *mrb, mrb_value hash1, mrb_value hash2, int eql)
     if (mrb_obj_equal(hash1, hash2))
         return mrb_true_value();
     if (!hash2.is_hash()) {
-        if (!mrb_respond_to(mrb, hash2, mrb->intern2("to_hash", 7))) {
-            return mrb_false_value();
+        if (!hash2.respond_to(mrb, mrb->intern2("to_hash", 7))) {
+            return mrb_value::_false();
         }
         if (eql)
             return mrb_bool_value(mrb_eql(mrb, hash2, hash1));
@@ -820,9 +820,9 @@ hash_equal(mrb_state *mrb, mrb_value hash1, mrb_value hash2, int eql)
         return mrb_bool_value(!h2);
     }
     if (!h2)
-        return mrb_false_value();
+        return mrb_value::_false();
     if (h1->size() != h2->size())
-        return mrb_false_value();
+        return mrb_value::_false();
 
     RHash::kh_ht_t::iterator k1, k2;
     mrb_value key;
@@ -839,7 +839,7 @@ hash_equal(mrb_state *mrb, mrb_value hash1, mrb_value hash2, int eql)
                     continue; /* next key */
                 }
             }
-            return mrb_false_value();
+            return mrb_value::_false();
         }
     }
     else {
@@ -853,7 +853,7 @@ hash_equal(mrb_state *mrb, mrb_value hash1, mrb_value hash2, int eql)
                     continue; /* next key */
                 }
             }
-            return mrb_false_value();
+            return mrb_value::_false();
         }
     }
     return mrb_true_value();

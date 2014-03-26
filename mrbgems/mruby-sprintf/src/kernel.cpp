@@ -9,17 +9,13 @@
 
 mrb_value mrb_f_sprintf(mrb_state *mrb, mrb_value obj); /* in sprintf.c */
 
-void
-mrb_mruby_sprintf_gem_init(mrb_state* mrb)
+void mrb_mruby_sprintf_gem_init(mrb_state* mrb)
 {
-    RClass *krn;
 
-    if (mrb->kernel_module == NULL) {
-        mrb->kernel_module = mrb_define_module(mrb, "Kernel"); /* Might be PARANOID. */
+    if (mrb->kernel_module == nullptr) {
+        mrb->kernel_module = &mrb->define_module("Kernel"); /* Might be PARANOID. */
     }
-    krn = mrb->kernel_module;
-
-    krn->define_method("sprintf", mrb_f_sprintf, MRB_ARGS_ANY())
+    mrb->kernel_module->define_method("sprintf", mrb_f_sprintf, MRB_ARGS_ANY())
             .define_method("format",  mrb_f_sprintf, MRB_ARGS_ANY());
 }
 

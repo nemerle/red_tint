@@ -7,7 +7,7 @@ static void printstr(mrb_state *mrb, mrb_value obj)
 {
 
     if (obj.is_string()) {
-        RString *str = mrb_str_ptr(obj);
+        RString *str = obj.ptr<RString>();
         char *s = str->m_ptr;
         int len = str->len;
         fwrite(s, len, 1, stdout);

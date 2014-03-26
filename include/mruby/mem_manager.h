@@ -2,10 +2,11 @@
 #include <cstdlib>
 #include <memory>
 #include <limits>
+#include "mruby/value.h"
 struct RBasic;
 struct RClass;
 struct RProc;
-struct REnv;
+
 struct mrb_state;
 struct mrb_pool;
 struct heap_page;
@@ -24,9 +25,10 @@ struct MemManager {
     };
     friend struct mrb_state;
 public:
-    void mrb_full_gc();
-    void mrb_incremental_gc();
-    void change_gen_gc_mode(mrb_int enable);
+    void    init(mrb_state *mrb, void *user_data, mrb_allocf f);
+    void    mrb_full_gc();
+    void    mrb_incremental_gc();
+    void    change_gen_gc_mode(mrb_int enable);
 
             template<typename T>
     T *     obj_alloc(RClass *cls) {
@@ -123,7 +125,7 @@ protected:
     int         arena_idx;
 
     gc_state    m_gc_state; /* state of gc */
-    int         current_white_part; /* make white object by white_part */
+    eGcColor    current_white_part; /* make white object by white_part */
     RBasic *    m_gray_list; /* list of gray objects */
     RBasic *    atomic_gray_list; /* list of objects to be traversed atomically */
     size_t      m_gc_live_after_mark;
@@ -139,6 +141,8 @@ protected:
     void incremental_gc_step();
     size_t mark_irep_pool_size(struct mrb_irep *irep);
     void mark_irep_pool(struct mrb_irep *irep);
+    constexpr eGcColor otherWhitePart() const { return (eGcColor)(current_white_part^MRB_GC_WHITES);}
+    void flip_white_part() {current_white_part = otherWhitePart();}
 };
 // helper class to use user passed allocation routine in std containers
 template <class T>

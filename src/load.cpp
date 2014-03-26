@@ -119,7 +119,7 @@ read_irep_record_1(mrb_state *mrb, const uint8_t *bin, uint32_t *len,bool _alloc
                     break;
                 default:
                     assert(false);
-                    irep->pool[i] = mrb_nil_value();
+                    irep->pool[i] = mrb_value::nil();
                     /* should not happen */
                     break;
             }
@@ -463,11 +463,11 @@ mrb_load_irep_ctx(mrb_state *mrb, const uint8_t *bin, mrbc_context *c)
 
     if (!irep) {
         irep_error(mrb);
-        return mrb_nil_value();
+        return mrb_value::nil();
     }
     auto prc = mrb_proc_new(mrb, irep);
     mrb_irep_decref(mrb, irep);
-    if (c && c->no_exec) return mrb_obj_value(prc);
+    if (c && c->no_exec) return mrb_value::wrap(prc);
     return mrb->mrb_context_run(prc, mrb_top_self(mrb), 0);
 }
 mrb_value
@@ -677,11 +677,11 @@ mrb_value mrb_load_irep_file_cxt(mrb_state *mrb, FILE* fp, mrbc_context *c)
 
     if (!irep) {
         irep_error(mrb);
-        return mrb_nil_value();
+        return mrb_value::nil();
     }
     auto proc = mrb_proc_new(mrb, irep);
     mrb_irep_decref(mrb, irep);
-    if (c && c->no_exec) return mrb_obj_value(proc);
+    if (c && c->no_exec) return mrb_value::wrap(proc);
     return mrb->mrb_context_run(proc, mrb_top_self(mrb), 0);
 }
 mrb_value

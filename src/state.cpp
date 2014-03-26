@@ -16,6 +16,17 @@ void mrb_core_init(mrb_state*);
 void mrb_core_final(mrb_state*);
 void mrb_symtbl_free(mrb_state *mrb);
 
+static void* allocf(mrb_state */*mrb*/, void *p, size_t size, void */*ud*/)
+{
+    if (size == 0) {
+        free(p);
+        return nullptr;
+    }
+    else {
+        return realloc(p, size);
+    }
+}
+
 static mrb_value
 inspect_main(mrb_state *mrb, mrb_value mod)
 {
@@ -24,6 +35,8 @@ inspect_main(mrb_state *mrb, mrb_value mod)
 
 mrb_state* mrb_state::create(mrb_allocf f, void *ud)
 {
+    if(!f)
+        f=allocf;
 #ifdef MRB_NAN_BOXING
   mrb_assert(sizeof(void*) == 4);
 #endif
@@ -34,32 +47,12 @@ mrb_state* mrb_state::create(mrb_allocf f, void *ud)
         return nullptr;
 
     *mrb = mrb_state_zero;
-    mrb->gc().m_vm = mrb;
-    mrb->gc().ud = ud;
-    mrb->gc().m_allocf = f;
-    mrb->gc().current_white_part = MRB_GC_WHITE_A;
-#ifndef MRB_GC_FIXED_ARENA
-    mrb->gc().m_arena = (RBasic**)mrb->gc()._malloc(sizeof(RBasic*)*MRB_GC_ARENA_SIZE);
-    mrb->gc().arena_capa = MRB_GC_ARENA_SIZE;
-#endif
-    mrb->gc().mrb_heap_init();
+    mrb->gc().init(mrb,ud,f);
     mrb->m_ctx = ( mrb_context*)mrb->gc()._calloc(1,sizeof(mrb_context));
     *mrb->m_ctx = mrb_context_zero;
     mrb->root_c = mrb->m_ctx;
     mrb_core_init(mrb);
     return mrb;
-}
-
-static void*
-allocf(mrb_state *mrb, void *p, size_t size, void *ud)
-{
-    if (size == 0) {
-        free(p);
-        return NULL;
-    }
-    else {
-        return realloc(p, size);
-    }
 }
 
 struct alloca_header {
@@ -95,14 +88,7 @@ void MemManager::mrb_alloca_free()
     }
 }
 
-mrb_state* mrb_open(void)
-{
-    mrb_state *mrb = mrb_state::create(allocf, NULL);
-
-    return mrb;
-}
-void
-mrb_irep_incref(mrb_state *mrb, mrb_irep *irep)
+void mrb_irep_incref(mrb_state */*mrb*/, mrb_irep *irep)
 {
     irep->refcnt++;
 }
@@ -122,15 +108,15 @@ void mrb_irep_free(mrb_state *mrb, mrb_irep *irep)
         mm._free(irep->iseq);
     for (int i=0; i<irep->plen; i++) {
         if (mrb_type(irep->pool[i]) == MRB_TT_STRING) {
-            if ((mrb_str_ptr(irep->pool[i])->flags & MRB_STR_NOFREE) == 0) {
-                mm._free(mrb_str_ptr(irep->pool[i])->m_ptr);
+            if ((irep->pool[i].ptr<RString>()->flags & MRB_STR_NOFREE) == 0) {
+                mm._free(irep->pool[i].ptr<RString>()->m_ptr);
             }
             mm._free(irep->pool[i].basic_ptr());
         }
 #ifdef MRB_WORD_BOXING
     else if (mrb_type(irep->pool[i]) == MRB_TT_FLOAT) {
       mrb_free(mrb, mrb_obj_ptr(irep->pool[i]));
-	}
+    }
 #endif
     }
     mm._free(irep->pool);
@@ -147,8 +133,8 @@ void mrb_irep_free(mrb_state *mrb, mrb_irep *irep)
 mrb_value
 mrb_str_pool(mrb_state *mrb, mrb_value str)
 {
-    struct RString *s = mrb_str_ptr(str);
-    struct RString *ns;
+    RString *s = str.ptr<RString>();
+    RString *ns;
     mrb_int len;
 
     ns = (struct RString *)mrb->gc()._malloc(sizeof(struct RString));
@@ -170,7 +156,7 @@ mrb_str_pool(mrb_state *mrb, mrb_value str)
         ns->m_ptr[len] = '\0';
     }
 
-    return mrb_obj_value(ns);
+    return mrb_value::wrap(ns);
 }
 void mrb_free_context(mrb_state *mrb, struct mrb_context *ctx)
 {
@@ -184,22 +170,22 @@ void mrb_free_context(mrb_state *mrb, struct mrb_context *ctx)
     mm._free(ctx);
 }
 
-void mrb_close(mrb_state *mrb)
+void mrb_state::destroy()
 {
-    MemManager &mm(mrb->gc());
+    MemManager &mm(gc());
 
-    mrb_core_final(mrb);
+    mrb_core_final(this);
 
     /* free */
-    mrb_gc_free_gv(mrb);
-    mrb_free_context(mrb,mrb->root_c);
-    mrb_symtbl_free(mrb);
+    mrb_gc_free_gv(this);
+    mrb_free_context(this,this->root_c);
+    mrb_symtbl_free(this);
     mm.mrb_heap_free();
     mm.mrb_alloca_free();
 #ifndef MRB_GC_FIXED_ARENA
     mm._free(mm.m_arena);
 #endif
-    mm._free(mrb);
+    mm._free(this);
 }
 
 mrb_irep* mrb_add_irep(mrb_state *mrb)
@@ -221,5 +207,5 @@ mrb_top_self(mrb_state *mrb)
         mrb->top_self->define_singleton_method("inspect", inspect_main, MRB_ARGS_NONE());
         mrb->top_self->define_singleton_method("to_s", inspect_main, MRB_ARGS_NONE());
     }
-    return mrb_obj_value(mrb->top_self);
+    return mrb_value::wrap(mrb->top_self);
 }

@@ -24,12 +24,6 @@
 // https://www.securecoding.cert.org/confluence/display/seccode/INT32-C.+Ensure+that+operations+on+signed+integers+do+not+result+in+overflow
 
 
-#ifdef MRB_NAN_BOXING
-#define SET_FLT_VALUE(r,v) r.f = (v)
-#else
-#define SET_FLT_VALUE(r,v) MRB_SET_VALUE(r, MRB_TT_FLOAT, value.f, (v))
-#endif
-
 static constexpr int STACK_INIT_SIZE=128;
 static constexpr int CALLINFO_INIT_SIZE=32;
 
@@ -57,7 +51,7 @@ static inline void
 stack_clear(mrb_value *from, size_t count)
 {
 #ifndef MRB_NAN_BOXING
-    const mrb_value mrb_value_zero = { { 0 } };
+    constexpr mrb_value mrb_value_zero = mrb_value::nil();
 
     while(count-- > 0) {
         *from++ = mrb_value_zero;
@@ -77,8 +71,7 @@ stack_copy(mrb_value *dst, const mrb_value *src, size_t size)
     }
 }
 
-void
-stack_init(mrb_state *mrb)
+void stack_init(mrb_state *mrb)
 {
     mrb_context *c = mrb->m_ctx;
 
@@ -305,7 +298,7 @@ mrb_funcall_with_block(mrb_state *mrb, mrb_value self, mrb_sym mid, int argc, co
                 cipop(mrb);
             }
             mrb->jmp = nullptr;
-            val = mrb_nil_value();
+            val = mrb_value::nil();
         }
         MRB_END_EXC(&c_jmp);
     }
@@ -324,7 +317,9 @@ mrb_funcall_with_block(mrb_state *mrb, mrb_value self, mrb_sym mid, int argc, co
         if (!p) {
             undef = mid;
             mid = mrb_intern(mrb, "method_missing", 14);
+            assert(c);
             p = RClass::method_search_vm(&c, mid);
+            assert(p);
             n++;
             argc++;
         }
@@ -334,7 +329,7 @@ mrb_funcall_with_block(mrb_state *mrb, mrb_value self, mrb_sym mid, int argc, co
         ci->stackent = mrb->m_ctx->m_stack;
         ci->argc = argc;
         ci->target_class = c;
-        if (MRB_PROC_CFUNC_P(p)) {
+        if (p->is_cfunc()) {
             ci->nregs = argc + 2;
         }
         else {
@@ -353,7 +348,7 @@ mrb_funcall_with_block(mrb_state *mrb, mrb_value self, mrb_sym mid, int argc, co
         }
         mrb->m_ctx->m_stack[argc+1] = blk;
 
-        if (MRB_PROC_CFUNC_P(p)) {
+        if (p->is_cfunc()) {
             int ai = mrb->gc().arena_save();
 
             ci->acc = CI_ACC_DIRECT;
@@ -373,7 +368,7 @@ mrb_funcall_with_block(mrb_state *mrb, mrb_value self, mrb_sym mid, int argc, co
 
 mrb_value mrb_funcall_argv(mrb_state *mrb, mrb_value self, mrb_sym mid, int argc, mrb_value *argv)
 {
-    return mrb_funcall_with_block(mrb, self, mid, argc, argv, mrb_nil_value());
+    return mrb_funcall_with_block(mrb, self, mid, argc, argv, mrb_value::nil());
 }
 /* 15.3.1.3.4  */
 /* 15.3.1.3.44 */
@@ -428,7 +423,7 @@ mrb_f_send(mrb_state *mrb, mrb_value self)
         RARRAY(regs[0])->shift();
         //mrb_ary_shift(mrb, regs[0]);
     }
-    if (MRB_PROC_CFUNC_P(p)) {
+    if (p->is_cfunc()) {
         return p->body.func(mrb, self);
     }
     cipush(mrb);
@@ -455,7 +450,7 @@ mrb_value mrb_yield_internal(mrb_state *mrb, mrb_value b, int argc, mrb_value *a
     ci->stackent = mrb->m_ctx->m_stack;
     ci->argc = argc;
     ci->target_class = c;
-    if (MRB_PROC_CFUNC_P(p)) {
+    if (p->is_cfunc()) {
         ci->nregs = argc + 2;
     }
     else {
@@ -469,9 +464,9 @@ mrb_value mrb_yield_internal(mrb_state *mrb, mrb_value b, int argc, mrb_value *a
     if (argc > 0) {
         stack_copy(mrb->m_ctx->m_stack+1, argv, argc);
     }
-    mrb->m_ctx->m_stack[argc+1] = mrb_nil_value();
+    mrb->m_ctx->m_stack[argc+1] = mrb_value::nil();
 
-    if (MRB_PROC_CFUNC_P(p)) {
+    if (p->is_cfunc()) {
         val = p->body.func(mrb, self);
         mrb->m_ctx->m_stack = mrb->m_ctx->m_ci->stackent;
         cipop(mrb);
@@ -554,7 +549,7 @@ static void argnum_error(mrb_state *mrb, int num)
 
 #else
 
-#define INIT_DISPATCH JUMP; return mrb_nil_value();
+#define INIT_DISPATCH JUMP; return mrb_value::nil();
 #define CASE(op) L_ ## op:
 #define NEXT i=*++pc; CODE_FETCH_HOOK(mrb, irep, pc, regs); goto *optable[GET_OPCODE(i)]
 #define JUMP i=*pc; CODE_FETCH_HOOK(mrb, irep, pc, regs); goto *optable[GET_OPCODE(i)]
@@ -583,7 +578,6 @@ RProc * mrb_state::prepare_method_missing(RClass *c,mrb_sym mid_,const int &a,in
 }
 mrb_value mrb_state::mrb_context_run(RProc *proc, mrb_value self,unsigned int stack_keep)
 {
-    /* assert(mrb_proc_cfunc_p(proc)) */
     mrb_irep *irep = proc->body.irep;
     mrb_code *pc = irep->iseq;
     auto *pool = irep->pool;
@@ -680,19 +674,19 @@ RETRY_TRY_BLOCK:
 
             CASE(OP_LOADF) {
                 /* A      R(A) := false */
-                regs[GETARG_A(i)] = mrb_false_value();
+                regs[GETARG_A(i)] = mrb_value::_false();
                 NEXT;
             }
 
             CASE(OP_GETGLOBAL) {
                 /* A B    R(A) := getglobal(Sym(B)) */
-                regs[GETARG_A(i)] = mrb_gv_get(this, syms[GETARG_Bx(i)]);
+                regs[GETARG_A(i)] = this->mrb_gv_get(syms[GETARG_Bx(i)]);
                 NEXT;
             }
 
             CASE(OP_SETGLOBAL) {
                 /* setglobal(Sym(b), R(A)) */
-                mrb_gv_set(this, syms[GETARG_Bx(i)], regs[GETARG_A(i)]);
+                this->gv_set(syms[GETARG_Bx(i)], regs[GETARG_A(i)]);
                 NEXT;
             }
 
@@ -710,34 +704,34 @@ RETRY_TRY_BLOCK:
 
             CASE(OP_GETIV) {
                 /* A Bx   R(A) := ivget(Bx) */
-                regs[GETARG_A(i)] = mrb_vm_iv_get(this, syms[GETARG_Bx(i)]);
+                regs[GETARG_A(i)] = this->vm_iv_get(syms[GETARG_Bx(i)]);
                 NEXT;
             }
 
             CASE(OP_SETIV) {
                 /* ivset(Sym(B),R(A)) */
-                mrb_vm_iv_set(this, syms[GETARG_Bx(i)], regs[GETARG_A(i)]);
+                vm_iv_set(syms[GETARG_Bx(i)], regs[GETARG_A(i)]);
                 NEXT;
             }
 
             CASE(OP_GETCV) {
                 /* A B    R(A) := ivget(Sym(B)) */
                 ERR_PC_SET(this, pc);
-                regs[GETARG_A(i)] = mrb_vm_cv_get(this, syms[GETARG_Bx(i)]);
+                regs[GETARG_A(i)] = this->vm_cv_get(syms[GETARG_Bx(i)]);
                 ERR_PC_CLR(this);
                 NEXT;
             }
 
             CASE(OP_SETCV) {
                 /* ivset(Sym(B),R(A)) */
-                mrb_vm_cv_set(this, syms[GETARG_Bx(i)], regs[GETARG_A(i)]);
+                this->vm_cv_set(syms[GETARG_Bx(i)], regs[GETARG_A(i)]);
                 NEXT;
             }
 
             CASE(OP_GETCONST) {
                 /* A B    R(A) := constget(Sym(B)) */
                 ERR_PC_SET(this, pc);
-                mrb_value val = mrb_vm_const_get(this, syms[GETARG_Bx(i)]);
+                mrb_value val = this->mrb_vm_const_get(syms[GETARG_Bx(i)]);
                 ERR_PC_CLR(this);
                 regs =m_ctx->m_stack;
                 regs[GETARG_A(i)] = val;
@@ -765,7 +759,7 @@ RETRY_TRY_BLOCK:
                 /* A B C  R(A+1)::Sym(B) := R(A) */
                 int a = GETARG_A(i);
 
-                mrb_const_set(this, regs[a+1], syms[GETARG_Bx(i)], regs[a]);
+                this->const_set(regs[a+1], syms[GETARG_Bx(i)], regs[a]);
                 NEXT;
             }
 
@@ -773,7 +767,7 @@ RETRY_TRY_BLOCK:
                 /* A B C  R(A) := uvget(B,C) */
                 mrb_value &regs_a(regs[GETARG_A(i)]);
                 REnv *e = uvenv(this, GETARG_C(i));
-                regs_a = e ? e->stack[GETARG_B(i)] : mrb_nil_value();
+                regs_a = e ? e->stack[GETARG_B(i)] : mrb_value::nil();
                 NEXT;
             }
 
@@ -828,7 +822,7 @@ RETRY_TRY_BLOCK:
 
             CASE(OP_RESCUE) {
                 /* A      R(A) := exc; clear(exc) */
-                regs[GETARG_A(i)] = mrb_obj_value(m_exc);
+                regs[GETARG_A(i)] = mrb_value::wrap(m_exc);
                 m_exc = 0;
                 NEXT;
             }
@@ -877,7 +871,7 @@ RETRY_TRY_BLOCK:
 
             CASE(OP_LOADNIL) {
                 /* A B    R(A) := nil */
-                regs[GETARG_A(i)] = mrb_nil_value();
+                regs[GETARG_A(i)] = mrb_value::nil();
                 NEXT;
             }
 
@@ -898,10 +892,10 @@ L_SEND:
                 recv.tt=t;
                 if (GET_OPCODE(i) != OP_SENDB) {
                     if (n == CALL_MAXARGS) {
-                        regs[a+2] = mrb_nil_value();
+                        regs[a+2] = mrb_value::nil();
                     }
                     else {
-                        regs[a+n+1]= mrb_nil_value();
+                        regs[a+n+1]= mrb_value::nil();
                     }
                 }
 
@@ -930,7 +924,7 @@ L_SEND:
                 /* prepare stack */
                 m_ctx->m_stack += a;
 
-                if (MRB_PROC_CFUNC_P(m)) {
+                if (m->is_cfunc()) {
                     if (n == CALL_MAXARGS) {
                         _ci->nregs = 3;
                     }
@@ -944,7 +938,7 @@ L_SEND:
                         goto L_RAISE;
                     /* pop stackpos */
                     _ci = m_ctx->m_ci;
-                    if (!MRB_PROC_CFUNC_P(_ci[-1].proc)) {
+                    if (!_ci[-1].proc->is_cfunc()) {
                         proc = _ci[-1].proc;
                         irep = proc->body.irep;
                         pool = irep->pool;
@@ -993,7 +987,7 @@ L_SEND:
                 }
 
                 /* prepare stack */
-                if (MRB_PROC_CFUNC_P(m)) {
+                if (m->is_cfunc()) {
                     recv = m->body.func(this, recv);
                     gc().arena_restore(ai);
                     if (m_exc)
@@ -1010,7 +1004,7 @@ L_SEND:
                     proc = m;
                     irep = m->body.irep;
                     if (!irep) {
-                        m_ctx->m_stack[0] = mrb_nil_value();
+                        m_ctx->m_stack[0] = mrb_value::nil();
                         goto L_RETURN;
                     }
                     ci->nregs = irep->nregs;
@@ -1054,7 +1048,7 @@ L_SEND:
                 m_ctx->m_stack += a;
                 m_ctx->m_stack[0] = recv;
 
-                if (MRB_PROC_CFUNC_P(m)) {
+                if (m->is_cfunc()) {
                     m_ctx->m_stack[0] = m->body.func(this, recv);
                     gc().arena_restore(ai);
                     if (m_exc)
@@ -1231,8 +1225,8 @@ L_RETURN:
 
 L_RAISE:
                     _ci = m_ctx->m_ci;
-                    mrb_obj_iv_ifnone(this, m_exc, mrb_intern(this, "lastpc", 6), mrb_cptr_value(pc));
-                    mrb_obj_iv_ifnone(this, m_exc, mrb_intern(this, "ciidx", 5), mrb_fixnum_value(_ci - m_ctx->cibase));
+                    m_exc->iv_ifnone(mrb_intern(this, "lastpc", 6), mrb_cptr_value(pc));
+                    m_exc->iv_ifnone(mrb_intern(this, "ciidx", 5), mrb_fixnum_value(_ci - m_ctx->cibase));
                     eidx = _ci->eidx;
                     if (_ci == m_ctx->cibase) {
                         if (_ci->ridx == 0) goto L_STOP;
@@ -1381,7 +1375,7 @@ L_RESCUE:
                 /* move stack */
                 value_move(m_ctx->m_stack, &regs[a], _ci->argc+1);
 
-                if (MRB_PROC_CFUNC_P(m)) {
+                if (m->is_cfunc()) {
                     m_ctx->m_stack[0] = m->body.func(this, recv);
                     gc().arena_restore(ai);
                     goto L_RETURN;
@@ -1450,7 +1444,7 @@ L_RESCUE:
                         y = mrb_fixnum(regs_b);
 
                         if ( ((x^y) | (((x^(~(x^y) & std::numeric_limits<mrb_int>::min())) + y)^y)) >= 0) {
-                            SET_FLT_VALUE(regs_a, (mrb_float)x + (mrb_float)y);
+                            regs_a = mrb_float_value((mrb_float)x + (mrb_float)y);
                         } else {
                             regs_a.value.i =  x+y;
                         }
@@ -1460,7 +1454,7 @@ L_RESCUE:
                     {
                         mrb_int x = mrb_fixnum(regs_a);
                         mrb_float y = mrb_float(regs[a+1]);
-                        SET_FLT_VALUE(regs_a, (mrb_float)x + y);
+                        regs_a = mrb_float_value((mrb_float)x + y); //SET_FLT_VALUE(regs_a, (mrb_float)x + y);
                     }
                         break;
                     case TYPES2(MRB_TT_FLOAT,MRB_TT_FIXNUM):
@@ -1509,7 +1503,7 @@ L_RESCUE:
                         if (((x^y) & (((x ^ ((x^y)
                                              & (1 << (sizeof(mrb_int)*8-1))))-y)^y)) < 0) {
                             /* integer overflow */
-                            SET_FLT_VALUE(regs[a], (mrb_float)x - (mrb_float)y);
+                            regs[a] = mrb_float_value((mrb_float)x - (mrb_float)y); // SET_FLT_VALUE(regs[a], (mrb_float)x - (mrb_float)y);
                         }
                         else {
                             regs[a]=mrb_fixnum_value(x-y);
@@ -1520,7 +1514,8 @@ L_RESCUE:
                     {
                         mrb_int x = mrb_fixnum(regs[a]);
                         mrb_float y = mrb_float(regs[a+1]);
-                        SET_FLT_VALUE(regs[a], (mrb_float)x - y);
+                        regs[a] = mrb_float_value((mrb_float)x - y); // SET_FLT_VALUE(regs[a], (mrb_float)x - y);
+
                     }
                         break;
                     case TYPES2(MRB_TT_FLOAT,MRB_TT_FIXNUM):
@@ -1568,7 +1563,7 @@ L_RESCUE:
                         y = mrb_fixnum(regs[a+1]);
                         long long z = x * y;
                         if ( (z > std::numeric_limits<mrb_int>::max()) || (z < std::numeric_limits<mrb_int>::min()) ) {
-                            SET_FLT_VALUE(regs[a], (mrb_float)z);
+                            regs[a] = mrb_float_value(z); // SET_FLT_VALUE(regs[a], (mrb_float)z);
                         }
                         else {
                             regs[a]=mrb_fixnum_value(z);
@@ -1579,7 +1574,7 @@ L_RESCUE:
                     {
                         mrb_int x = mrb_fixnum(regs[a]);
                         mrb_float y = mrb_float(regs[a+1]);
-                        SET_FLT_VALUE(regs[a], (mrb_float)x * y);
+                        regs[a] = mrb_float_value((mrb_float)x * y); //SET_FLT_VALUE(regs[a], );
                     }
                         break;
                     case TYPES2(MRB_TT_FLOAT,MRB_TT_FIXNUM):
@@ -1625,7 +1620,7 @@ L_RESCUE:
                         /* Initialize sl1 and sl2 */
 
                         if ( (y == 0) || ( (x == std::numeric_limits<mrb_int>::min()) && (y == -1) ) ) {
-                            SET_FLT_VALUE(regs_a, (mrb_float)x / (mrb_float)y);
+                            regs_a = mrb_float_value((mrb_float)x / (mrb_float)y); // SET_FLT_VALUE(regs_a, (mrb_float)x / (mrb_float)y);
                         }
                         else {
                             regs_a.value.i = x / y;
@@ -1636,7 +1631,7 @@ L_RESCUE:
                     {
                         mrb_int x = mrb_fixnum(regs[a]);
                         mrb_float y = mrb_float(regs[a+1]);
-                        SET_FLT_VALUE(regs[a], (mrb_float)x / y);
+                        regs[a] = mrb_float_value((mrb_float)x / y); //SET_FLT_VALUE(regs[a], (mrb_float)x / y);
                     }
                         break;
                     case TYPES2(MRB_TT_FLOAT,MRB_TT_FIXNUM):
@@ -1680,7 +1675,7 @@ L_RESCUE:
                         mrb_int y = GETARG_C(i);
 
                         if ( ((x^y) | (((x^(~(x^y) & std::numeric_limits<mrb_int>::min())) + y)^y)) >= 0) {
-                            SET_FLT_VALUE(regs_a, (mrb_float)x + (mrb_float)y);
+                            regs_a = mrb_float_value((mrb_float)x + (mrb_float)y); //SET_FLT_VALUE(regs_a, (mrb_float)x + (mrb_float)y);
                         } else {
                             regs_a.value.i = x+y;
                         }
@@ -1718,7 +1713,7 @@ L_RESCUE:
                         if (((x^y) & (((x ^ ((x^y)
                                              & (1 << (sizeof(mrb_int)*8-1))))-y)^y)) < 0) {
                             /* integer overflow */
-                            SET_FLT_VALUE(regs[a], (mrb_float)x - (mrb_float)y);
+                            *regs_a = mrb_float_value((mrb_float)x - (mrb_float)y); //SET_FLT_VALUE(regs[a], (mrb_float)x - (mrb_float)y);
                         }
                         else {
                             regs[a]=mrb_fixnum_value(x-y);
@@ -1748,7 +1743,7 @@ L_RESCUE:
     regs[a]=mrb_true_value();\
         }\
     else {\
-    regs[a]=mrb_false_value();\
+    regs[a]=mrb_value::_false();\
         }\
         } while(0)
 
@@ -1840,7 +1835,7 @@ L_RESCUE:
                         regs[GETARG_A(i)] = v;
                     }
                     else {
-                        regs[a] = mrb_nil_value();
+                        regs[a] = mrb_value::nil();
                     }
                 }
                 else {
@@ -1865,7 +1860,7 @@ L_RESCUE:
                 if (!v.is_array()) {
                     regs[a++] = RArray::new_capa(this, 0);
                     while (post--) {
-                        regs[a] = mrb_nil_value();
+                        regs[a] = mrb_value::nil();
                         a++;
                     }
                 }
@@ -1886,7 +1881,7 @@ L_RESCUE:
                             regs[a+i] = ary->m_ptr[pre+i];
                         }
                         while (i < post) {
-                            regs[a+i] = mrb_nil_value();
+                            regs[a+i] = mrb_value::nil();
                             i++;
                         }
                     }
@@ -1937,14 +1932,14 @@ L_RESCUE:
                 }
                 if (c & OP_L_STRICT)
                     p->flags |= MRB_PROC_STRICT;
-                regs[GETARG_A(i)] = mrb_obj_value(p);
+                regs[GETARG_A(i)] = mrb_value::wrap(p);
                 gc().arena_restore(ai);
                 NEXT;
             }
 
             CASE(OP_OCLASS) {
                 /* A      R(A) := ::Object */
-                regs[GETARG_A(i)] = mrb_obj_value(this->object_class);
+                regs[GETARG_A(i)] = mrb_value::wrap(this->object_class);
                 NEXT;
             }
 
@@ -1956,10 +1951,10 @@ L_RESCUE:
                 mrb_value base  = regs[a];
                 mrb_value super = regs[a+1];
                 if (base.is_nil()) {
-                    base = mrb_obj_value(m_ctx->m_ci->target_class);
+                    base = mrb_value::wrap(m_ctx->m_ci->target_class);
                 }
-                RClass *c = mrb_vm_define_class(this, base, super, id);
-                regs[a] = mrb_obj_value(c);
+                RClass *c = mrb_vm_define_class(base, super, id);
+                regs[a] = mrb_value::wrap(c);
                 gc().arena_restore(ai);
                 NEXT;
             }
@@ -1970,10 +1965,10 @@ L_RESCUE:
                 mrb_sym id = syms[GETARG_B(i)];
                 mrb_value base = regs[a];
                 if (base.is_nil()) {
-                    base = mrb_obj_value(m_ctx->m_ci->target_class);
+                    base = mrb_value::wrap(m_ctx->m_ci->target_class);
                 }
-                RClass *c = mrb_vm_define_module(this, base, id);
-                regs[a] = mrb_obj_value(c);
+                RClass *c = base.ptr<RClass>()->define_module_under(id);
+                regs[a] = mrb_value::wrap(c);
                 gc().arena_restore(ai);
                 NEXT;
             }
@@ -1999,7 +1994,7 @@ L_RESCUE:
                 p->m_target_class = ci->target_class;
                 ci->proc = p;
 
-                if (MRB_PROC_CFUNC_P(p)) {
+                if (p->is_cfunc()) {
                     m_ctx->m_stack[0] = p->body.func(this, recv);
                     gc().arena_restore(ai);
                     if (m_exc)
@@ -2045,7 +2040,7 @@ L_RESCUE:
                     m_exc = exc.object_ptr();
                     goto L_RAISE;
                 }
-                regs[GETARG_A(i)] = mrb_obj_value(m_ctx->m_ci->target_class);
+                regs[GETARG_A(i)] = mrb_value::wrap(m_ctx->m_ci->target_class);
                 NEXT;
             }
 
@@ -2084,7 +2079,7 @@ L_STOP:
                 ERR_PC_CLR(this);
                 this->jmp = prev_jmp;
                 if (m_exc) {
-                    return mrb_obj_value(m_exc);
+                    return mrb_value::wrap(m_exc);
                 }
                 return regs[irep->nlocals];
             }

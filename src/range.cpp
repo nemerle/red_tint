@@ -40,7 +40,7 @@ mrb_value mrb_range_new(mrb_state *mrb, mrb_value beg, mrb_value end, int excl)
     r->edges->beg = beg;
     r->edges->end = end;
     r->excl = excl;
-    return mrb_obj_value(r);
+    return mrb_value::wrap(r);
 }
 
 /*
@@ -140,23 +140,22 @@ mrb_range_initialize(mrb_state *mrb, mrb_value range)
  *
  */
 
-mrb_value
-mrb_range_eq(mrb_state *mrb, mrb_value range)
+mrb_value mrb_range_eq(mrb_state *mrb, mrb_value range)
 {
     RRange *rr;
     RRange *ro;
     mrb_value obj = mrb->get_arg<mrb_value>();
     if (mrb_obj_equal(range, obj))
         return mrb_true_value();
-    if (!mrb_obj_is_instance_of(mrb, obj, mrb_obj_class(mrb, range))) { /* same class? */
-        return mrb_false_value();
+    if (!obj.is_instance_of(mrb, mrb_obj_class(mrb, range))) { /* same class? */
+        return mrb_value::_false();
     }
     rr = mrb_range_ptr(range);
     ro = mrb_range_ptr(obj);
     if (mrb_type(mrb->funcall(rr->edges->beg, "==", 1, ro->edges->beg))!=MRB_TT_TRUE ||
             mrb_type(mrb->funcall(rr->edges->end, "==", 1, ro->edges->end))!=MRB_TT_TRUE ||
             rr->excl != ro->excl) {
-        return mrb_false_value();
+        return mrb_value::_false();
     }
     return mrb_true_value();
 }
@@ -357,17 +356,17 @@ range_eql(mrb_state *mrb, mrb_value range)
     mrb_value obj = mrb->get_arg<mrb_value>();
     if (mrb_obj_equal(range, obj))
         return mrb_true_value();
-    if (!mrb_obj_is_kind_of(mrb, obj, RANGE_CLASS)) {
-        return mrb_false_value();
+    if (!obj.is_kind_of(mrb, RANGE_CLASS)) {
+        return mrb_value::_false();
     }
     if (mrb_type(obj) != MRB_TT_RANGE)
-        return mrb_false_value();
+        return mrb_value::_false();
     r = mrb_range_ptr(range);
     o = mrb_range_ptr(obj);
     if (!mrb_eql(mrb, r->edges->beg, o->edges->beg) ||
             !mrb_eql(mrb, r->edges->end, o->edges->end) ||
             (r->excl != o->excl)) {
-        return mrb_false_value();
+        return mrb_value::_false();
     }
     return mrb_true_value();
 }
@@ -379,7 +378,7 @@ mrb_value range_initialize_copy(mrb_state *mrb, mrb_value copy)
 
     if (mrb_obj_equal(copy, src))
         return copy;
-    if (!mrb_obj_is_instance_of(mrb, src, mrb_obj_class(mrb, copy))) {
+    if (!src.is_instance_of(mrb, mrb_obj_class(mrb, copy))) {
         mrb->mrb_raise(E_TYPE_ERROR, "wrong argument class");
     }
 

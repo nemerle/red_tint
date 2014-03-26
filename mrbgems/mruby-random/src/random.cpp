@@ -134,9 +134,9 @@ static mrb_value mrb_random_g_rand(mrb_state *mrb, mrb_value self)
     mrb_value seed;
 
     max = get_opt(mrb);
-    seed = mrb_gv_get(mrb, mrb->intern2(GLOBAL_RAND_SEED_KEY,GLOBAL_RAND_SEED_KEY_CSTR_LEN));
+    seed = mrb->mrb_gv_get(mrb->intern2(GLOBAL_RAND_SEED_KEY,GLOBAL_RAND_SEED_KEY_CSTR_LEN));
     if (seed.is_nil()) {
-        mrb_random_mt_g_srand(mrb, mrb_nil_value());
+        mrb_random_mt_g_srand(mrb, mrb_value::nil());
     }
     return mrb_random_mt_g_rand(mrb, max);
 }
@@ -149,8 +149,8 @@ static mrb_value mrb_random_g_srand(mrb_state *mrb, mrb_value self)
     seed = get_opt(mrb);
     seed = mrb_random_mt_g_srand(mrb, seed);
     mrb_sym glob_randseed=mrb->intern2(GLOBAL_RAND_SEED_KEY,GLOBAL_RAND_SEED_KEY_CSTR_LEN);
-    old_seed = mrb_gv_get(mrb,glob_randseed);
-    mrb_gv_set(mrb, glob_randseed, seed);
+    old_seed = mrb->mrb_gv_get(glob_randseed);
+    mrb->gv_set(glob_randseed, seed);
     return old_seed;
 }
 
@@ -176,15 +176,14 @@ static mrb_value mrb_random_init(mrb_state *mrb, mrb_value self)
     DATA_PTR(self) = t;
     return self;
 }
-static void
-mrb_random_rand_seed(mrb_state *mrb, mrb_value self)
+static void mrb_random_rand_seed(mrb_state *mrb, mrb_value self)
 {
     mrb_value seed;
     mt_state *t = (mt_state *)DATA_PTR(self);
 
-    seed = mrb_iv_get(self, mrb->intern2(INSTANCE_RAND_SEED_KEY, INSTANCE_RAND_SEED_KEY_CSTR_LEN));
+    seed = self.mrb_iv_get(mrb->intern2(INSTANCE_RAND_SEED_KEY, INSTANCE_RAND_SEED_KEY_CSTR_LEN));
     if (seed.is_nil()) {
-        mrb_random_mt_srand(mrb, t, mrb_nil_value());
+        mrb_random_mt_srand(mrb, t, mrb_value::nil());
     }
 }
 static mrb_value mrb_random_rand(mrb_state *mrb, mrb_value self)
@@ -205,7 +204,7 @@ static mrb_value mrb_random_srand(mrb_state *mrb, mrb_value self)
     seed = get_opt(mrb);
     seed = mrb_random_mt_srand(mrb, t, seed);
     mrb_sym sym_seed_key = mrb->intern2(INSTANCE_RAND_SEED_KEY,INSTANCE_RAND_SEED_KEY_CSTR_LEN);
-    old_seed = mrb_iv_get(self, sym_seed_key);
+    old_seed = self.mrb_iv_get(sym_seed_key);
     mrb_iv_set(mrb, self, sym_seed_key, seed);
     return old_seed;
 }
@@ -214,9 +213,9 @@ mrb_random_g_rand_seed(mrb_state *mrb)
 {
     mrb_value seed;
 
-    seed = mrb_gv_get(mrb, mrb->intern2(GLOBAL_RAND_SEED_KEY, GLOBAL_RAND_SEED_KEY_CSTR_LEN));
+    seed = mrb->mrb_gv_get(mrb->intern2(GLOBAL_RAND_SEED_KEY, GLOBAL_RAND_SEED_KEY_CSTR_LEN));
     if (seed.is_nil()) {
-        mrb_random_mt_g_srand(mrb, mrb_nil_value());
+        mrb_random_mt_g_srand(mrb, mrb_value::nil());
     }
 }
 /*
@@ -232,7 +231,7 @@ mrb_ary_shuffle_bang(mrb_state *mrb, mrb_value ary)
     mrb_int i;
     mrb_value seed;
     RArray *arr_p = mrb_ary_ptr(ary);
-    mrb_value random = mrb_nil_value();
+    mrb_value random = mrb_value::nil();
     if (arr_p->m_len > 1) {
         mrb_get_args(mrb, "|o", &random);
         if( random.is_nil() ) {

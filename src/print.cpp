@@ -9,45 +9,35 @@
 
 static void printstr(mrb_state *mrb, const mrb_value &obj)
 {
-
-    RString *str;
     if (obj.is_string()) {
-        str = mrb_str_ptr(obj);
+        RString *str = obj.ptr<RString>();
         mrb->sys.print_f("%s",str->m_ptr);
-        //fwrite(str->m_ptr, str->len, 1, stdout);
     }
 }
 void mrb_p(mrb_state *mrb, mrb_value obj)
-{
-#ifdef ENABLE_STDIO
+{    
     obj = mrb->funcall(obj, "inspect", 0);
     printstr(mrb, obj);
-    putc('\n', stdout);
-#endif
+    mrb->sys.print_f("\n");
 }
-void mrb_print_error(mrb_state *mrb)
+void mrb_state::print_error()
 {
-#ifdef ENABLE_STDIO
-
-    mrb_print_backtrace(mrb);
-    mrb_value s = mrb->funcall(mrb_obj_value(mrb->m_exc), "inspect", 0);
-
+    mrb_print_backtrace(this);
+    mrb_value s = funcall(mrb_value::wrap(m_exc), "inspect", 0);
     if (s.is_string()) {
-        RString *str = mrb_str_ptr(s);
-        fwrite(str->m_ptr, str->len, 1, stderr);
-        putc('\n', stderr);
+        RString *str = s.ptr<RString>();
+        sys.error_f("%s\n",str->m_ptr);
     }
-#endif
 }
 #include "mruby/variable.h"
-extern mrb_value mrb_const_get(mrb_state *mrb, mrb_value mod, mrb_sym sym);
+
 void mrb_show_version(mrb_state *mrb)
 {
   mrb_value msg;
 
-  msg = mrb_const_get(mrb, mrb_obj_value(mrb->object_class), mrb_intern_lit(mrb, "MRUBY_DESCRIPTION"));
+  msg = mrb->object_class->const_get(mrb_intern_lit(mrb, "MRUBY_DESCRIPTION"));
   printstr(mrb, msg);
-  printstr(mrb, mrb_str_new_lit(mrb, "\n"));
+  mrb->sys.print_f("\n");
 }
 
 void
@@ -55,7 +45,7 @@ mrb_show_copyright(mrb_state *mrb)
 {
   mrb_value msg;
 
-  msg = mrb_const_get(mrb, mrb_obj_value(mrb->object_class), mrb_intern_lit(mrb, "MRUBY_COPYRIGHT"));
+  msg = mrb->object_class->const_get(mrb_intern_lit(mrb, "MRUBY_COPYRIGHT"));
   printstr(mrb, msg);
-  printstr(mrb, mrb_str_new_lit(mrb, "\n"));
+  mrb->sys.print_f("\n");
 }

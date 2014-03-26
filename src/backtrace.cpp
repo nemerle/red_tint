@@ -31,31 +31,28 @@ print_backtrace_i(mrb_state *mrb, void *stream, int level, const char *format, .
 
 #define MIN_BUFSIZE 127
 
-static void
-get_backtrace_i(mrb_state *mrb, void *stream, int level, const char *format, ...)
+static void get_backtrace_i(mrb_state *mrb, void *stream, int level, const char *format, ...)
 {
     va_list ap;
-    mrb_value ary, str;
 
     if (level > 0) {
         return;
     }
-
+    RArray *ar_stream = (RArray*)stream;
     int ai = mrb->gc().arena_save();
-    ary = mrb_obj_value((RArray*)stream);
 
     va_start(ap, format);
-    str = mrb_str_new(mrb, 0, vsnprintf(NULL, 0, format, ap) + 1);
+    RString *str_ptr = RString::create(mrb,0,vsnprintf(NULL, 0, format, ap) + 1);
     va_end(ap);
 
     va_start(ap, format);
-    vsnprintf(RSTRING_PTR(str), RSTRING_LEN(str), format, ap);
+    vsnprintf(str_ptr->m_ptr, str_ptr->len, format, ap);
     va_end(ap);
-    mrb_str_resize(mrb, str, RSTRING_LEN(str) - 1);
-    mrb_ary_ptr(ary)->push(str);
+    str_ptr->resize(str_ptr->len - 1);
+    ar_stream->push(mrb_value::wrap(str_ptr));
     mrb->gc().arena_restore(ai);
 }
-extern mrb_value mrb_mod_cv_get(mrb_state *mrb, RClass * c, mrb_sym sym);
+
 static void
 output_backtrace(mrb_state *mrb, mrb_int ciidx, mrb_code *pc0, output_stream_func func, void *stream)
 {
@@ -70,11 +67,9 @@ output_backtrace(mrb_state *mrb, mrb_int ciidx, mrb_code *pc0, output_stream_fun
         ci = &mrb->m_ctx->cibase[i];
         filename = nullptr;
         lineno = -1;
-        if (!ci->proc) continue;
-        if (MRB_PROC_CFUNC_P(ci->proc)) {
+        if (!ci->proc || ci->proc->is_cfunc())
             continue;
-        }
-        else {
+        {
             //assert(mrb_type(*ci->proc)==MRB_TT_PROC);
             mrb_irep *irep = ci->proc->body.irep;
             mrb_code *pc;
@@ -144,23 +139,21 @@ void mrb_print_backtrace(mrb_state *mrb)
 mrb_value
 mrb_exc_backtrace(mrb_state *mrb, mrb_value self)
 {
-    mrb_value ary = mrb_ary_new(mrb);
-    exc_output_backtrace(mrb, self.object_ptr(), get_backtrace_i, (void*)mrb_ary_ptr(ary));
-    return ary;
+    RArray *ary = RArray::create(mrb);
+    exc_output_backtrace(mrb, self.object_ptr(), get_backtrace_i, ary);
+    return mrb_value::wrap(ary);
 }
 
-mrb_value
-mrb_get_backtrace(mrb_state *mrb)
+mrb_value mrb_get_backtrace(mrb_state *mrb)
 {
-    mrb_value ary;
     mrb_callinfo *ci = mrb->m_ctx->m_ci;
     mrb_code *pc = ci->pc;
     mrb_int ciidx = ci - mrb->m_ctx->cibase - 1;
 
-    if (ciidx < 0) ciidx = 0;
+    if (ciidx < 0)
+        ciidx = 0;
+    RArray *arr = RArray::create(mrb);
+    output_backtrace(mrb, ciidx, pc, get_backtrace_i, arr);
 
-    ary = mrb_ary_new(mrb);
-    output_backtrace(mrb, ciidx, pc, get_backtrace_i, (void*)mrb_ary_ptr(ary));
-
-    return ary;
+    return mrb_value::wrap(arr);
 }

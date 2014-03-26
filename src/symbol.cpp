@@ -133,7 +133,7 @@ mrb_value mrb_check_intern(mrb_state *mrb, const char *name, size_t len)
 
     if(iter != name2sym_tab.end())
         return mrb_symbol_value(name2sym_tab[iter]);
-    return mrb_nil_value();
+    return mrb_value::nil();
 }
 
 mrb_value mrb_check_intern_str(mrb_state *mrb, mrb_value str)
@@ -413,7 +413,7 @@ mrb_value mrb_sym2str(mrb_state *mrb, mrb_sym sym)
     const char *name = mrb_sym2name_len(mrb, sym, len);
 
     if (!name)
-        return mrb_undef_value(); /* can't happen */
+        return mrb_value::undef(); /* can't happen */
     return mrb_str_new_static(mrb, name, len);
 }
 
@@ -436,7 +436,7 @@ static mrb_value sym_cmp(mrb_state *mrb, mrb_value s1) {
 
     mrb_get_args(mrb, "o", &s2);
     if (mrb_type(s2) != MRB_TT_SYMBOL)
-        return mrb_nil_value();
+        return mrb_value::nil();
     mrb_sym sym1 = mrb_symbol(s1);
     mrb_sym sym2 = mrb_symbol(s2);
     if (sym1 == sym2)

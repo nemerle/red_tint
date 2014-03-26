@@ -7,8 +7,8 @@
 template<typename T>
 class Allocator {
 
-    MemManager *m_mem;
 public:
+    MemManager *m_mem;
     typedef size_t size_type;
     typedef ptrdiff_t difference_type;
     typedef T* pointer;

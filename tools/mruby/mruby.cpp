@@ -166,13 +166,13 @@ cleanup(mrb_state *mrb, struct mrbc_args *args)
         mrb->gc()._free(args->cmdline);
     if (args->argv)
         mrb->gc()._free(args->argv);
-    mrb_close(mrb);
+    mrb->destroy();
 }
 
 int
 main(int argc, char **argv)
 {
-    mrb_state *mrb = mrb_open();
+    mrb_state *mrb = mrb_state::create();
     int n = -1;
     int i;
     struct mrbc_args args;
@@ -194,7 +194,7 @@ main(int argc, char **argv)
     for (i = 0; i < args.argc; i++) {
         pARGV->push(mrb_str_new(mrb, args.argv[i], strlen(args.argv[i])));
     }
-    mrb_define_global_const(mrb, "ARGV", mrb_obj_value(pARGV));
+    mrb->define_global_const("ARGV", mrb_value::wrap(pARGV));
     c = mrbc_context_new(mrb);
     if (args.verbose)
         c->dump_result = 1;
@@ -210,12 +210,12 @@ main(int argc, char **argv)
             const char *cmdline;
             cmdline = args.cmdline ? args.cmdline : "-";
             mrbc_filename(mrb, c, args.cmdline ? args.cmdline : "-");
-            mrb_gv_set(mrb, zero_sym, mrb_str_new_cstr(mrb, cmdline));
+            mrb->gv_set(zero_sym, mrb_str_new_cstr(mrb, cmdline));
             v = mrb_load_file_cxt(mrb, args.rfp, c);
         }
         else {
             mrbc_filename(mrb, c, "-e");
-            mrb_gv_set(mrb, zero_sym, mrb_str_new_lit(mrb, "-e"));
+            mrb->gv_set(zero_sym, mrb_str_new_lit(mrb, "-e"));
             v = mrb_load_string_cxt(mrb, args.cmdline, c);
         }
 
@@ -223,7 +223,7 @@ main(int argc, char **argv)
     mrbc_context_free(mrb, c);
     if (mrb->m_exc) {
         if (!v.is_undef()) {
-            mrb_print_error(mrb);
+            mrb->print_error();
         }
         n = -1;
     }

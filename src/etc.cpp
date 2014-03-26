@@ -41,7 +41,7 @@ void mrb_data_check_type(mrb_state *mrb, const mrb_value &obj, const mrb_data_ty
         } else {
             const RClass *c = RClass::mrb_class(mrb, obj);
             mrb->mrb_raisef(E_TYPE_ERROR, "uninitialized %S (expected %S)",
-                       mrb_obj_value((RClass *)c), mrb_str_new_cstr(mrb, type->struct_name));
+                       mrb_value::wrap((RClass *)c), mrb_str_new_cstr(mrb, type->struct_name));
         }
     }
 }

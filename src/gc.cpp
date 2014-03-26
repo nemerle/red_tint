@@ -17,6 +17,9 @@
 #include "mruby/variable.h"
 #include "mruby/gc.h"
 
+#define is_dead(s, o) (((o)->color & other_white_part(s) & MRB_GC_WHITES) || (o)->tt == MRB_TT_FREE)
+#define other_white_part(s) ((s)->current_white_part ^ MRB_GC_WHITES)
+
 /*
   = Tri-color Incremental Garbage Collection
 
@@ -382,7 +385,7 @@ RBasic* MemManager::mrb_obj_alloc(enum mrb_vtype ttype, RClass *cls)
     *(RVALUE *)p = RVALUE_zero;
     p->tt = ttype;
     p->c = cls;
-    paint_partial_white(this, p);
+    p->paint_partial_white(this->current_white_part);
     return p;
 }
 void MemManager::mark_context_stack(mrb_context *ctx) {
@@ -403,7 +406,7 @@ void MemManager::mark_context(mrb_context *ctx)
     size_t i;
     size_t e;
     mrb_callinfo *ci;
-    
+
     /* mark stack */
     mark_context_stack(ctx);
 
@@ -431,87 +434,87 @@ void MemManager::mark_children(RBasic *obj)
     m_gray_list = obj->gcnext;
     mark(obj->c);
     switch (obj->tt) {
-        case MRB_TT_ICLASS:
-            mark(((RClass*)obj)->super);
-            break;
+    case MRB_TT_ICLASS:
+        mark(((RClass*)obj)->super);
+        break;
 
-        case MRB_TT_CLASS:
-        case MRB_TT_MODULE:
-        case MRB_TT_SCLASS:
-        {
-            RClass *c = (RClass*)obj;
+    case MRB_TT_CLASS:
+    case MRB_TT_MODULE:
+    case MRB_TT_SCLASS:
+    {
+        RClass *c = (RClass*)obj;
 
-            c->mark_mt(m_vm->gc());
-            mark(c->super);
-        }
-            /* fall through */
+        c->mark_mt(m_vm->gc());
+        mark(c->super);
+    }
+        /* fall through */
 
-        case MRB_TT_OBJECT:
-        case MRB_TT_DATA:
-            mrb_gc_mark_iv(m_vm, (RObject*)obj);
-            break;
+    case MRB_TT_OBJECT:
+    case MRB_TT_DATA:
+        mrb_gc_mark_iv((RObject*)obj);
+        break;
 
-        case MRB_TT_PROC:
-        {
-            RProc *p = (RProc*)obj;
+    case MRB_TT_PROC:
+    {
+        RProc *p = (RProc*)obj;
 
-            mark(p->env);
-            mark(p->target_class());
-        }
-            break;
+        mark(p->env);
+        mark(p->target_class());
+    }
+        break;
 
-        case MRB_TT_ENV:
-        {
-            REnv *e = (REnv*)obj;
+    case MRB_TT_ENV:
+    {
+        REnv *e = (REnv*)obj;
 
-            if (e->cioff < 0) {
-                int i, len;
+        if (e->cioff < 0) {
+            int i, len;
 
-                len = (int)e->flags;
-                for (i=0; i<len; i++) {
-                    mrb_gc_mark_value(m_vm, e->stack[i]);
-                }
+            len = (int)e->flags;
+            for (i=0; i<len; i++) {
+                mrb_gc_mark_value(m_vm, e->stack[i]);
             }
         }
-            break;
-        case MRB_TT_FIBER:
-        {
-            mrb_context *c = ((RFiber*)obj)->cxt;
-            mark_context(c);
+    }
+        break;
+    case MRB_TT_FIBER:
+    {
+        mrb_context *c = ((RFiber*)obj)->cxt;
+        mark_context(c);
+    }
+        break;
+    case MRB_TT_ARRAY:
+    {
+        RArray *a = (RArray*)obj;
+        size_t i, e;
+
+        for (i=0,e=a->m_len; i<e; i++) {
+            mrb_gc_mark_value(m_vm, a->m_ptr[i]);
         }
-            break;
-        case MRB_TT_ARRAY:
-        {
-            RArray *a = (RArray*)obj;
-            size_t i, e;
+    }
+        break;
 
-            for (i=0,e=a->m_len; i<e; i++) {
-                mrb_gc_mark_value(m_vm, a->m_ptr[i]);
-            }
+    case MRB_TT_HASH:
+        mrb_gc_mark_iv((RObject*)obj);
+        mrb_gc_mark_hash(m_vm, (RHash*)obj);
+        break;
+
+    case MRB_TT_STRING:
+        break;
+
+    case MRB_TT_RANGE:
+    {
+        RRange *r((RRange*)obj);
+
+        if (r->edges) {
+            mrb_gc_mark_value(m_vm, r->edges->beg);
+            mrb_gc_mark_value(m_vm, r->edges->end);
         }
-            break;
+    }
+        break;
 
-        case MRB_TT_HASH:
-            mrb_gc_mark_iv(m_vm, (RObject*)obj);
-            mrb_gc_mark_hash(m_vm, (RHash*)obj);
-            break;
-
-        case MRB_TT_STRING:
-            break;
-
-        case MRB_TT_RANGE:
-        {
-            RRange *r((RRange*)obj);
-
-            if (r->edges) {
-                mrb_gc_mark_value(m_vm, r->edges->beg);
-                mrb_gc_mark_value(m_vm, r->edges->end);
-            }
-        }
-            break;
-
-        default:
-            break;
+    default:
+        break;
     }
 }
 
@@ -529,87 +532,87 @@ void MemManager::obj_free(RBasic *obj)
 {
     DEBUG(printf("obj_free(%p,tt=%d)\n",obj,obj->tt));
     switch (obj->tt) {
-        /* immediate - no mark */
-        case MRB_TT_TRUE:
-        case MRB_TT_FIXNUM:
-        case MRB_TT_SYMBOL:
-            /* cannot happen */
-            return;
-        case MRB_TT_FLOAT:
+    /* immediate - no mark */
+    case MRB_TT_TRUE:
+    case MRB_TT_FIXNUM:
+    case MRB_TT_SYMBOL:
+        /* cannot happen */
+        return;
+    case MRB_TT_FLOAT:
 #ifdef MRB_WORD_BOXING
-            break;
+        break;
 #else
-            return;
+        return;
 #endif
 
-        case MRB_TT_OBJECT:
-            mrb_gc_free_iv(m_vm, (RObject*)obj);
-            break;
+    case MRB_TT_OBJECT:
+        mrb_gc_free_iv((RObject*)obj);
+        break;
 
-        case MRB_TT_CLASS:
-        case MRB_TT_MODULE:
-        case MRB_TT_SCLASS:
-            mrb_gc_free_mt(m_vm, (RClass*)obj);
-            mrb_gc_free_iv(m_vm, (RObject*)obj);
-            break;
+    case MRB_TT_CLASS:
+    case MRB_TT_MODULE:
+    case MRB_TT_SCLASS:
+        mrb_gc_free_mt(m_vm, (RClass*)obj);
+        mrb_gc_free_iv((RObject*)obj);
+        break;
 
-        case MRB_TT_ENV:
-        {
-            REnv *e = (REnv*)obj;
+    case MRB_TT_ENV:
+    {
+        REnv *e = (REnv*)obj;
 
-            if (e->cioff < 0) {
-                _free(e->stack);
-                e->stack = 0;
-            }
+        if (e->cioff < 0) {
+            _free(e->stack);
+            e->stack = 0;
         }
-            break;
-        case MRB_TT_FIBER:
-        {
-            mrb_context *c = ((RFiber*)obj)->cxt;
-            if(c !=m_vm->root_c)
-                mrb_free_context(m_vm,c);
+    }
+        break;
+    case MRB_TT_FIBER:
+    {
+        mrb_context *c = ((RFiber*)obj)->cxt;
+        if(c !=m_vm->root_c)
+            mrb_free_context(m_vm,c);
+    }
+        break;
+    case MRB_TT_ARRAY:
+        if (obj->flags & MRB_ARY_SHARED)
+            mrb_ary_decref(m_vm, ((RArray*)obj)->m_aux.shared);
+        else
+            _free(((RArray*)obj)->m_ptr);
+        break;
+
+    case MRB_TT_HASH:
+        mrb_gc_free_iv((RObject*)obj);
+        mrb_gc_free_hash(m_vm, (RHash*)obj);
+        break;
+
+    case MRB_TT_STRING:
+        mrb_gc_free_str(m_vm, (RString*)obj);
+        break;
+    case MRB_TT_PROC:
+    {
+        struct RProc *p = (struct RProc*)obj;
+
+        if (!p->is_cfunc() && p->body.irep) {
+            mrb_irep_decref(m_vm, p->body.irep);
         }
-            break;
-        case MRB_TT_ARRAY:
-            if (obj->flags & MRB_ARY_SHARED)
-                mrb_ary_decref(m_vm, ((RArray*)obj)->m_aux.shared);
-            else
-                _free(((RArray*)obj)->m_ptr);
-            break;
+    }
+        break;
+    case MRB_TT_RANGE:
+        _free(((RRange*)obj)->edges);
+        break;
 
-        case MRB_TT_HASH:
-            mrb_gc_free_iv(m_vm, (RObject*)obj);
-            mrb_gc_free_hash(m_vm, (RHash*)obj);
-            break;
-
-        case MRB_TT_STRING:
-            mrb_gc_free_str(m_vm, (RString*)obj);
-            break;
-        case MRB_TT_PROC:
-        {
-            struct RProc *p = (struct RProc*)obj;
-
-            if (!MRB_PROC_CFUNC_P(p) && p->body.irep) {
-                mrb_irep_decref(m_vm, p->body.irep);
-            }
+    case MRB_TT_DATA:
+    {
+        RData *d = (RData*)obj;
+        if (d->type && d->type->dfree) {
+            d->type->dfree(m_vm, d->data);
         }
-            break;
-        case MRB_TT_RANGE:
-            _free(((RRange*)obj)->edges);
-            break;
+        mrb_gc_free_iv((RObject*)obj);
+    }
+        break;
 
-        case MRB_TT_DATA:
-        {
-            RData *d = (RData*)obj;
-            if (d->type && d->type->dfree) {
-                d->type->dfree(m_vm, d->data);
-            }
-            mrb_gc_free_iv(m_vm, (RObject*)obj);
-        }
-            break;
-
-        default:
-            break;
+    default:
+        break;
     }
     obj->tt = MRB_TT_FREE;
 }
@@ -646,75 +649,75 @@ size_t MemManager::gc_gray_mark(RBasic *obj)
     mark_children(obj);
 
     switch (obj->tt) {
-        case MRB_TT_ICLASS:
-            children++;
-            break;
+    case MRB_TT_ICLASS:
+        children++;
+        break;
 
-        case MRB_TT_CLASS:
-        case MRB_TT_SCLASS:
-        case MRB_TT_MODULE:
-        {
-            RClass *c = (RClass*)obj;
+    case MRB_TT_CLASS:
+    case MRB_TT_SCLASS:
+    case MRB_TT_MODULE:
+    {
+        RClass *c = (RClass*)obj;
 
-            children += mrb_gc_mark_iv_size(m_vm, c);
-            children += c->mark_mt_size();
-            children++;
+        children += mrb_gc_mark_iv_size(c);
+        children += c->mark_mt_size();
+        children++;
+    }
+        break;
+
+    case MRB_TT_OBJECT:
+    case MRB_TT_DATA:
+        children += mrb_gc_mark_iv_size((RObject*)obj);
+        break;
+
+    case MRB_TT_ENV:
+        children += ((REnv *)obj)->stackSize();
+        break;
+    case MRB_TT_FIBER:
+    {
+        mrb_context *c = ((RFiber*)obj)->cxt;
+        size_t i;
+
+        /* mark stack */
+        i = c->m_stack - c->m_stbase;
+        if (c->m_ci)
+            i += c->m_ci->nregs;
+        if (c->m_stbase + i > c->stend)
+            i = c->stend - c->m_stbase;
+        children += i;
+
+        /* mark ensure stack */
+        children += (c->m_ci) ? c->m_ci->eidx : 0;
+
+        /* mark closure */
+        if (c->cibase) {
+            mrb_callinfo *ci;
+            for (i=0, ci = c->cibase; ci <= c->m_ci; i++, ci++)
+                ; // TODO: ?
         }
-            break;
+        children += i;
+    }
+        break;
 
-        case MRB_TT_OBJECT:
-        case MRB_TT_DATA:
-            children += mrb_gc_mark_iv_size(m_vm, (RObject*)obj);
-            break;
+    case MRB_TT_ARRAY:
+    {
+        RArray *a = (RArray*)obj;
+        children += a->m_len;
+    }
+        break;
 
-        case MRB_TT_ENV:
-            children += (int)obj->flags;
-            break;
-        case MRB_TT_FIBER:
-        {
-            mrb_context *c = ((RFiber*)obj)->cxt;
-            size_t i;
+    case MRB_TT_HASH:
+        children += mrb_gc_mark_iv_size((RObject*)obj);
+        children += mrb_gc_mark_hash_size(m_vm, (RHash*)obj);
+        break;
 
-            /* mark stack */
-            i = c->m_stack - c->m_stbase;
-            if (c->m_ci)
-                i += c->m_ci->nregs;
-            if (c->m_stbase + i > c->stend)
-                i = c->stend - c->m_stbase;
-            children += i;
+    case MRB_TT_PROC:
+    case MRB_TT_RANGE:
+        children+=2;
+        break;
 
-            /* mark ensure stack */
-            children += (c->m_ci) ? c->m_ci->eidx : 0;
-
-            /* mark closure */
-            if (c->cibase) {
-                mrb_callinfo *ci;
-                for (i=0, ci = c->cibase; ci <= c->m_ci; i++, ci++)
-                    ; // TODO: ?
-            }
-            children += i;
-        }
-            break;
-
-        case MRB_TT_ARRAY:
-        {
-            RArray *a = (RArray*)obj;
-            children += a->m_len;
-        }
-            break;
-
-        case MRB_TT_HASH:
-            children += mrb_gc_mark_iv_size(m_vm, (RObject*)obj);
-            children += mrb_gc_mark_hash_size(m_vm, (RHash*)obj);
-            break;
-
-        case MRB_TT_PROC:
-        case MRB_TT_RANGE:
-            children+=2;
-            break;
-
-        default:
-            break;
+    default:
+        break;
     }
     return children;
 }
@@ -783,7 +786,7 @@ size_t MemManager::incremental_sweep_phase(size_t limit)
             }
             else {
                 if (!is_generational(this))
-                    paint_partial_white(this, &p->as.basic); /* next gc target */
+                    p->as.basic.paint_partial_white(this->current_white_part); /* next gc target */
                 dead_slot = 0;
             }
             p++;
@@ -819,31 +822,31 @@ size_t MemManager::incremental_sweep_phase(size_t limit)
 size_t MemManager::incremental_gc(size_t limit)
 {
     switch (m_gc_state) {
-        case GC_STATE_NONE:
-            root_scan_phase();
-            m_gc_state = GC_STATE_MARK;
-            flip_white_part(this);
-            return 0;
-        case GC_STATE_MARK:
-            if (m_gray_list) {
-                return incremental_marking_phase(limit);
-            }
-            else {
-                final_marking_phase();
-                prepare_incremental_sweep();
-                return 0;
-            }
-        case GC_STATE_SWEEP: {
-            size_t tried_sweep = 0;
-            tried_sweep = incremental_sweep_phase(limit);
-            if (tried_sweep == 0)
-                m_gc_state = GC_STATE_NONE;
-            return tried_sweep;
+    case GC_STATE_NONE:
+        root_scan_phase();
+        m_gc_state = GC_STATE_MARK;
+        flip_white_part();
+        return 0;
+    case GC_STATE_MARK:
+        if (m_gray_list) {
+            return incremental_marking_phase(limit);
         }
-        default:
-            /* unknown state */
-            mrb_assert(0);
+        else {
+            final_marking_phase();
+            prepare_incremental_sweep();
             return 0;
+        }
+    case GC_STATE_SWEEP: {
+        size_t tried_sweep = 0;
+        tried_sweep = incremental_sweep_phase(limit);
+        if (tried_sweep == 0)
+            m_gc_state = GC_STATE_NONE;
+        return tried_sweep;
+    }
+    default:
+        /* unknown state */
+        mrb_assert(0);
+        return 0;
     }
 }
 
@@ -922,6 +925,19 @@ void MemManager::mrb_incremental_gc()
     GC_TIME_STOP_AND_REPORT;
 }
 /* Perform a full gc cycle */
+void MemManager::init(mrb_state *mrb, void *user_data,mrb_allocf f)
+{
+    current_white_part = MRB_GC_WHITE_A;
+    m_vm = mrb;
+    ud = user_data;
+    m_allocf = f;
+#ifndef MRB_GC_FIXED_ARENA
+    m_arena = (RBasic**)_malloc(sizeof(RBasic*)*MRB_GC_ARENA_SIZE);
+    arena_capa = MRB_GC_ARENA_SIZE;
+#endif
+    mrb_heap_init();
+}
+
 void MemManager::mrb_full_gc()
 {
     if (m_gc_disabled)
@@ -992,7 +1008,7 @@ void MemManager::mrb_field_write_barrier(RBasic *obj, RBasic *value)
     }
     else {
         mrb_assert(m_gc_state == GC_STATE_SWEEP);
-        paint_partial_white(this, obj); /* for never write barriers */
+        obj->paint_partial_white(this->current_white_part); /* for never write barriers */
     }
 }
 
@@ -1026,7 +1042,7 @@ void MemManager::mrb_write_barrier(RBasic *obj)
 static mrb_value gc_start(mrb_state *mrb, mrb_value obj)
 {
     mrb->gc().mrb_full_gc();
-    return mrb_nil_value();
+    return mrb_value::nil();
 }
 
 /*
@@ -1094,7 +1110,7 @@ static mrb_value gc_interval_ratio_set(mrb_state *mrb, mrb_value obj)
 
     mrb_get_args(mrb, "i", &ratio);
     mrb->gc().interval_ratio(ratio);
-    return mrb_nil_value();
+    return mrb_value::nil();
 }
 
 /*
@@ -1126,7 +1142,7 @@ static mrb_value gc_step_ratio_set(mrb_state *mrb, mrb_value obj)
 
     mrb_get_args(mrb, "i", &ratio);
     mrb->gc().step_ratio(ratio);
-    return mrb_nil_value();
+    return mrb_value::nil();
 }
 
 void MemManager::change_gen_gc_mode(mrb_int enable)
@@ -1481,7 +1497,7 @@ gc_test(mrb_state *mrb, mrb_value self)
     test_gc_gray_mark();
     test_incremental_gc();
     test_incremental_sweep_phase();
-    return mrb_nil_value();
+    return mrb_value::nil();
 }
 #endif
 #endif

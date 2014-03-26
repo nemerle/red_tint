@@ -66,7 +66,7 @@ mrb_ary_assoc(mrb_state *mrb, mrb_value ary)
         mrb_equal(mrb, RARRAY_PTR(v)[0], k))
       return v;
   }
-  return mrb_nil_value();
+  return mrb_value::nil();
 }
 
 /*
@@ -98,7 +98,7 @@ mrb_ary_rassoc(mrb_state *mrb, mrb_value ary)
         mrb_equal(mrb, RARRAY_PTR(v)[1], value))
       return v;
   }
-  return mrb_nil_value();
+  return mrb_value::nil();
 }
 
 /*

@@ -74,7 +74,7 @@ static mrb_value fiber_init(mrb_state *mrb, mrb_value self)
         mrb_raise(E_ARGUMENT_ERROR, "tried to create Fiber object without a block");
     }
     p = mrb_proc_ptr(blk);
-    if (MRB_PROC_CFUNC_P(p)) {
+    if (p->is_cfunc()) {
         mrb_raise(E_ARGUMENT_ERROR, "tried to create Fiber from C defined method");
     }
 
@@ -123,7 +123,7 @@ static mrb_context* fiber_check(mrb_state *mrb, mrb_value fib)
 static mrb_value fiber_result(mrb_state *mrb, mrb_value *a, int len)
 {
     if (len == 0)
-        return mrb_nil_value();
+        return mrb_value::nil();
     if (len == 1)
         return a[0];
     return RArray::new_from_values(mrb, len, a);
@@ -255,19 +255,19 @@ fiber_current(mrb_state *mrb, mrb_value self)
         f->cxt = mrb->m_ctx;
         mrb->m_ctx->fib = f;
     }
-    return mrb_obj_value(mrb->m_ctx->fib);
+    return mrb_value::wrap(mrb->m_ctx->fib);
 }
 void
 mrb_mruby_fiber_gem_init(mrb_state* mrb)
 {
-    RClass &c = mrb->define_class("Fiber", mrb->object_class)
+    mrb->define_class("Fiber", mrb->object_class)
+            .instance_tt(MRB_TT_FIBER)
             .define_method("initialize", fiber_init, MRB_ARGS_NONE())
             .define_method("resume", fiber_resume, MRB_ARGS_ANY())
             .define_method("alive?", fiber_alive_p, MRB_ARGS_NONE())
             .define_class_method("yield", fiber_yield, MRB_ARGS_ANY())
             .define_class_method("current", fiber_current, MRB_ARGS_NONE())
             ;
-    MRB_SET_INSTANCE_TT((&c), MRB_TT_FIBER);
 }
 
 void

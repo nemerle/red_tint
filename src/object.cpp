@@ -186,7 +186,7 @@ static mrb_value true_or(mrb_state *mrb, mrb_value obj)
 
 static mrb_value false_and(mrb_state *mrb, mrb_value obj)
 {
-    return mrb_false_value();
+    return mrb_value::_false();
 }
 
 /* 15.2.4.3.2  */
@@ -285,13 +285,13 @@ inspect_type(mrb_state *mrb, mrb_value val)
 static mrb_value convert_type(mrb_state *mrb, const mrb_value &val, const char *tname, const char *method, bool raise)
 {
     mrb_sym m = mrb_intern_cstr(mrb, method);
-    if (mrb_respond_to(mrb, val, m))
+    if (val.respond_to(mrb, m))
         return mrb_funcall_argv(mrb, val, m, 0, 0);
 
     if (raise)
         mrb->mrb_raisef(E_TYPE_ERROR, "can't convert %S into %S", inspect_type(mrb, val), mrb_str_new_cstr(mrb, tname));
 
-    return mrb_nil_value();
+    return mrb_value::nil();
 }
 
 mrb_value mrb_check_to_integer(mrb_state *mrb, mrb_value val, const char *method)
@@ -300,7 +300,7 @@ mrb_value mrb_check_to_integer(mrb_state *mrb, mrb_value val, const char *method
         return val;
     mrb_value v = convert_type(mrb, val, "Integer", method, false);
     if (v.is_nil() || mrb_type(v) != MRB_TT_FIXNUM)
-        return mrb_nil_value();
+        return mrb_value::nil();
     return v;
 }
 
@@ -316,14 +316,13 @@ mrb_value mrb_convert_type(mrb_state *mrb, const mrb_value &val, mrb_vtype type,
     return v;
 }
 
-mrb_value
-mrb_check_convert_type(mrb_state *mrb, const mrb_value &val, mrb_vtype type, const char *tname, const char *method)
+mrb_value mrb_check_convert_type(mrb_state *mrb, const mrb_value &val, mrb_vtype type, const char *tname, const char *method)
 {
     if (mrb_type(val) == type && type != MRB_TT_DATA)
         return val;
     mrb_value v = convert_type(mrb, val, tname, method, false);
     if (v.is_nil() || mrb_type(v) != type)
-        return mrb_nil_value();
+        return mrb_value::nil();
     return v;
 }
 
@@ -376,7 +375,7 @@ void mrb_check_type(mrb_state *mrb, mrb_value x, mrb_vtype t)
                 etype = "Symbol";
             }
             else if (x.is_special_const()) {
-                s = mrb_str_ptr(mrb_obj_as_string(mrb, x));
+                s = mrb_obj_as_string(mrb, x).ptr<RString>();
                 etype = s->m_ptr;
             }
             else {
@@ -409,7 +408,7 @@ mrb_value mrb_any_to_s(mrb_state *mrb, mrb_value obj)
     rs->str_buf_cat("#<", 2);
     rs->str_cat(cname,strlen(cname));
     rs->str_cat(":", 1);
-    mrb_value str(mrb_obj_value(rs));
+    mrb_value str(mrb_value::wrap(rs));
     mrb_str_concat(mrb, str, mrb_ptr_to_str(mrb, mrb_cptr(obj)));
     rs->str_buf_cat(">", 1);
     return str;
@@ -441,9 +440,9 @@ mrb_value mrb_any_to_s(mrb_state *mrb, mrb_value obj)
  *     b.kind_of? M       #=> true
  */
 
-int mrb_obj_is_kind_of(mrb_state *mrb, mrb_value obj, RClass *c)
+bool mrb_value::is_kind_of(mrb_state *mrb, RClass *c)
 {
-    RClass *cl = RClass::mrb_class(mrb, obj);
+    RClass *cl = RClass::mrb_class(mrb, *this);
 
     switch (c->tt) {
         case MRB_TT_MODULE:
@@ -469,7 +468,7 @@ static mrb_value mrb_to_integer(mrb_state *mrb, mrb_value val, const char *metho
     if (val.is_fixnum())
         return val;
     mrb_value v = convert_type(mrb, val, "Integer", method, true);
-    if (!mrb_obj_is_kind_of(mrb, v, mrb->fixnum_class)) {
+    if (!v.is_kind_of(mrb, mrb->fixnum_class)) {
         mrb_value type = inspect_type(mrb, val);
         mrb->mrb_raisef(E_TYPE_ERROR, "can't convert %S to Integer (%S#%S gives %S)",
                         type, type, mrb_str_new_cstr(mrb, method), inspect_type(mrb, v));
@@ -565,6 +564,15 @@ mrb_value mrb_value::check_type(mrb_state *mrb, mrb_vtype t, const char *c, cons
         mrb->mrb_raisef(E_TYPE_ERROR, "expected %S", mrb_str_new_cstr(mrb, c));
     }
     return tmp;
+}
+
+bool mrb_value::respond_to(mrb_state *mrb, mrb_sym msg) const
+{
+    return RClass::mrb_class(mrb, *this)->respond_to(msg);
+}
+bool mrb_value::is_instance_of(mrb_state *mrb, RClass* c) const
+{
+    return RClass::mrb_class(mrb, *this)->class_real() == c;
 }
 
 void mrb_state::get_arg(const mrb_value &arg,mrb_int &tgt) {

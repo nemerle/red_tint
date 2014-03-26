@@ -19,13 +19,13 @@
 
 mrb_value mrb_exc_new(RClass *c, const char *ptr, long len)
 {
-    return c->m_vm->funcall(mrb_obj_value(c), "new", 1, mrb_str_new(c->m_vm, ptr, len));
+    return c->m_vm->funcall(mrb_value::wrap(c), "new", 1, mrb_str_new(c->m_vm, ptr, len));
 }
 
 mrb_value mrb_exc_new_str(RClass* c, mrb_value str)
 {
     str = mrb_str_to_str(c->m_vm, str);
-    return c->m_vm->funcall(mrb_obj_value(c), "new", 1, str);
+    return c->m_vm->funcall(mrb_value::wrap(c), "new", 1, str);
 }
 
 /*
@@ -157,11 +157,11 @@ static mrb_value exc_equal(mrb_state *mrb, mrb_value exc)
     }
     else {
         if (mrb_obj_class(mrb, exc) != mrb_obj_class(mrb, obj)) {
-            if (mrb_respond_to(mrb, obj, mrb_intern(mrb, "message", 7))) {
+            if (obj.respond_to(mrb, mrb->intern2("message", 7))) {
                 mesg = mrb->funcall(obj, "message", 0);
             }
             else
-                return mrb_false_value();
+                return mrb_value::_false();
         }
         else {
             mesg = mrb_attr_get(obj, id_mesg);
@@ -184,7 +184,7 @@ static void exc_debug_info(mrb_state *mrb, RObject *exc)
         mrb_code *err = ci->err;
 
         if (!err && pc) err = pc - 1;
-        if (err && ci->proc && !MRB_PROC_CFUNC_P(ci->proc)) {
+        if (err && ci->proc && !ci->proc->is_cfunc()) {
             mrb_irep *irep = ci->proc->body.irep;
             int32_t const line = mrb_debug_get_line(irep, err - irep->iseq);
             char const* file = mrb_debug_get_filename(irep, err - irep->iseq);
@@ -331,7 +331,7 @@ void mrb_bug(mrb_state *mrb, const char *fmt, ...)
 
 int sysexit_status(mrb_state *mrb, mrb_value err)
 {
-    mrb_value st = mrb_iv_get(err, mrb_intern(mrb, "status", 6));
+    mrb_value st = err.mrb_iv_get(mrb_intern(mrb, "status", 6));
     return mrb_fixnum(st);
 }
 
@@ -345,7 +345,7 @@ mrb_value make_exception(mrb_state *mrb, int argc, mrb_value *argv, int isstr)
     mrb_value mesg;
     int n;
 
-    mesg = mrb_nil_value();
+    mesg = mrb_value::nil();
     switch (argc) {
         case 0:
             break;
@@ -368,7 +368,7 @@ mrb_value make_exception(mrb_state *mrb, int argc, mrb_value *argv, int isstr)
 exception_call:
         {
             mrb_sym exc = mrb_intern(mrb, "exception", 9);
-            if (mrb_respond_to(mrb, argv[0], exc)) {
+            if (argv[0].respond_to(mrb, exc)) {
                 mesg = mrb_funcall_argv(mrb, argv[0], exc, n, argv+1);
             }
             else {
@@ -383,7 +383,7 @@ exception_call:
             break;
     }
     if (argc > 0) {
-        if (!mrb_obj_is_kind_of(mrb, mesg, mrb->eException_class))
+        if (!mesg.is_kind_of(mrb, mrb->eException_class))
             mrb->mrb_raise(E_TYPE_ERROR, "exception object expected");
         if (argc > 2)
             set_backtrace(mrb, mesg, argv[2]);
@@ -405,9 +405,9 @@ void mrb_sys_fail(mrb_state *mrb, const char *mesg)
     if (mrb->class_defined("SystemCallError")) {
         RClass *sce = mrb->class_get("SystemCallError");
         if (mesg != NULL) {
-            mrb->funcall(mrb_obj_value(sce), "_sys_fail", 2, mrb_fixnum_value(no), mrb_str_new_cstr(mrb, mesg));
+            mrb->funcall(mrb_value::wrap(sce), "_sys_fail", 2, mrb_fixnum_value(no), mrb_str_new_cstr(mrb, mesg));
         } else {
-            mrb->funcall(mrb_obj_value(sce), "_sys_fail", 1, mrb_fixnum_value(no));
+            mrb->funcall(mrb_value::wrap(sce), "_sys_fail", 1, mrb_fixnum_value(no));
         }
     } else {
         mrb->mrb_raise(E_RUNTIME_ERROR, mesg);
@@ -416,12 +416,11 @@ void mrb_sys_fail(mrb_state *mrb, const char *mesg)
 #ifdef MRB_ENABLE_CXX_EXCEPTION
 mrb_int mrb_jmpbuf::jmpbuf_id = 0;
 #endif
-extern mrb_value mrb_exc_backtrace(mrb_state *mrb, mrb_value self);
 void mrb_init_exception(mrb_state *mrb)
 {
     RClass *e;
 
-    e = mrb->eException_class = mrb_define_class(mrb, "Exception",           mrb->object_class);        /* 15.2.22 */
+    e = mrb->eException_class = &mrb->define_class("Exception", mrb->object_class);        /* 15.2.22 */
     e->define_class_method("exception", mrb_instance_new, MRB_ARGS_ANY())
             .define_method("exception", exc_exception, MRB_ARGS_ANY())
             .define_method("initialize", exc_initialize, MRB_ARGS_ANY())
@@ -434,6 +433,6 @@ void mrb_init_exception(mrb_state *mrb)
 
     mrb->eStandardError_class = &mrb->define_class("StandardError",       mrb->eException_class);       /* 15.2.23 */
     mrb->define_class("RuntimeError", mrb->eStandardError_class);                                       /* 15.2.28 */
-    e = mrb_define_class(mrb, "ScriptError",  mrb->eException_class);                                    /* 15.2.37 */
+    e = &mrb->define_class("ScriptError",  mrb->eException_class);                                    /* 15.2.37 */
     mrb->define_class("SyntaxError",  e);                                                           /* 15.2.38 */
 }

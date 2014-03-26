@@ -202,7 +202,7 @@ parse_args(mrb_state *mrb, int argc, char **argv, struct mrbc_args *args)
 static void
 cleanup(mrb_state *mrb, struct mrbc_args *args)
 {
-    mrb_close(mrb);
+    mrb->destroy();
 }
 
 /* Print a short remark for the user */
@@ -245,7 +245,7 @@ main(int argc, char **argv)
     unsigned int nregs;
 
     /* new interpreter instance */
-    mrb = mrb_open();
+    mrb = mrb_state::create();
     if (mrb == NULL) {
         fputs("Invalid mrb interpreter, exiting mirb\n", stderr);
         return EXIT_FAILURE;
@@ -341,13 +341,13 @@ main(int argc, char **argv)
                                  proc, mrb_top_self(mrb),nregs);
                 /* did an exception occur? */
                 if (mrb->m_exc) {
-                    p(mrb, mrb_obj_value(mrb->m_exc));
+                    p(mrb, mrb_value::wrap(mrb->m_exc));
                     mrb->m_exc = 0;
                 }
                 else {
                     /* no */
                     printf(" => ");
-                    if (!mrb_respond_to(mrb,result,mrb->intern2("inspect",7))){
+                    if (!result.respond_to(mrb,mrb->intern2("inspect",7))){
                         result = mrb_any_to_s(mrb,result);
                     }
                     p(mrb, result);
@@ -361,7 +361,7 @@ main(int argc, char **argv)
         }
     }
     mrbc_context_free(mrb, cxt);
-    mrb_close(mrb);
+    mrb->destroy();
 
     return 0;
 }

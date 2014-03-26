@@ -127,7 +127,7 @@ mrb_fix2binstr(mrb_state *mrb, mrb_value x, int base)
     while (blen + (l) >= bsiz) {\
     bsiz*=2;\
     }\
-    mrb_str_resize(mrb, result, bsiz);\
+    RSTRING(result)->resize(bsiz);\
     /*  ENC_CODERANGE_SET(result, cr);*/\
     buf = RSTRING_PTR(result);\
     } while (0)
@@ -146,28 +146,28 @@ mrb_fix2binstr(mrb_state *mrb, mrb_value x, int base)
 
 #define GETARG() (!nextvalue.is_undef() ? nextvalue : \
     posarg == -1 ? \
-    (mrb->mrb_raisef(E_ARGUMENT_ERROR, "unnumbered(%S) mixed with numbered", mrb_fixnum_value(nextarg)), mrb_undef_value()) : \
+    (mrb->mrb_raisef(E_ARGUMENT_ERROR, "unnumbered(%S) mixed with numbered", mrb_fixnum_value(nextarg)), mrb_value::undef()) : \
     posarg == -2 ? \
-    (mrb->mrb_raisef(E_ARGUMENT_ERROR, "unnumbered(%S) mixed with named", mrb_fixnum_value(nextarg)), mrb_undef_value()) : \
+    (mrb->mrb_raisef(E_ARGUMENT_ERROR, "unnumbered(%S) mixed with named", mrb_fixnum_value(nextarg)), mrb_value::undef()) : \
     (posarg = nextarg++, GETNTHARG(posarg)))
 
 #define GETPOSARG(n) (posarg > 0 ? \
-    (mrb->mrb_raisef(E_ARGUMENT_ERROR, "numbered(%S) after unnumbered(%S)", mrb_fixnum_value(n), mrb_fixnum_value(posarg)), mrb_undef_value()) : \
+    (mrb->mrb_raisef(E_ARGUMENT_ERROR, "numbered(%S) after unnumbered(%S)", mrb_fixnum_value(n), mrb_fixnum_value(posarg)), mrb_value::undef()) : \
     posarg == -2 ? \
-    (mrb->mrb_raisef(E_ARGUMENT_ERROR, "numbered(%S) after named", mrb_fixnum_value(n)), mrb_undef_value()) : \
+    (mrb->mrb_raisef(E_ARGUMENT_ERROR, "numbered(%S) after named", mrb_fixnum_value(n)), mrb_value::undef()) : \
     ((n < 1) ? \
-    (mrb->mrb_raisef(E_ARGUMENT_ERROR, "invalid index - %S$", mrb_fixnum_value(n)), mrb_undef_value()) : \
+    (mrb->mrb_raisef(E_ARGUMENT_ERROR, "invalid index - %S$", mrb_fixnum_value(n)), mrb_value::undef()) : \
     (posarg = -1, GETNTHARG(n))))
 
 #define GETNTHARG(nth) \
-    ((nth >= argc) ? (mrb->mrb_raise(E_ARGUMENT_ERROR, "too few arguments"), mrb_undef_value()) : argv[nth])
+    ((nth >= argc) ? (mrb->mrb_raise(E_ARGUMENT_ERROR, "too few arguments"), mrb_value::undef()) : argv[nth])
 
 #define GETNAMEARG(id, name, len) ( \
     posarg > 0 ? \
-    (mrb->mrb_raisef(E_ARGUMENT_ERROR, "named%S after unnumbered(%S)", mrb_str_new(mrb, (name), (len)), mrb_fixnum_value(posarg)), mrb_undef_value()) : \
+    (mrb->mrb_raisef(E_ARGUMENT_ERROR, "named%S after unnumbered(%S)", mrb_str_new(mrb, (name), (len)), mrb_fixnum_value(posarg)), mrb_value::undef()) : \
     posarg == -1 ? \
-    (mrb->mrb_raisef(E_ARGUMENT_ERROR, "named%S after numbered", mrb_str_new(mrb, (name), (len))), mrb_undef_value()) :    \
-    (posarg = -2, mrb_hash_fetch(mrb, get_hash(mrb, &hash, argc, argv), id, mrb_undef_value())))
+    (mrb->mrb_raisef(E_ARGUMENT_ERROR, "named%S after numbered", mrb_str_new(mrb, (name), (len))), mrb_value::undef()) :    \
+    (posarg = -2, mrb_hash_fetch(mrb, get_hash(mrb, &hash, argc, argv), id, mrb_value::undef())))
 
 #define GETNUM(n, val) \
     for (; p < end && ISDIGIT(*p); p++) {\
@@ -483,7 +483,7 @@ mrb_f_sprintf(mrb_state *mrb, mrb_value obj)
 
     if (argc <= 0) {
         mrb->mrb_raise(E_ARGUMENT_ERROR, "too few arguments");
-        return mrb_nil_value();
+        return mrb_value::nil();
     }
     else {
         return mrb_str_format(mrb, argc - 1, argv + 1, argv[0]);
@@ -507,7 +507,7 @@ mrb_str_format(mrb_state *mrb, int argc, const mrb_value *argv, mrb_value fmt)
     mrb_value nextvalue;
     mrb_value tmp;
     mrb_value str;
-    mrb_value hash = mrb_undef_value();
+    mrb_value hash = mrb_value::undef();
 
 #define CHECK_FOR_WIDTH(f)                                                  \
     if ((f) & FWIDTH) {                                                       \
@@ -532,6 +532,7 @@ mrb_str_format(mrb_state *mrb, int argc, const mrb_value *argv, mrb_value fmt)
     blen = 0;
     bsiz = 120;
     result = mrb_str_buf_new(mrb, bsiz);
+    RString *res_ptr=result.ptr<RString>();
     buf = RSTRING_PTR(result);
     memset(buf, 0, bsiz);
 
@@ -547,7 +548,7 @@ mrb_str_format(mrb_state *mrb, int argc, const mrb_value *argv, mrb_value fmt)
         p = t + 1;    /* skip `%' */
 
         width = prec = -1;
-        nextvalue = mrb_undef_value();
+        nextvalue = mrb_value::undef();
 
 retry:
         switch (*p) {
@@ -843,7 +844,7 @@ bin_retry:
                     else {
                         val = mrb_fixnum_to_str(mrb, mrb_fixnum_value(v), base);
                     }
-                    v = mrb_fixnum(mrb_str_to_inum(mrb, val, 10, 0/*Qfalse*/));
+                    v = mrb_fixnum(mrb_str_to_inum(mrb, val, 10, false));
                 }
                 if (sign) {
                     char c = *p;
@@ -1071,8 +1072,7 @@ sprint_exit:
         if (mrb_test(ruby_verbose)) mrb_warn(mrb,"%s", mesg);
     }
 #endif
-    mrb_str_resize(mrb, result, blen);
-
+    res_ptr->resize(blen);
     return result;
 }
 

@@ -795,7 +795,7 @@ load_exec(mrb_state *mrb, mrb_parser_state *p, mrbc_context *c)
     mrb_value v;
 
     if (!p) {
-        return mrb_undef_value();
+        return mrb_value::undef();
     }
     if (!p->m_tree || p->nerr) {
         if (p->m_capture_errors) {
@@ -805,13 +805,13 @@ load_exec(mrb_state *mrb, mrb_parser_state *p, mrbc_context *c)
                              p->error_buffer[0].lineno, p->error_buffer[0].message);
             mrb->m_exc = mrb_exc_new(E_SYNTAX_ERROR, buf, n).object_ptr();
             mrb_parser_free(p);
-            return mrb_undef_value();
+            return mrb_value::undef();
         }
         else {
             static const char msg[] = "syntax error";
             mrb->m_exc = mrb_exc_new(E_SYNTAX_ERROR, msg, sizeof(msg) - 1).object_ptr();
             mrb_parser_free(p);
-            return mrb_undef_value();
+            return mrb_value::undef();
         }
     }
     proc = mrb_generate_code(mrb, p);
@@ -819,11 +819,11 @@ load_exec(mrb_state *mrb, mrb_parser_state *p, mrbc_context *c)
     if (nullptr == proc) {
         static const char msg[] = "codegen error";
         mrb->m_exc = mrb_exc_new(E_SCRIPT_ERROR, msg, sizeof(msg) - 1).object_ptr();
-        return mrb_undef_value();
+        return mrb_value::undef();
     }
     if (c) {
         if (c->dump_result) mrb->codedump_all(proc);
-        if (c->no_exec) return mrb_obj_value(proc);
+        if (c->no_exec) return mrb_value::wrap(proc);
         if (c->target_class) {
             target = c->target_class;
         }
@@ -833,7 +833,7 @@ load_exec(mrb_state *mrb, mrb_parser_state *p, mrbc_context *c)
         mrb->m_ctx->m_ci->target_class = target;
     }
     v = mrb->mrb_context_run(proc, mrb_top_self(mrb),0);
-    if (mrb->m_exc) return mrb_nil_value();
+    if (mrb->m_exc) return mrb_value::nil();
     return v;
 }
 

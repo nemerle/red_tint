@@ -10,375 +10,14 @@
 #include "mruby/class.h"
 #include "mruby/proc.h"
 #include "mruby/string.h"
-
+#include "InstanceVariablesTable.h"
 namespace {
-typedef int (iv_foreach_func)(mrb_sym,mrb_value,void*);
 struct csym_arg {
     RClass *c;
     mrb_sym sym;
 };
 
 } // end of anonymous namespace
-#ifdef MRB_USE_IV_SEGLIST
-
-#ifndef MRB_SEGMENT_SIZE
-#define MRB_SEGMENT_SIZE 4
-#endif
-
-typedef struct segment {
-    mrb_sym key[MRB_SEGMENT_SIZE];
-    mrb_value val[MRB_SEGMENT_SIZE];
-    struct segment *next;
-} segment;
-
-typedef struct iv_tbl {
-    segment *rootseg;
-    size_t size;
-    size_t last_len;
-} iv_tbl;
-
-static iv_tbl*
-iv_new(mrb_state *mrb)
-{
-    iv_tbl *t;
-
-    t = mrb_malloc(mrb, sizeof(iv_tbl));
-    if (t) {
-        t->size = 0;
-        t->rootseg =  NULL;
-        t->last_len = 0;
-    }
-    return t;
-}
-
-static void
-iv_put(mrb_state *mrb, iv_tbl *t, mrb_sym sym, mrb_value val)
-{
-    segment *seg = t->rootseg;
-    segment *prev = NULL;
-    segment *matched_seg = NULL;
-    size_t matched_idx = 0;
-    size_t i;
-
-    while (seg) {
-        for (i=0; i<MRB_SEGMENT_SIZE; i++) {
-            mrb_sym key = seg->key[i];
-            /* Found room in last segment after last_len */
-            if (!seg->next && i >= t->last_len) {
-                seg->key[i] = sym;
-                seg->val[i] = val;
-                t->last_len = i+1;
-                t->size++;
-                return;
-            }
-            if (!matched_seg && key == 0) {
-                matched_seg = seg;
-                matched_idx = i;
-            }
-            else if (key == sym) {
-                seg->val[i] = val;
-                return;
-            }
-        }
-        prev = seg;
-        seg = seg->next;
-    }
-
-    /* not found */
-    t->size++;
-    if (matched_seg) {
-        matched_seg->key[matched_idx] = sym;
-        matched_seg->val[matched_idx] = val;
-        return;
-    }
-
-    seg = mrb_malloc(mrb, sizeof(segment));
-    if (!seg) return;
-    seg->next = NULL;
-    seg->key[0] = sym;
-    seg->val[0] = val;
-    t->last_len = 1;
-    if (prev) {
-        prev->next = seg;
-    }
-    else {
-        t->rootseg = seg;
-    }
-    return;
-}
-
-static mrb_bool
-iv_get(mrb_state *mrb, iv_tbl *t, mrb_sym sym, mrb_value *vp)
-{
-    segment *seg;
-    size_t i;
-
-    seg = t->rootseg;
-    while (seg) {
-        for (i=0; i<MRB_SEGMENT_SIZE; i++) {
-            mrb_sym key = seg->key[i];
-
-            if (!seg->next && i >= t->last_len) {
-                return false;
-            }
-            if (key == sym) {
-                if (vp) *vp = seg->val[i];
-                return true;
-            }
-        }
-        seg = seg->next;
-    }
-    return false;
-}
-
-static mrb_bool
-iv_del(mrb_state *mrb, iv_tbl *t, mrb_sym sym, mrb_value *vp)
-{
-    segment *seg;
-    size_t i;
-
-    seg = t->rootseg;
-    while (seg) {
-        for (i=0; i<MRB_SEGMENT_SIZE; i++) {
-            mrb_sym key = seg->key[i];
-
-            if (!seg->next && i >= t->last_len) {
-                return false;
-            }
-            if (key == sym) {
-                t->size--;
-                seg->key[i] = 0;
-                if (vp) *vp = seg->val[i];
-                return true;
-            }
-        }
-        seg = seg->next;
-    }
-    return false;
-}
-
-static mrb_bool
-iv_foreach(mrb_state *mrb, iv_tbl *t, iv_foreach_func *func, void *p)
-{
-    segment *seg;
-    size_t i;
-    int n;
-
-    seg = t->rootseg;
-    while (seg) {
-        for (i=0; i<MRB_SEGMENT_SIZE; i++) {
-            mrb_sym key = seg->key[i];
-
-            /* no value in last segment after last_len */
-            if (!seg->next && i >= t->last_len) {
-                return false;
-            }
-            if (key != 0) {
-                n =(*func)(mrb, key, seg->val[i], p);
-                if (n > 0) return false;
-                if (n < 0) {
-                    t->size--;
-                    seg->key[i] = 0;
-                }
-            }
-        }
-        seg = seg->next;
-    }
-    return true;
-}
-
-static size_t
-iv_size(mrb_state *mrb, iv_tbl *t)
-{
-    segment *seg;
-    size_t size = 0;
-
-    if (!t) return 0;
-    if (t->size > 0) return t->size;
-    seg = t->rootseg;
-    while (seg) {
-        if (seg->next == NULL) {
-            size += t->last_len;
-            return size;
-        }
-        seg = seg->next;
-        size += MRB_SEGMENT_SIZE;
-    }
-    /* empty iv_tbl */
-    return 0;
-}
-
-static iv_tbl*
-iv_copy(mrb_state *mrb, iv_tbl *t)
-{
-    segment *seg;
-    iv_tbl *t2;
-
-    size_t i;
-
-    seg = t->rootseg;
-    t2 = iv_new(mrb);
-
-    while (seg != NULL) {
-        for (i=0; i<MRB_SEGMENT_SIZE; i++) {
-            mrb_sym key = seg->key[i];
-            mrb_value val = seg->val[i];
-
-            if ((seg->next == NULL) && (i >= t->last_len)) {
-                return t2;
-            }
-            iv_put(mrb, t2, key, val);
-        }
-        seg = seg->next;
-    }
-    return t2;
-}
-
-static void
-iv_free(mrb_state *mrb, iv_tbl *t)
-{
-    segment *seg;
-
-    seg = t->rootseg;
-    while (seg) {
-        segment *p = seg;
-        seg = seg->next;
-        mrb_free(mrb, p);
-    }
-    mrb_free(mrb, t);
-}
-
-#else
-
-#include "mruby/khash.h"
-
-#ifndef MRB_IVHASH_INIT_SIZE
-#define MRB_IVHASH_INIT_SIZE 8
-#endif
-
-/* Instance variable table structure */
-struct iv_tbl {
-protected:
-    typedef kh_T<mrb_sym, mrb_value,IntHashFunc,IntHashEq> hashtab;
-    hashtab *h;
-    //kh_iv h;
-public:
-    iv_tbl() {
-    }
-    /**
-     * Set the value for the symbol in the instance variable table.
-     *
-     *   \arg mrb
-     *   \arg t     the instance variable table to be set in.
-     *   \arg sym   the symbol to be used as the key.
-     *   \arg val   the value to be set.
-     */
-    void iv_put(mrb_sym sym, const mrb_value &val)
-    {
-        khiter_t k = h->put(sym);
-        h->value(k) = val;
-    }
-    /**
-     * Get a value for a symbol from the instance the variable table.
-     *
-     * Parameters
-     *   \arg mrb
-     *   \arg t     the variable table to be searched.
-     *   \arg sym   the symbol to be used as the key.
-     *   \arg vp    the value pointer. Recieves the value if if the specified symbol contains
-     *         in the instance variable table.
-     * \returns true if the specfiyed symbol contains in the instance variable table.
-     */
-    bool iv_get(mrb_sym sym, mrb_value &vp)
-    {
-        khiter_t k = h->get(sym);
-        if (k != h->end() ) {
-            vp = h->value(k);
-            return true;
-        }
-        return false;
-    }
-    bool iv_get(mrb_sym sym) const
-    {
-        khiter_t k = h->get(sym);
-        if (k != h->end() ) {
-            return true;
-        }
-        return false;
-    }
-    /**
-     * Deletes the value for the symbol from the instance variable table.
-     *
-     * Parameters
-     *   \arg t    the variable table to be searched.
-     *   \arg sym  the symbol to be used as the key.
-     *   \arg vp   the value pointer. Recieves the value if the specified symbol contains
-     *        in the instance varible table.
-     * \returns true if the specfied symbol contains in the instance variable table.
-     */
-    bool iv_del(mrb_sym sym, mrb_value *vp)
-    {
-        if(!h)
-            return false;
-        khiter_t k = h->get(sym);
-        if (k == h->end() )
-            return false;
-        if (vp)
-            *vp = h->value(k);
-        h->del(k);
-        return true;
-    }
-    size_t iv_size(mrb_state *mrb)
-    {
-        if(!this || !this->h)
-            return 0;
-        return h->size();
-    }
-    mrb_bool iv_foreach(mrb_state *mrb, iv_foreach_func *func, void *p)
-    {
-
-        if (!h)
-            return true;
-        for (khiter_t k = h->begin(); k != h->end(); k++) {
-            if (!h->exist(k))
-                continue;
-            int n = (*func)(h->key(k), h->value(k), p);
-            if (n > 0)
-                return false;
-            if (n < 0) {
-                h->del(k);
-            }
-        }
-        return true;
-    }
-    /**
-     * Creates the instance variable table.
-     *
-     * Parameters
-     *   mrb
-     * \returns the instance variable table.
-     */
-    static iv_tbl* iv_new(mrb_state *mrb)
-    {
-        iv_tbl * res = new(mrb->gc()._malloc(sizeof(iv_tbl))) iv_tbl;
-        res->h = hashtab::init_size(mrb->gc(),MRB_IVHASH_INIT_SIZE);
-        return res;
-    }
-    iv_tbl* iv_copy(mrb_state *mrb)
-    {
-        iv_tbl * res = new(mrb->gc()._malloc(sizeof(iv_tbl))) iv_tbl;
-        res->h = h->copy(mrb->gc());
-        return res;
-    }
-
-    void iv_free(mrb_state *mrb)
-    {
-        h->destroy();
-        this->~iv_tbl();
-    }
-};
-
-#endif
 
 static int iv_mark_i(mrb_sym sym, mrb_value v, void *p)
 {
@@ -389,41 +28,40 @@ static int iv_mark_i(mrb_sym sym, mrb_value v, void *p)
     return 0;
 }
 
-static void mark_tbl(mrb_state *mrb, iv_tbl *t)
+static void mark_tbl(iv_tbl *t)
 {
     if (!t)
         return;
-    t->iv_foreach(mrb, iv_mark_i, 0);
+    t->iv_foreach(iv_mark_i, 0);
 }
 
 void mrb_gc_mark_gv(mrb_state *mrb)
 {
-    mark_tbl(mrb, mrb->globals);
+    mark_tbl(mrb->globals);
 }
 
 void mrb_gc_free_gv(mrb_state *mrb)
 {
     if (mrb->globals) {
-        mrb->globals->iv_free(mrb);
+        mrb->globals->iv_free();
         mrb->globals = nullptr;
     }
 }
 
-void
-mrb_gc_mark_iv(mrb_state *mrb, RObject *obj)
+void mrb_gc_mark_iv(RObject *obj)
 {
-    mark_tbl(mrb, obj->iv);
+    mark_tbl(obj->iv);
 }
 
-size_t mrb_gc_mark_iv_size(mrb_state *mrb, RObject *obj)
+size_t mrb_gc_mark_iv_size(RObject *obj)
 {
-    return obj->iv->iv_size(mrb);
+    return obj->iv->iv_size();
 }
 
-void mrb_gc_free_iv(mrb_state *mrb, RObject *obj)
+void mrb_gc_free_iv(RObject *obj)
 {
     if (obj->iv) {
-        obj->iv->iv_free(mrb);
+        obj->iv->iv_free();
         obj->iv = nullptr;
     }
 }
@@ -437,18 +75,19 @@ void mrb_vm_special_set(mrb_state *mrb, mrb_sym i, mrb_value v)
 {
 }
 
-static mrb_bool obj_iv_p(mrb_value obj)
+bool mrb_value::hasInstanceVariables() const
 {
-    switch (mrb_type(obj)) {
-        case MRB_TT_OBJECT:
-        case MRB_TT_CLASS:
-        case MRB_TT_MODULE:
-        case MRB_TT_SCLASS:
-        case MRB_TT_HASH:
-        case MRB_TT_DATA:
-            return true;
-        default:
-            return false;
+    switch (tt) {
+    //TODO: add MRB_TT_FIBER here ?
+    case MRB_TT_OBJECT:
+    case MRB_TT_CLASS:
+    case MRB_TT_MODULE:
+    case MRB_TT_SCLASS:
+    case MRB_TT_HASH:
+    case MRB_TT_DATA:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -458,43 +97,43 @@ mrb_value RObject::iv_get(mrb_sym sym)
 
     if (this->iv && this->iv->iv_get(sym, v))
         return v;
-    return mrb_nil_value();
+    return mrb_value::nil();
 }
 
-mrb_value mrb_iv_get(const mrb_value &obj, mrb_sym sym)
+mrb_value mrb_value::mrb_iv_get(mrb_sym sym) const
 {
-    if (obj_iv_p(obj)) {
-        return obj.object_ptr()->iv_get(sym);
+    if (hasInstanceVariables()) {
+        return object_ptr()->iv_get(sym);
     }
-    return mrb_nil_value();
+    return mrb_value::nil();
 }
 
 void RObject::iv_set(mrb_sym sym, const mrb_value &v)
 {
     if (!iv) {
-        iv = iv_tbl::iv_new(m_vm);
+        iv = iv_tbl::iv_new(m_vm->gc());
     }
     m_vm->gc().mrb_write_barrier(this);
     iv->iv_put(sym, v);
 }
 
-void mrb_obj_iv_ifnone(mrb_state *mrb, RObject *obj, mrb_sym sym, mrb_value v)
+void RObject::iv_ifnone(mrb_sym sym, mrb_value v)
 {
-    iv_tbl *t = obj->iv;
+    iv_tbl *t = this->iv;
 
     if (!t) {
-        t = obj->iv = iv_tbl::iv_new(mrb);
+        t = this->iv = iv_tbl::iv_new(m_vm->gc());
     }
     else if (t->iv_get(sym, v)) {
         return;
     }
-    mrb->gc().mrb_write_barrier(obj);
+    m_vm->gc().mrb_write_barrier(this);
     t->iv_put(sym, v);
 }
 
 void mrb_iv_set(mrb_state *mrb, mrb_value obj, mrb_sym sym, const mrb_value &v)
 {
-    if (obj_iv_p(obj)) {
+    if (obj.hasInstanceVariables()) {
         obj.object_ptr()->iv_set(sym, v);
     }
     else {
@@ -502,34 +141,33 @@ void mrb_iv_set(mrb_state *mrb, mrb_value obj, mrb_sym sym, const mrb_value &v)
     }
 }
 
-mrb_bool mrb_obj_iv_defined(mrb_state *mrb, struct RObject *obj, mrb_sym sym)
+bool RObject::iv_defined(mrb_sym sym)
 {
-    iv_tbl *t;
-
-    t = obj->iv;
+    iv_tbl *t = this->iv;
     if (t) {
         return t->iv_get(sym);
     }
     return false;
 }
 
-mrb_bool mrb_iv_defined(mrb_state *mrb, mrb_value obj, mrb_sym sym)
+mrb_bool mrb_iv_defined(mrb_value obj, mrb_sym sym)
 {
-    if (!obj_iv_p(obj)) return false;
-    return mrb_obj_iv_defined(mrb, obj.object_ptr(), sym);
+    if (obj.hasInstanceVariables())
+        return false;
+    return obj.object_ptr()->iv_defined(sym);
 }
 
-void mrb_iv_copy(mrb_state *mrb, mrb_value dest, mrb_value src)
+void mrb_iv_copy(mrb_value dest, mrb_value src)
 {
     RObject *d = dest.object_ptr();
     RObject *s = src.object_ptr();
 
     if (d->iv) {
-        d->iv->iv_free(mrb);
-        d->iv = 0;
+        d->iv->iv_free();
+        d->iv = nullptr;
     }
     if (s->iv) {
-        d->iv = s->iv->iv_copy(mrb);
+        d->iv = s->iv->iv_copy();
     }
 }
 
@@ -560,51 +198,57 @@ static int inspect_i(mrb_sym sym, mrb_value v, void *p)
     return 0;
 }
 
-mrb_value mrb_obj_iv_inspect(mrb_state *mrb, struct RObject *obj)
+mrb_value RObject::iv_inspect()
 {
-    iv_tbl *t = obj->iv;
-    size_t len = t->iv_size(mrb);
-
+    iv_tbl *t = this->iv;
+    size_t len = t->iv_size();
+    mrb_value wrapped_self = mrb_value::wrap(this);
     if (len > 0) {
-        const char *cn = mrb_obj_classname(mrb, mrb_obj_value(obj));
-        mrb_value str = mrb_str_buf_new(mrb, 30);
+        const char *cn = mrb_obj_classname(m_vm, wrapped_self);
+        mrb_value str = mrb_str_buf_new(m_vm, 30);
 
         mrb_str_buf_cat(str, "-<", 2);
-        mrb_str_cat_cstr(mrb, str, cn);
-        mrb_str_cat_lit(mrb, str, ":");
-        mrb_str_concat(mrb, str, mrb_ptr_to_str(mrb, obj));
+        mrb_str_cat_cstr(m_vm, str, cn);
+        mrb_str_cat_lit(m_vm, str, ":");
+        mrb_str_concat(m_vm, str, mrb_ptr_to_str(m_vm, this));
 
-        t->iv_foreach(mrb, inspect_i, &str);
-        mrb_str_cat_lit(mrb, str, ">");
+        t->iv_foreach(inspect_i, &str);
+        mrb_str_cat_lit(m_vm, str, ">");
         return str;
     }
-    return mrb_any_to_s(mrb, mrb_obj_value(obj));
+    return mrb_any_to_s(m_vm, wrapped_self);
 }
 
 mrb_value mrb_iv_remove(mrb_value obj, mrb_sym sym)
 {
-    if (obj_iv_p(obj)) {
-        iv_tbl *t = obj.object_ptr()->iv;
-        mrb_value val;
+    if (!obj.hasInstanceVariables())
+        return mrb_value::undef();
+    iv_tbl *t = obj.object_ptr()->iv;
+    mrb_value val;
 
-        if (t && t->iv_del(sym, &val)) {
-            return val;
-        }
+    if (t && t->iv_del(sym, &val)) {
+        return val;
     }
-    return mrb_undef_value();
+    return mrb_value::undef();
+
 }
 
-mrb_value mrb_vm_iv_get(mrb_state *mrb, mrb_sym sym)
+mrb_value mrb_state::vm_iv_get(mrb_sym sym)
 {
     /* get self */
-    return mrb_iv_get(mrb->m_ctx->m_stack[0], sym);
+    return m_ctx->m_stack[0].mrb_iv_get(sym);
 }
 
-void
-mrb_vm_iv_set(mrb_state *mrb, mrb_sym sym, const mrb_value &v)
+void mrb_state::vm_iv_set(mrb_sym sym, const mrb_value &v)
 {
     /* get self */
-    mrb_iv_set(mrb, mrb->m_ctx->m_stack[0], sym, v);
+    mrb_value &obj(m_ctx->m_stack[0]);
+    if (obj.hasInstanceVariables()) {
+        obj.object_ptr()->iv_set(sym, v);
+    }
+    else {
+        mrb_raise(I_ARGUMENT_ERROR, "cannot set instance variable");
+    }
 }
 
 static int iv_i(mrb_sym sym, mrb_value v, void *p)
@@ -612,7 +256,7 @@ static int iv_i(mrb_sym sym, mrb_value v, void *p)
     const char* s;
     size_t len;
 
-    RArray *tgt_array = RARRAY(*(mrb_value*)p);
+    RArray *tgt_array = (RArray *)p;
     s = mrb_sym2name_len(tgt_array->m_vm, sym, len);
     if (len > 1 && s[0] == '@' && s[1] != '@') {
         tgt_array->push(mrb_symbol_value(sym));
@@ -639,21 +283,19 @@ static int iv_i(mrb_sym sym, mrb_value v, void *p)
  */
 mrb_value mrb_obj_instance_variables(mrb_state *mrb, mrb_value self)
 {
-    mrb_value ary;
-
-    ary = mrb_ary_new(mrb);
-    if (obj_iv_p(self) && self.object_ptr()->iv) {
-        self.object_ptr()->iv->iv_foreach(mrb, iv_i, &ary);
+    RArray *ary = RArray::create(mrb);
+    if (self.hasInstanceVariables() && self.object_ptr()->iv) {
+        self.object_ptr()->iv->iv_foreach(iv_i, ary);
     }
-    return ary;
+    return mrb_value::wrap(ary);
 }
 
-static int cv_i(mrb_sym sym, mrb_value v, void *p)
+static int cv_i(mrb_sym sym, mrb_value /*v*/, void *p)
 {
     const char* s;
     size_t len;
 
-    RArray *arr = mrb_ary_ptr(*(mrb_value*)p);
+    RArray *arr = (RArray *)p;
     s = mrb_sym2name_len(arr->m_vm, sym, len);
     if (len > 2 && s[0] == '@' && s[1] == '@') {
         arr->push(mrb_symbol_value(sym));
@@ -675,77 +317,65 @@ static int cv_i(mrb_sym sym, mrb_value v, void *p)
  *       @@var2 = 2
  *     end
  *     One.class_variables   #=> [:@@var1]
- *     Two.class_variables   #=> [:@@var2]
+ *     Two.class_variables   #=> [:@@var2,:@@var1]
  */
 mrb_value mrb_mod_class_variables(mrb_state *mrb, mrb_value mod)
 {
-    mrb_value ary = mrb_ary_new(mrb);
-    RClass *c = mrb_class_ptr(mod);
+    RArray *arr = RArray::create(mrb);
+    RClass *c = mod.ptr<RClass>();
     while (c) {
         if (c->iv) {
-            c->iv->iv_foreach(mrb, cv_i, &ary);
+            c->iv->iv_foreach(cv_i, arr);
         }
         c = c->super;
     }
-    return ary;
+    return mrb_value::wrap(arr);
 }
 
-mrb_value mrb_mod_cv_get(mrb_state *mrb, RClass * c, mrb_sym sym)
+mrb_value RClass::mrb_mod_cv_get(mrb_sym sym)
 {
-    RClass * cls = c;
+    RClass * cls = this;
 
-    while (c) {
-        if (c->iv) {
-            iv_tbl *t = c->iv;
+    while (cls) {
+        if (cls->iv) {
+            iv_tbl *t = cls->iv;
             mrb_value v;
 
             if (t->iv_get(sym, v))
                 return v;
         }
-        c = c->super;
+        cls = cls->super;
     }
-    mrb_name_error(mrb, sym, "uninitialized class variable %S in %S", mrb_sym2str(mrb, sym), mrb_obj_value(cls));
+    mrb_name_error(m_vm, sym, "uninitialized class variable %S in %S", mrb_sym2str(m_vm, sym), mrb_value::wrap(this));
     /* not reached */
-    return mrb_nil_value();
+    return mrb_value::nil();
 }
 
-mrb_value mrb_cv_get(mrb_state *mrb, mrb_value mod, mrb_sym sym)
+void RClass::mrb_mod_cv_set(mrb_sym sym, const mrb_value &v)
 {
-    return mrb_mod_cv_get(mrb, mrb_class_ptr(mod), sym);
-}
+    for(RClass * cls = this; cls; cls=cls->super) {
+        if (!cls->iv)
+            continue;
+        iv_tbl *t = cls->iv;
 
-void mrb_mod_cv_set(mrb_state *mrb, struct RClass * c, mrb_sym sym, mrb_value v)
-{
-    RClass * cls = c;
-
-    while (c) {
-        if (c->iv) {
-            iv_tbl *t = c->iv;
-
-            if (t->iv_get(sym)) {
-                mrb->gc().mrb_write_barrier(c);
-                t->iv_put(sym, v);
-                return;
-            }
+        if (t->iv_get(sym)) {
+            m_vm->gc().mrb_write_barrier(cls);
+            t->iv_put(sym, v);
+            return;
         }
-        c = c->super;
     }
 
-    if (!cls->iv) {
-        cls->iv = iv_tbl::iv_new(mrb);
+    if (!this->iv) {
+        this->iv = iv_tbl::iv_new(m_vm->gc());
     }
 
-    mrb->gc().mrb_write_barrier(cls);
-    cls->iv->iv_put(sym, v);
+    m_vm->gc().mrb_write_barrier(this);
+    this->iv->iv_put(sym, v);
 }
 
-void mrb_cv_set(mrb_state *mrb, mrb_value mod, mrb_sym sym, mrb_value v)
+bool RClass::mrb_mod_cv_defined(mrb_sym sym)
 {
-    mrb_mod_cv_set(mrb, mrb_class_ptr(mod), sym, v);
-}
-
-mrb_bool mrb_mod_cv_defined(mrb_state *mrb, RClass * c, mrb_sym sym)
-{
+    RClass *c = this;
     while (c) {
         if (c->iv) {
             iv_tbl *t = c->iv;
@@ -754,55 +384,45 @@ mrb_bool mrb_mod_cv_defined(mrb_state *mrb, RClass * c, mrb_sym sym)
         }
         c = c->super;
     }
-
     return false;
 }
 
-mrb_bool mrb_cv_defined(mrb_state *mrb, mrb_value mod, mrb_sym sym)
+mrb_value mrb_state::vm_cv_get(mrb_sym sym)
 {
-    return mrb_mod_cv_defined(mrb, mrb_class_ptr(mod), sym);
-}
-
-mrb_value mrb_vm_cv_get(mrb_state *mrb, mrb_sym sym)
-{
-    RClass *c = mrb->m_ctx->m_ci->proc->m_target_class;
+    RClass *c = m_ctx->m_ci->proc->m_target_class;
 
     if (!c)
-        c = mrb->m_ctx->m_ci->target_class;
-
-    return mrb_mod_cv_get(mrb, c, sym);
+        c = m_ctx->m_ci->target_class;
+    return c->mrb_mod_cv_get(sym);
 }
 
-void
-mrb_vm_cv_set(mrb_state *mrb, mrb_sym sym, mrb_value v)
+void mrb_state::vm_cv_set(mrb_sym sym, const mrb_value &v)
 {
-    RClass *c = mrb->m_ctx->m_ci->proc->m_target_class;
+    RClass *c = m_ctx->m_ci->proc->m_target_class;
 
     if (!c)
-        c = mrb->m_ctx->m_ci->target_class;
-    mrb_mod_cv_set(mrb, c, sym, v);
+        c = m_ctx->m_ci->target_class;
+    c->mrb_mod_cv_set(sym, v);
 }
 
-bool mrb_const_defined(mrb_state *mrb, const mrb_value &mod, mrb_sym sym)
+bool mrb_const_defined(const mrb_value &mod, mrb_sym sym)
 {
-    const RClass *m = mrb_class_ptr(mod);
+    const RClass *m = mod.ptr<RClass>();
     const iv_tbl *t = m->iv;
 
-    if (!t) return false;
-    return t->iv_get(sym);
+    return t ? t->iv_get(sym) : false;
 }
 
-static void
-mod_const_check(mrb_state *mrb, const mrb_value &mod)
+static void mod_const_check(mrb_state *mrb, const mrb_value &mod)
 {
     switch (mrb_type(mod)) {
-        case MRB_TT_CLASS:
-        case MRB_TT_MODULE:
-        case MRB_TT_SCLASS:
-            break;
-        default:
-            mrb->mrb_raise(E_TYPE_ERROR, "constant look-up for non class/module");
-            break;
+    case MRB_TT_CLASS:
+    case MRB_TT_MODULE:
+    case MRB_TT_SCLASS:
+        break;
+    default:
+        mrb->mrb_raise(E_TYPE_ERROR, "constant look-up for non class/module");
+        break;
     }
 }
 
@@ -829,26 +449,26 @@ L_RETRY:
         goto L_RETRY;
     }
     name = mrb_symbol_value(sym);
-    return mrb_funcall_argv(m_vm, mrb_obj_value(this), m_vm->intern2("const_missing", 13), 1, &name);
+    return mrb_funcall_argv(m_vm, mrb_value::wrap(this), m_vm->intern2("const_missing", 13), 1, &name);
 }
 
-mrb_value mrb_const_get(mrb_state *mrb, mrb_value mod, mrb_sym sym)
-{
-    mod_const_check(mrb, mod);
-    return mrb_class_ptr(mod)->const_get(sym);
-}
-mrb_value mrb_state::const_get(mrb_value mod, mrb_sym sym)
+mrb_value mrb_state::const_get(const mrb_value &mod, mrb_sym sym)
 {
     mod_const_check(this, mod);
-    return mrb_class_ptr(mod)->const_get(sym);
+    return mod.ptr<RClass>()->const_get(sym);
+}
+void mrb_state::const_set(mrb_value mod, mrb_sym sym, const mrb_value &v)
+{
+    mod_const_check(this, mod);
+    mrb_iv_set(this, mod, sym, v);
 }
 
-mrb_value mrb_vm_const_get(mrb_state *mrb, mrb_sym sym)
+mrb_value mrb_state::mrb_vm_const_get(mrb_sym sym)
 {
-    RClass *c = mrb->m_ctx->m_ci->proc->m_target_class;
+    RClass *c = m_ctx->m_ci->proc->m_target_class;
 
     if (!c)
-        c = mrb->m_ctx->m_ci->target_class;
+        c = m_ctx->m_ci->target_class;
     if (c) {
         RClass *c2 = c;
         mrb_value v;
@@ -856,11 +476,7 @@ mrb_value mrb_vm_const_get(mrb_state *mrb, mrb_sym sym)
         if (c->iv && c->iv->iv_get(sym, v)) {
             return v;
         }
-        c2 = c;
-        for (;;) {
-            c2 = c2->outer_module();
-            if (!c2)
-                break;
+        for (c2 = c->outer_module(); c2; c2 = c2->outer_module()) {
             if (c2->iv && c2->iv->iv_get(sym, v)) {
                 return v;
             }
@@ -868,14 +484,9 @@ mrb_value mrb_vm_const_get(mrb_state *mrb, mrb_sym sym)
     }
     if(c)
         return c->const_get(sym);
-    return mrb_nil_value();
+    return mrb_value::nil();
 }
 
-void mrb_const_set(mrb_state *mrb, mrb_value mod, mrb_sym sym, mrb_value v)
-{
-    mod_const_check(mrb, mod);
-    mrb_iv_set(mrb, mod, sym, v);
-}
 
 void mrb_vm_const_set(mrb_state *mrb, mrb_sym sym, mrb_value v)
 {
@@ -886,26 +497,27 @@ void mrb_vm_const_set(mrb_state *mrb, mrb_sym sym, mrb_value v)
     c->iv_set(sym, v);
 }
 
-void mrb_const_remove(mrb_state *mrb, mrb_value mod, mrb_sym sym)
-{
-    mod_const_check(mrb, mod);
-    mrb_iv_remove(mod, sym);
-}
+//void mrb_const_remove(mrb_state *mrb, mrb_value mod, mrb_sym sym)
+//{
+//    mod_const_check(mrb, mod);
+//    mrb_iv_remove(mod, sym);
+//}
 
-void RClass::define_const(const char *name, mrb_value v)
+RClass& RClass::define_const(const char *name, mrb_value v)
 {
     iv_set(m_vm->intern_cstr(name), v);
+    return *this;
 }
 
-void mrb_define_global_const(mrb_state *mrb, const char *name, mrb_value val)
+void mrb_state::define_global_const(const char *name, mrb_value val)
 {
-    mrb->object_class->define_const(name, val);
+    object_class->define_const(name, val);
 }
 static int const_i(mrb_sym sym, mrb_value v, void *p)
 {
     size_t len;
 
-    RArray *arr = mrb_ary_ptr(*(mrb_value*)p);
+    RArray *arr = (RArray *)p;
     const char* s = mrb_sym2name_len(arr->m_vm, sym, len);
     if (len >= 1 && ISUPPER(s[0])) {
         arr->push(mrb_symbol_value(sym));
@@ -922,43 +534,42 @@ static int const_i(mrb_sym sym, mrb_value v, void *p)
  */
 mrb_value mrb_mod_constants(mrb_state *mrb, mrb_value mod)
 {
-    mrb_value ary = mrb_ary_new(mrb);;
-    RClass *c = mrb_class_ptr(mod);
+    RArray *arr = RArray::create(mrb);
+    RClass *c = mod.ptr<RClass>();
     while (c) {
         if (c->iv) {
-            c->iv->iv_foreach(mrb, const_i, &ary);
+            c->iv->iv_foreach(const_i, arr);
         }
         c = c->super;
-        if (c == mrb->object_class) break;
+        if (c == mrb->object_class)
+            break;
     }
-    return ary;
+    return mrb_value::wrap(arr);
 }
-mrb_value mrb_gv_get(mrb_state *mrb, mrb_sym sym)
+mrb_value mrb_state::mrb_gv_get(mrb_sym sym)
 {
     mrb_value v;
 
-    if (!mrb->globals) {
-        return mrb_nil_value();
+    if (!globals) {
+        return mrb_value::nil();
     }
-    if (mrb->globals->iv_get(sym, v))
+    if (globals->iv_get(sym, v))
         return v;
-    return mrb_nil_value();
+    return mrb_value::nil();
 }
 
-void mrb_gv_set(mrb_state *mrb, mrb_sym sym, mrb_value v)
+void mrb_state::gv_set(mrb_sym sym, mrb_value v)
 {
-    if (!mrb->globals)
-        mrb->globals = iv_tbl::iv_new(mrb);
-
-    mrb->globals->iv_put(sym, v);
+    if (!globals)
+        globals = iv_tbl::iv_new(gc());
+    globals->iv_put(sym, v);
 }
-void
-mrb_gv_remove(mrb_state *mrb, mrb_sym sym)
+void mrb_state::gv_remove(mrb_sym sym)
 {
-    if (!mrb->globals) {
+    if (!globals) {
         return;
     }
-    mrb->globals->iv_del(sym,NULL);
+    globals->iv_del(sym,NULL);
 }
 
 static int gv_i_arr(mrb_sym sym, mrb_value v, void *p)
@@ -986,7 +597,7 @@ mrb_value mrb_f_global_variables(mrb_state *mrb, mrb_value self)
     char buf[3];
 
     if (t) {
-        t->iv_foreach(mrb, gv_i_arr, arr);
+        t->iv_foreach(gv_i_arr, arr);
     }
     buf[0] = '$';
     buf[2] = 0;
@@ -994,16 +605,21 @@ mrb_value mrb_f_global_variables(mrb_state *mrb, mrb_value self)
         buf[1] = (char)(i + '0');
         arr->push(mrb_symbol_value(mrb_intern(mrb, buf, 2)));
     }
-    return mrb_obj_value(arr);
+    return mrb_value::wrap(arr);
 }
 
-static mrb_bool mrb_const_defined_0(RClass *klass, mrb_sym id, mrb_bool exclude, mrb_bool recurse)
+bool RClass::const_defined_at(mrb_sym id)
 {
-    const RClass *  obj_class   = klass->m_vm->object_class;
-    const RClass *  tmp         = klass;
+    //return mrb_const_defined_0(klass, id, true, false);
+    RClass *klass = this;
+    constexpr bool exclude = true;
+    constexpr bool recurse = false;
+
+    const RClass *  obj_class   = m_vm->object_class;
+    const RClass *  tmp         = this;
     mrb_bool mod_retry = 0;
 
-retry:
+    retry:
     while (tmp) {
         if (tmp->iv && tmp->iv->iv_get(id)) {
             return true;
@@ -1019,14 +635,9 @@ retry:
     return false;
 }
 
-int mrb_const_defined_at(RClass *klass, mrb_sym id)
+mrb_value mrb_attr_get(const mrb_value &obj, mrb_sym id)
 {
-    return mrb_const_defined_0(klass, id, true, false);
-}
-
-mrb_value mrb_attr_get(mrb_value obj, mrb_sym id)
-{
-    return mrb_iv_get(obj, id);
+    return obj.mrb_iv_get(id);
 }
 
 static int csym_i(mrb_sym sym, mrb_value v, void *p)
@@ -1034,7 +645,7 @@ static int csym_i(mrb_sym sym, mrb_value v, void *p)
     csym_arg *a = (csym_arg*)p;
     RClass *c = a->c;
 
-    if (mrb_type(v) == c->tt && mrb_class_ptr(v) == c) {
+    if (mrb_type(v) == c->tt && v.ptr<RClass>() == c) {
         a->sym = sym;
         return 1;     /* stop iteration */
     }
@@ -1049,6 +660,6 @@ mrb_sym mrb_class_sym(mrb_state *mrb, RClass *c, RClass *outer)
     if (!outer)
         return 0;
     csym_arg arg {c,0};
-    outer->iv->iv_foreach(mrb, csym_i, &arg);
+    outer->iv->iv_foreach(csym_i, &arg);
     return arg.sym;
 }

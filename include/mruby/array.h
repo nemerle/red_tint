@@ -12,8 +12,9 @@
 
 #define RARRAY_LEN(a) (RARRAY(a)->m_len)
 #define RARRAY_PTR(a) (RARRAY(a)->m_ptr)
-#define MRB_ARY_SHARED      (1<<8)
-
+enum eArrayFlags {
+    MRB_ARY_SHARED = (1<<8)
+};
 struct mrb_state;
 struct mrb_shared_array {
     int refcnt;
@@ -36,7 +37,7 @@ static const mrb_vtype ttype=MRB_TT_ARRAY;
         mrb_value * m_ptr;
 public:
 static  RArray *    create(mrb_state *mrb, size_t capa=0) {return ary_new_capa(mrb,capa);}
-static  mrb_value   new_capa(mrb_state *mrb, mrb_int capa);
+static  mrb_value   new_capa(mrb_state *mrb, mrb_int capa=0);
 static  mrb_value   s_create(mrb_state *mrb, mrb_value self);
 static  mrb_value   new_from_values(mrb_state *mrb, mrb_int size, const mrb_value *vals);
 static  mrb_value   new_from_values(mrb_state *mrb, const std::vector<mrb_value> &values);
@@ -95,7 +96,7 @@ static  RArray *    ary_new_capa(mrb_state *mrb, size_t capa);
         mrb_value   ary_elt(mrb_int offset)
                     {
                                         if ((m_len == 0) || (offset < 0 || offset >= m_len)  ) {
-                            return mrb_nil_value();
+                            return mrb_value::nil();
                         }
                         return m_ptr[offset];
                     }
@@ -104,7 +105,6 @@ static  RArray *    ary_new_capa(mrb_state *mrb, size_t capa);
 };
 
 void mrb_ary_decref(mrb_state*, mrb_shared_array*);
-mrb_value mrb_ary_new(mrb_state *mrb);
 mrb_value mrb_check_array_type(mrb_state *mrb, const mrb_value &self);
 mrb_value mrb_assoc_new(mrb_state *mrb, const mrb_value &car, const mrb_value &cdr);
 

@@ -15,10 +15,10 @@
 #define MRB_ASPEC_KEY(a) (((a) >> 2) & 0x1f)
 #define MRB_ASPEC_KDICT(a) ((a) & (1<<1))
 #define MRB_ASPEC_BLOCK(a) ((a) & 1)
-
-#define MRB_PROC_CFUNC (1<<7)
-#define MRB_PROC_CFUNC_P(p) ((p)->flags & MRB_PROC_CFUNC)
-#define MRB_PROC_STRICT (1<<8)
+enum eProcFlags {
+    MRB_PROC_CFUNC  = (1<<7),
+    MRB_PROC_STRICT = (1<<8)
+};
 #define MRB_PROC_STRICT_P(p) ((p)->flags & MRB_PROC_STRICT)
 
 struct REnv;
@@ -33,12 +33,12 @@ struct RProc : public RBasic {
 public:
     RClass *target_class() {return m_target_class;}
     REnv *env;
+    inline bool is_cfunc() const { return (flags & MRB_PROC_CFUNC)!=0;}
     void copy_from(RProc *src) {
         flags = src->flags;
         body  = src->body;
-        if (!(this->flags & MRB_PROC_CFUNC)) {
+        if (!is_cfunc())
             body.irep->refcnt++;
-        };
         m_target_class = src->m_target_class;
         env   = src->env;
     }
@@ -50,9 +50,11 @@ public:
     }
 };
 struct REnv : public RBasic {
+    static const mrb_vtype ttype=MRB_TT_ENV;
     mrb_value *stack;
     mrb_sym mid;
     int cioff;
+    constexpr inline int stackSize() const { return this->flags; }
     static REnv *alloc(mrb_state *mrb);
 };
 

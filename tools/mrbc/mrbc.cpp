@@ -164,7 +164,7 @@ cleanup(mrb_state *mrb, struct mrbc_args *args)
 {
     if (args->outfile)
         mrb->gc()._free((void*)args->outfile);
-    mrb_close(mrb);
+    mrb->destroy();
 }
 
 static int partial_hook(mrb_parser_state *p)
@@ -207,7 +207,7 @@ load_file(mrb_state *mrb, struct mrbc_args *args)
         need_close = true;
         if ((infile = fopen(input, "r")) == NULL) {
             fprintf(stderr, "%s: cannot open program file. (%s)\n", args->prog, input);
-            return mrb_nil_value();
+            return mrb_value::nil();
         }
     }
     mrbc_filename(mrb, c, input);
@@ -222,7 +222,7 @@ load_file(mrb_state *mrb, struct mrbc_args *args)
         fclose(infile);
     mrbc_context_free(mrb, c);
     if (result.is_undef()) {
-        return mrb_nil_value();
+        return mrb_value::nil();
     }
     return result;
 }
@@ -251,7 +251,7 @@ dump_file(mrb_state *mrb, FILE *wfp, const char *outfile, RProc *proc, struct mr
 int
 main(int argc, char **argv)
 {
-    mrb_state *mrb = mrb_open();
+    mrb_state *mrb = mrb_state::create();
     int n, result;
     struct mrbc_args args;
     FILE *wfp = stdout;

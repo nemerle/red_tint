@@ -447,7 +447,7 @@ flo_infinite_p(mrb_state *mrb, mrb_value num)
     if (isinf(value)) {
         return mrb_fixnum_value( value < 0 ? -1 : 1 );
     }
-    return mrb_nil_value();
+    return mrb_value::nil();
 }
 
 /* 15.2.9.3.9  */
@@ -1214,7 +1214,7 @@ static mrb_value num_cmp(mrb_state *mrb, mrb_value self)
             y = mrb_float(other);
             break;
         default:
-            return mrb_nil_value();
+            return mrb_value::nil();
     }
     if (x > y)
         return mrb_fixnum_value(1);

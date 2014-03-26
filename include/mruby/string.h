@@ -11,8 +11,10 @@
 #ifndef MRB_STR_BUF_MIN_SIZE
 # define MRB_STR_BUF_MIN_SIZE 128
 #endif
-#define MRB_STR_SHARED    1
-#define MRB_STR_NOFREE    2
+enum eStringFlags {
+    MRB_STR_SHARED = 1,
+    MRB_STR_NOFREE = 2
+};
 #define IS_EVSTR(p,e) ((p) < (e) && (*(p) == '$' || *(p) == '@' || *(p) == '{'))
 
 extern const char mrb_digitmap[];
@@ -35,10 +37,10 @@ public:
     void str_buf_cat(const char *ptr) { str_buf_cat(ptr,strlen(ptr)); }
     void str_buf_cat(const char *m_ptr, size_t len);
     void str_modify();
+    void resize(mrb_int len);
 private:
 };
 
-#define mrb_str_ptr(s)    ((RString*)((s).value.p))
 #define RSTRING(s)        ((RString*)((s).value.p))
 #define RSTRING_PTR(s)    (RSTRING(s)->m_ptr)
 #define RSTRING_LEN(s)    (RSTRING(s)->len)
@@ -50,7 +52,6 @@ void mrb_str_concat(mrb_state*, mrb_value, mrb_value);
 mrb_value mrb_str_plus(mrb_state*, mrb_value, mrb_value);
 mrb_value mrb_ptr_to_str(mrb_state *, void *);
 mrb_value mrb_obj_as_string(mrb_state *mrb, mrb_value obj);
-mrb_value mrb_str_resize(mrb_state *mrb, mrb_value str, mrb_int len); /* mrb_str_resize */
 mrb_value mrb_str_substr(mrb_state *mrb, mrb_value str, mrb_int beg, mrb_int len);
 mrb_value mrb_check_string_type(mrb_state *mrb, mrb_value str);
 mrb_value mrb_str_buf_new(mrb_state *mrb, mrb_int capa);
@@ -58,7 +59,6 @@ mrb_value mrb_str_buf_cat(mrb_value str, const char *ptr, size_t len);
 
 char *mrb_string_value_cstr(mrb_state *mrb, mrb_value *ptr);
 char *mrb_string_value_ptr(mrb_state *mrb, mrb_value ptr);
-int mrb_str_offset(mrb_state *mrb, mrb_value str, int pos);
 mrb_value mrb_str_dup(mrb_state *mrb, mrb_value str); /* mrb_str_dup */
 mrb_value mrb_str_pool(mrb_state *mrb, mrb_value str); /* mrb_str_dup */
 mrb_value mrb_str_intern(mrb_state *mrb, mrb_value self);

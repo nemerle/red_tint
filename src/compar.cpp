@@ -8,5 +8,5 @@
 
 void mrb_init_comparable(mrb_state *mrb)
 {
-  mrb_define_module(mrb, "Comparable");
+    mrb->define_module("Comparable");
 }

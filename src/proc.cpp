@@ -31,14 +31,13 @@ RProc * mrb_proc_new(mrb_state *mrb, mrb_irep *irep)
     return p;
 }
 
-static inline void
-closure_setup(mrb_state *mrb, RProc *p, int nlocals)
+static inline void closure_setup(mrb_state *mrb, RProc *p, int nlocals)
 {
 
     if (!mrb->m_ctx->m_ci->env) {
         REnv * e = REnv::alloc(mrb);
-        e->flags= (unsigned int)nlocals;
-        e->mid = mrb->m_ctx->m_ci->mid;
+        e->flags = (unsigned int)nlocals;
+        e->mid   = mrb->m_ctx->m_ci->mid;
         e->cioff = mrb->m_ctx->m_ci - mrb->m_ctx->cibase;
         e->stack = mrb->m_ctx->m_stack;
         mrb->m_ctx->m_ci->env = e;
@@ -59,7 +58,7 @@ RProc *mrb_proc_new_cfunc(mrb_state *mrb, mrb_func_t func)
     RProc *p = RProc::alloc(mrb);
     p->body.func = func;
     p->flags |= MRB_PROC_CFUNC;
-
+    p->env = nullptr;
     return p;
 }
 
@@ -94,11 +93,6 @@ static mrb_value mrb_proc_init_copy(mrb_state *mrb, mrb_value self)
     }
     mrb_proc_ptr(self)->copy_from(mrb_proc_ptr(proc));
     return self;
-}
-
-int mrb_proc_cfunc_p(RProc *p)
-{
-    return MRB_PROC_CFUNC_P(p);
 }
 
 mrb_value mrb_proc_call_cfunc(mrb_state *mrb, RProc *p, mrb_value self)
@@ -149,7 +143,7 @@ static mrb_value proc_lambda(mrb_state *mrb, mrb_value self)
         RProc *p2 = mrb->gc().obj_alloc<RProc>(p->c);
         p2->copy_from(p);
         p2->flags |= MRB_PROC_STRICT;
-        return mrb_obj_value(p2);
+        return mrb_value::wrap(p2);
     }
     return blk;
 }
@@ -168,7 +162,7 @@ void mrb_init_proc(mrb_state *mrb)
     call_irep->iseq = call_iseq;
     call_irep->ilen = 1;
 
-    mrb->proc_class = mrb_define_class(mrb, "Proc", mrb->object_class);
+    mrb->proc_class = &mrb->define_class("Proc", mrb->object_class);
     MRB_SET_INSTANCE_TT(mrb->proc_class, MRB_TT_PROC);
     m = mrb_proc_new(mrb, call_irep);
     mrb->proc_class->define_method("initialize", mrb_proc_initialize, MRB_ARGS_NONE())
@@ -182,9 +176,9 @@ void mrb_init_proc(mrb_state *mrb)
 }
 
 RProc *RProc::alloc(mrb_state *mrb) {
-    return (RProc*)mrb->gc().mrb_obj_alloc(MRB_TT_PROC, mrb->proc_class);
+    return mrb->gc().obj_alloc<RProc>(mrb->proc_class);
 }
 
 REnv *REnv::alloc(mrb_state *mrb) {
-    return (REnv *)mrb->gc().mrb_obj_alloc(MRB_TT_ENV, (RClass*)mrb->m_ctx->m_ci->proc->env);
+    return mrb->gc().obj_alloc<REnv>((RClass*)mrb->m_ctx->m_ci->proc->env);
 }
