@@ -123,10 +123,10 @@ static mrb_value exc_inspect(mrb_state *mrb, mrb_value exc)
     mrb_value line = mrb_attr_get(exc, mrb->intern2("line", 4));
     RString *mesg_ptr = mesg.is_nil() ? nullptr : mesg.ptr<RString>();
     if (!file.is_nil() && !line.is_nil()) {
-        assert(file.is_string() && line.is_string());
+        assert(file.is_string());
         str = file.ptr<RString>()->dup();
         str->str_buf_cat(":",1);
-        str->str_cat(line.ptr<RString>());
+        str->str_cat(mrb_obj_as_string(mrb,line));
         str->str_buf_cat(": ",2);
         if (mesg_ptr && mesg_ptr->len > 0) {
             str->str_cat(mesg_ptr);

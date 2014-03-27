@@ -1138,7 +1138,7 @@ static mrb_value fix_minus(mrb_state *mrb, mrb_value self)
 }
 
 
-mrb_value mrb_fixnum_to_str(mrb_state *mrb, mrb_value x, int base)
+RString *mrb_fixnum_to_str(mrb_state *mrb, mrb_value x, int base)
 {
     char buf[sizeof(mrb_int)*CHAR_BIT+1];
     char *b = buf + sizeof buf;
@@ -1161,7 +1161,7 @@ mrb_value mrb_fixnum_to_str(mrb_state *mrb, mrb_value x, int base)
         } while (val /= base);
     }
 
-    return mrb_str_new(mrb, b, buf + sizeof(buf) - b);
+    return RString::create(mrb, b, buf + sizeof(buf) - b);
 }
 
 /* 15.2.8.3.25 */
@@ -1180,13 +1180,12 @@ mrb_value mrb_fixnum_to_str(mrb_state *mrb, mrb_value x, int base)
  *     12345.to_s(36)   #=> "9ix"
  *
  */
-static mrb_value
-fix_to_s(mrb_state *mrb, mrb_value self)
+static mrb_value fix_to_s(mrb_state *mrb, mrb_value self)
 {
     mrb_int base = 10;
 
     mrb_get_args(mrb, "|i", &base);
-    return mrb_fixnum_to_str(mrb, self, base);
+    return mrb_fixnum_to_str(mrb, self, base)->wrap();
 }
 
 /* 15.2.9.3.6  */

@@ -73,7 +73,7 @@ static  RClass *        mrb_class(mrb_state *mrb, const mrb_value &v);
         bool            mrb_mod_cv_defined(mrb_sym sym);
         bool            const_defined_at(mrb_sym id);
         bool            const_defined(mrb_sym sym);
-        mrb_value       mod_const_defined(mrb_value id);
+        bool mod_const_defined(mrb_value id);
         RClass *        class_real() const;
         void            define_method_vm(mrb_sym name, mrb_value body);
         void            define_method_id(mrb_sym mid, mrb_func_t func, mrb_aspec aspec);

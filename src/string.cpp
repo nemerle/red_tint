@@ -2359,11 +2359,6 @@ mrb_string_type(mrb_state *mrb, mrb_value str)
 {
     return mrb_convert_type(mrb, str, MRB_TT_STRING, "String", "to_str");
 }
-mrb_value mrb_str_cat_cstr(mrb_state *mrb, mrb_value str, const char *ptr)
-{
-    return mrb_str_cat(mrb, str, ptr, strlen(ptr));
-}
-
 mrb_value mrb_str_append(mrb_state *mrb, mrb_value str, mrb_value str2)
 {
     str2 = mrb_str_to_str(mrb, str2);

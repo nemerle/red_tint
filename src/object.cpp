@@ -510,7 +510,7 @@ static mrb_value mrb_convert_to_integer(mrb_state *mrb, mrb_value val, int base)
     if (base != 0) {
         tmp = mrb_check_string_type(mrb, val);
         if (!tmp.is_nil())
-            return mrb_str_to_inum(mrb, val, base, true);
+            return mrb_str_to_inum(mrb, val.ptr<RString>(), base, true);
 arg_error:
         mrb->mrb_raise(E_ARGUMENT_ERROR, "base specified for non string value");
     }

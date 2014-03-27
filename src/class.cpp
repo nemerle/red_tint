@@ -1728,7 +1728,7 @@ bool RClass::const_defined(mrb_sym sym)
     return t ? t->iv_get(sym) : false;
 }
 
-mrb_value RClass::mod_const_defined(mrb_value id) {
+bool RClass::mod_const_defined(mrb_value id) {
     mrb_bool const_defined_p;
     if (mrb_type(id) == MRB_TT_SYMBOL) {
         check_const_name_sym(m_vm, mrb_symbol(id));
@@ -1747,7 +1747,7 @@ mrb_value RClass::mod_const_defined(mrb_value id) {
         }
     }
 
-    return mrb_value::wrap(const_defined_p);
+    return const_defined_p;
 
 }
 mrb_value mrb_mod_const_defined(mrb_state *mrb, mrb_value mod)
@@ -1755,7 +1755,7 @@ mrb_value mrb_mod_const_defined(mrb_state *mrb, mrb_value mod)
     mrb_value id = get_sym_or_str_arg(mrb);
     assert(mod.hasInstanceVariables());
     assert((mod.tt == MRB_TT_CLASS)||mod.tt == MRB_TT_MODULE);
-    return mod.ptr<RClass>()->mod_const_defined(id);
+    return mrb_value::wrap(mod.ptr<RClass>()->mod_const_defined(id));
 }
 
 mrb_value mrb_mod_const_get(mrb_state *mrb, mrb_value mod)
@@ -1788,14 +1788,12 @@ mrb_value mrb_mod_remove_const(mrb_state *mrb, mrb_value mod)
     }
     return val;
 }
-mrb_value
-mrb_mod_const_missing(mrb_state *mrb, mrb_value mod)
+mrb_value mrb_mod_const_missing(mrb_state *mrb, mrb_value mod)
 {
     mrb_sym sym;
 
     mrb_get_args(mrb, "n", &sym);
-    mrb_name_error(mrb, sym, "uninitialized constant %S",
-                   mrb_sym2str(mrb, sym));
+    mrb_name_error(mrb, sym, "uninitialized constant %S", mrb_sym2str(mrb, sym));
     /* not reached */
     return mrb_value::nil();
 }

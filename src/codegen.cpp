@@ -1264,11 +1264,10 @@ void codegen_scope::visit(BackRefNode *n) {
 void codegen_scope::visit(NthRefNode *n) {
     mrb_state *mrb = m_mrb;
     mrb_value fix = mrb_fixnum_value(n->m_ref);
-    mrb_value str = mrb_str_buf_new(mrb, 4);
-
-    mrb_str_buf_cat(str, "$", 1);
-    mrb_str_buf_append(mrb, str, mrb_fixnum_to_str(mrb, fix, 10));
-    int sym = new_sym( mrb_intern_str(mrb, str));
+    RString *str = RString::create(mrb, 4);
+    str->str_buf_cat("$", 1);
+    str->str_cat(mrb_fixnum_to_str(mrb, fix, 10));
+    int sym = new_sym( mrb->intern2(str->m_ptr,str->len));
     genop( MKOP_ABx(OP_GETGLOBAL, m_sp, sym));
     push_();
 }

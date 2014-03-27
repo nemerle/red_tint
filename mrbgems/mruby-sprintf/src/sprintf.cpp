@@ -809,7 +809,7 @@ bin_retry:
                         if (val.is_fixnum()) goto bin_retry;
                         break;
                     case MRB_TT_STRING:
-                        val = mrb_str_to_inum(mrb, val, 0, true);
+                        val = mrb_str_to_inum(mrb, val.ptr<RString>(), 0, true);
                         goto bin_retry;
                     case MRB_TT_FIXNUM:
                         v = mrb_fixnum(val);
@@ -837,14 +837,15 @@ bin_retry:
 
                 if (base == 2) {
                     org_v = v;
+                    RString *val_ptr;
                     if ( v < 0 && !sign ) {
-                        val = mrb_fix2binstr(mrb, mrb_fixnum_value(v), base)->wrap();
+                        val_ptr = mrb_fix2binstr(mrb, mrb_fixnum_value(v), base);
                         dots = 1;
                     }
                     else {
-                        val = mrb_fixnum_to_str(mrb, mrb_fixnum_value(v), base);
+                        val_ptr = mrb_fixnum_to_str(mrb, mrb_fixnum_value(v), base);
                     }
-                    v = mrb_fixnum(mrb_str_to_inum(mrb, val, 10, false));
+                    v = mrb_fixnum(mrb_str_to_inum(mrb, val_ptr, 10, false));
                 }
                 if (sign) {
                     char c = *p;
