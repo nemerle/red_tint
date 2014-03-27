@@ -76,7 +76,7 @@ typedef uint16_t mrb_sym;
 typedef bool mrb_bool;
 
 #ifndef MRB_NAN_BOXING
-
+struct RBasic;
 struct RClass;
 struct RObject;
 struct mrb_context;
@@ -124,22 +124,6 @@ enum eGcColor {
     MRB_GC_WHITES = (MRB_GC_WHITE_A | MRB_GC_WHITE_B),
     MRB_GC_COLOR_MASK = 7
 };
-struct RBasic {
-                    mrb_vtype   tt:8;
-                    uint32_t    color:3;
-                    uint32_t    flags:21; // REnv uses flags to store number of children.
-                    RClass *    c;
-                    RBasic *    gcnext;
-                    mrb_state * m_vm;
-
-                    void        paint_gray()  { color = MRB_GC_GRAY; }
-                    void        paint_black() { color = MRB_GC_BLACK; }
-                    void        paint_white() { color = MRB_GC_WHITES; }
-                    void        paint_partial_white(uint8_t current_white_part) { color = current_white_part;}
-        constexpr   bool        is_gray() const { return color == MRB_GC_GRAY;}
-        constexpr   bool        is_white() const { return (color & MRB_GC_WHITES);}
-        constexpr   bool        is_black() const { return (color & MRB_GC_BLACK);}
-};
 struct mrb_value {
 public:
                     union {
@@ -184,6 +168,23 @@ static  inline      mrb_value   wrap(T p) { return {{p},p->tt}; }
 
                     // TODO: consider using a constructor to ease the return value conversions from void *, to mrb_values
                     mrb_value   mrb_iv_get(mrb_sym sym) const;
+};
+struct RBasic {
+                    mrb_vtype   tt:8;
+                    uint32_t    color:3;
+                    uint32_t    flags:21; // REnv uses flags to store number of children.
+                    RClass *    c;
+                    RBasic *    gcnext;
+                    mrb_state * m_vm;
+
+                    void        paint_gray()  { color = MRB_GC_GRAY; }
+                    void        paint_black() { color = MRB_GC_BLACK; }
+                    void        paint_white() { color = MRB_GC_WHITES; }
+                    void        paint_partial_white(uint8_t current_white_part) { color = current_white_part;}
+        constexpr   bool        is_gray() const { return color == MRB_GC_GRAY;}
+        constexpr   bool        is_white() const { return (color & MRB_GC_WHITES);}
+        constexpr   bool        is_black() const { return (color & MRB_GC_BLACK);}
+        inline      mrb_value   wrap() { return mrb_value::wrap(this);}
 };
 
 

@@ -334,7 +334,7 @@ void mrb_state::codedump_recur( mrb_irep *irep)
 
 void mrb_state::codedump_all(RProc *proc)
 {
-    codedump_recur(proc->body.irep);
+    codedump_recur(proc->ireps());
 }
 
 

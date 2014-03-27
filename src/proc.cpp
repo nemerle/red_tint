@@ -13,7 +13,7 @@ static mrb_code call_iseq[] = {
     MKOP_A(OP_CALL, 0),
 };
 
-RProc * mrb_proc_new(mrb_state *mrb, mrb_irep *irep)
+RProc * RProc::create(mrb_state *mrb, mrb_irep *irep)
 {
     RProc *p = RProc::alloc(mrb);
     mrb_callinfo *ci = mrb->m_ctx->m_ci;
@@ -31,29 +31,29 @@ RProc * mrb_proc_new(mrb_state *mrb, mrb_irep *irep)
     return p;
 }
 
-static inline void closure_setup(mrb_state *mrb, RProc *p, int nlocals)
+static inline void closure_setup(RProc *p, int nlocals)
 {
-
-    if (!mrb->m_ctx->m_ci->env) {
-        REnv * e = REnv::alloc(mrb);
+    mrb_context *ctx = p->m_vm->m_ctx;
+    if (!ctx->m_ci->env) {
+        REnv * e = REnv::alloc(p->m_vm);
         e->flags = (unsigned int)nlocals;
-        e->mid   = mrb->m_ctx->m_ci->mid;
-        e->cioff = mrb->m_ctx->m_ci - mrb->m_ctx->cibase;
-        e->stack = mrb->m_ctx->m_stack;
-        mrb->m_ctx->m_ci->env = e;
+        e->mid   = ctx->m_ci->mid;
+        e->cioff = ctx->m_ci - ctx->cibase;
+        e->stack = ctx->m_stack;
+        ctx->m_ci->env = e;
     }
-    p->env = mrb->m_ctx->m_ci->env;
+    p->env = ctx->m_ci->env;
 }
 
-RProc *mrb_closure_new(mrb_state *mrb, mrb_irep *irep)
+RProc *RProc::new_closure(mrb_state *mrb, mrb_irep *irep)
 {
-    RProc *p = mrb_proc_new(mrb, irep);
+    RProc *p = RProc::create(mrb, irep);
 
-    closure_setup(mrb, p, mrb->m_ctx->m_ci->proc->body.irep->nlocals);
+    closure_setup(p, mrb->m_ctx->m_ci->proc->body.irep->nlocals);
     return p;
 }
 
-RProc *mrb_proc_new_cfunc(mrb_state *mrb, mrb_func_t func)
+RProc *RProc::create(mrb_state *mrb, mrb_func_t func)
 {
     RProc *p = RProc::alloc(mrb);
     p->body.func = func;
@@ -62,11 +62,11 @@ RProc *mrb_proc_new_cfunc(mrb_state *mrb, mrb_func_t func)
     return p;
 }
 
-RProc * mrb_closure_new_cfunc(mrb_state *mrb, mrb_func_t func, int nlocals)
+RProc * RProc::new_closure(mrb_state *mrb, mrb_func_t func, int nlocals)
 {
-    RProc *p = mrb_proc_new_cfunc(mrb, func);
+    RProc *p = RProc::create(mrb, func);
 
-    closure_setup(mrb, p, nlocals);
+    closure_setup(p, nlocals);
     return p;
 }
 
@@ -80,7 +80,7 @@ static mrb_value mrb_proc_initialize(mrb_state *mrb, mrb_value self)
         mrb->mrb_raise(E_ARGUMENT_ERROR, "tried to create Proc object without a block");
     }
     else {
-        mrb_proc_ptr(self)->copy_from(mrb_proc_ptr(blk));
+        self.ptr<RProc>()->copy_from(blk.ptr<RProc>());
     }
     return self;
 }
@@ -91,25 +91,20 @@ static mrb_value mrb_proc_init_copy(mrb_state *mrb, mrb_value self)
     if (mrb_type(proc) != MRB_TT_PROC) {
         mrb->mrb_raise(E_ARGUMENT_ERROR, "not a proc");
     }
-    mrb_proc_ptr(self)->copy_from(mrb_proc_ptr(proc));
+    self.ptr<RProc>()->copy_from(proc.ptr<RProc>());
     return self;
 }
 
-mrb_value mrb_proc_call_cfunc(mrb_state *mrb, RProc *p, mrb_value self)
+mrb_value RProc::call_cfunc(mrb_value self)
 {
-    return (p->body.func)(mrb, self);
-}
-
-mrb_code* mrb_proc_iseq(mrb_state *mrb, RProc *p)
-{
-    return p->body.irep->iseq;
+    return (body.func)(m_vm, self);
 }
 
 /* 15.2.17.4.2 */
 static mrb_value mrb_proc_arity(mrb_state *mrb, mrb_value self)
 {
-    RProc *p = mrb_proc_ptr(self);
-    mrb_code *iseq = mrb_proc_iseq(mrb, p);
+    RProc *p = self.ptr<RProc>();
+    mrb_code *iseq = p->ireps()->iseq;
     mrb_aspec aspec = GETARG_Ax(*iseq);
     int ma, ra, pa, arity;
 
@@ -138,7 +133,7 @@ static mrb_value proc_lambda(mrb_state *mrb, mrb_value self)
     if (blk.is_nil()) {
         mrb->mrb_raise(E_ARGUMENT_ERROR, "tried to create Proc object without a block");
     }
-    RProc *p = mrb_proc_ptr(blk);
+    RProc *p = blk.ptr<RProc>();
     if (!MRB_PROC_STRICT_P(p)) {
         RProc *p2 = mrb->gc().obj_alloc<RProc>(p->c);
         p2->copy_from(p);
@@ -164,7 +159,7 @@ void mrb_init_proc(mrb_state *mrb)
 
     mrb->proc_class = &mrb->define_class("Proc", mrb->object_class);
     MRB_SET_INSTANCE_TT(mrb->proc_class, MRB_TT_PROC);
-    m = mrb_proc_new(mrb, call_irep);
+    m = RProc::create(mrb, call_irep);
     mrb->proc_class->define_method("initialize", mrb_proc_initialize, MRB_ARGS_NONE())
             .define_method("initialize_copy", mrb_proc_init_copy, MRB_ARGS_REQ(1))
             .define_method("arity", mrb_proc_arity, MRB_ARGS_NONE())

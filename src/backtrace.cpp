@@ -65,13 +65,12 @@ output_backtrace(mrb_state *mrb, mrb_int ciidx, mrb_code *pc0, output_stream_fun
 
     for (i = ciidx; i >= 0; i--) {
         ci = &mrb->m_ctx->cibase[i];
-        filename = nullptr;
-        lineno = -1;
         if (!ci->proc || ci->proc->is_cfunc())
             continue;
+        filename = nullptr;
         {
             //assert(mrb_type(*ci->proc)==MRB_TT_PROC);
-            mrb_irep *irep = ci->proc->body.irep;
+            mrb_irep *irep = ci->proc->ireps();
             mrb_code *pc;
             if (ci->err) {
                 pc = ci->err;

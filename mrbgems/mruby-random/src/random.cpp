@@ -265,7 +265,7 @@ mrb_ary_shuffle_bang(mrb_state *mrb, mrb_value ary)
 static mrb_value
 mrb_ary_shuffle(mrb_state *mrb, mrb_value ary)
 {
-    mrb_value new_ary = RArray::new_from_values(mrb, RARRAY_LEN(ary), RARRAY_PTR(ary));
+    mrb_value new_ary = mrb_value::wrap(RArray::new_from_values(mrb, RARRAY_LEN(ary), RARRAY_PTR(ary)));
     mrb_ary_shuffle_bang(mrb, new_ary);
 
     return new_ary;

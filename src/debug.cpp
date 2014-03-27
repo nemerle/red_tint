@@ -201,8 +201,7 @@ mrb_debug_info_append_file(mrb_state *mrb, mrb_irep *irep,
     return ret;
 }
 
-void
-mrb_debug_info_free(mrb_state *mrb, mrb_irep_debug_info *d)
+void mrb_debug_info_free(MemManager &mm, mrb_irep_debug_info *d)
 {
     uint32_t i;
 
@@ -210,9 +209,9 @@ mrb_debug_info_free(mrb_state *mrb, mrb_irep_debug_info *d)
 
     for(i = 0; i < d->flen; ++i) {
         mrb_assert(d->files[i]);
-        mrb->gc()._free(d->files[i]->lines.ptr);
-        mrb->gc()._free(d->files[i]);
+        mm._free(d->files[i]->lines.ptr);
+        mm._free(d->files[i]);
     }
-    mrb->gc()._free(d->files);
-    mrb->gc()._free(d);
+    mm._free(d->files);
+    mm._free(d);
 }

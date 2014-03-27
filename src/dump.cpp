@@ -292,7 +292,7 @@ static int write_section_irep(mrb_state *mrb, mrb_irep *irep, uint8_t *bin)
         return result;
     }
 
-    cur += rlen;
+    //cur += rlen;
     section_size += rlen;
     write_section_irep_header(mrb, section_size, bin);
     return MRB_DUMP_OK;

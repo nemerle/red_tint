@@ -291,19 +291,15 @@ mrb_range_beg_len(mrb_state *mrb, mrb_value range, mrb_int *begp, mrb_int *lenp,
  * Convert this range object to a printable form.
  */
 
-static mrb_value
-range_to_s(mrb_state *mrb, mrb_value range)
+static mrb_value range_to_s(mrb_state *mrb, mrb_value range)
 {
-    mrb_value str, str2;
     RRange *r = mrb_range_ptr(range);
 
-    str  = mrb_obj_as_string(mrb, r->edges->beg);
-    str2 = mrb_obj_as_string(mrb, r->edges->end);
-    str  = mrb_str_dup(mrb, str);
-    mrb_str_cat(mrb, str, "...", r->excl ? 3 : 2);
-    mrb_str_append(mrb, str, str2);
-
-    return str;
+    RString *str  = mrb_obj_as_string(mrb, r->edges->beg);
+    RString *str2 = mrb_obj_as_string(mrb, r->edges->end);
+    str->str_buf_cat("...", r->excl ? 3 : 2);
+    str->str_cat(str2);
+    return mrb_value::wrap(str);
 }
 
 
@@ -318,19 +314,13 @@ range_to_s(mrb_state *mrb, mrb_value range)
  * objects).
  */
 
-static mrb_value
-range_inspect(mrb_state *mrb, mrb_value range)
+mrb_value range_inspect(mrb_state *mrb, mrb_value range)
 {
-    mrb_value str, str2;
     RRange *r = mrb_range_ptr(range);
-
-    str  = mrb_inspect(mrb, r->edges->beg);
-    str2 = mrb_inspect(mrb, r->edges->end);
-    str  = mrb_str_dup(mrb, str);
-    mrb_str_cat(mrb, str, "...", r->excl ? 3 : 2);
-    mrb_str_append(mrb, str, str2);
-
-    return str;
+    RString *str  = mrb_inspect(mrb, r->edges->beg);
+    str->str_buf_cat("...", r->excl ? 3 : 2);
+    str->str_cat(mrb_inspect(mrb, r->edges->end));
+    return str->wrap();
 }
 
 /* 15.2.14.4.14(x) */

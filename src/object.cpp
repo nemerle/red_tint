@@ -79,7 +79,7 @@ static mrb_value nil_to_s(mrb_state *mrb, mrb_value obj)
 
 static mrb_value nil_inspect(mrb_state *mrb, mrb_value obj)
 {
-    return mrb_str_new_lit(mrb, "nil");
+    return mrb_str_new_lit(mrb, "nil")->wrap();
 }
 
 /***********************************************************************
@@ -137,7 +137,7 @@ static mrb_value true_xor(mrb_state *mrb, mrb_value obj)
 
 static mrb_value true_to_s(mrb_state *mrb, mrb_value obj)
 {
-    return mrb_str_new_lit(mrb, "true");
+    return mrb_str_new_lit(mrb, "true")->wrap();
 }
 
 /* 15.2.5.3.4  */
@@ -239,7 +239,7 @@ static mrb_value false_or(mrb_state *mrb, mrb_value obj)
 
 static mrb_value false_to_s(mrb_state *mrb, mrb_value obj)
 {
-    return mrb_str_new_lit(mrb, "false");
+    return mrb_str_new_lit(mrb, "false")->wrap();
 }
 
 void mrb_init_object(mrb_state *mrb)
@@ -272,8 +272,7 @@ void mrb_init_object(mrb_state *mrb)
             .define_method("inspect", false_to_s,  MRB_ARGS_NONE())
             ;
 }
-static mrb_value
-inspect_type(mrb_state *mrb, mrb_value val)
+static RString *inspect_type(mrb_state *mrb, const mrb_value &val)
 {
     if (mrb_type(val) == MRB_TT_FALSE || mrb_type(val) == MRB_TT_TRUE) {
         return mrb_inspect(mrb, val);
@@ -375,7 +374,7 @@ void mrb_check_type(mrb_state *mrb, mrb_value x, mrb_vtype t)
                 etype = "Symbol";
             }
             else if (x.is_special_const()) {
-                s = mrb_obj_as_string(mrb, x).ptr<RString>();
+                s = mrb_obj_as_string(mrb, x);
                 etype = s->m_ptr;
             }
             else {
@@ -408,10 +407,11 @@ mrb_value mrb_any_to_s(mrb_state *mrb, mrb_value obj)
     rs->str_buf_cat("#<", 2);
     rs->str_cat(cname,strlen(cname));
     rs->str_cat(":", 1);
-    mrb_value str(mrb_value::wrap(rs));
-    mrb_str_concat(mrb, str, mrb_ptr_to_str(mrb, mrb_cptr(obj)));
+    rs->str_cat(mrb_ptr_to_str(mrb, mrb_cptr(obj)));
+//    mrb_value str(mrb_value::wrap(rs));
+//    mrb_str_concat(mrb, str, mrb_ptr_to_str(mrb, mrb_cptr(obj)));
     rs->str_buf_cat(">", 1);
-    return str;
+    return mrb_value::wrap(rs);
 }
 
 /*
@@ -469,9 +469,9 @@ static mrb_value mrb_to_integer(mrb_state *mrb, mrb_value val, const char *metho
         return val;
     mrb_value v = convert_type(mrb, val, "Integer", method, true);
     if (!v.is_kind_of(mrb, mrb->fixnum_class)) {
-        mrb_value type = inspect_type(mrb, val);
+        mrb_value type = inspect_type(mrb, val)->wrap();
         mrb->mrb_raisef(E_TYPE_ERROR, "can't convert %S to Integer (%S#%S gives %S)",
-                        type, type, mrb_str_new_cstr(mrb, method), inspect_type(mrb, v));
+                        type, type, mrb_str_new_cstr(mrb, method), inspect_type(mrb, v)->wrap());
     }
     return v;
 }
@@ -539,14 +539,14 @@ mrb_value mrb_Float(mrb_state *mrb, mrb_value val)
             return val;
 
         case MRB_TT_STRING:
-            return mrb_float_value(mrb_str_to_dbl(mrb, val, true));
+            return mrb_float_value(mrb_str_to_dbl(mrb, val.ptr<RString>(), true));
 
         default:
             return mrb_convert_type(mrb, val, MRB_TT_FLOAT, "Float", "to_f");
     }
 }
 
-mrb_value mrb_inspect(mrb_state *mrb, mrb_value obj)
+RString *mrb_inspect(mrb_state *mrb, mrb_value obj)
 {
     return mrb_obj_as_string(mrb, mrb->funcall(obj, "inspect", 0));
 }

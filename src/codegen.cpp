@@ -581,7 +581,7 @@ int codegen_scope::new_lit(mrb_value val)
 
     switch (mrb_type(val)) {
     case MRB_TT_STRING:
-        *pv = mrb_str_pool(m_mrb, val);
+        *pv = mrb_str_pool(m_mrb, val.ptr<RString>());
         break;
     case MRB_TT_FLOAT:
     case MRB_TT_FIXNUM:
@@ -1134,7 +1134,6 @@ void codegen_scope::gen_literal_array(node *tree, int sym, int val)
             tree = tree->right();
         }
         if (j > 0) {
-            j = 0;
             ++i;
             if (sym)
                 gen_send_intern();
@@ -1158,7 +1157,7 @@ void codegen_scope::gen_literal_array(node *tree, int sym, int val)
 
 void codegen_scope::raise_error(const char *msg)
 {
-    int idx = new_lit(mrb_str_new_cstr(m_mrb, msg));
+    int idx = new_lit(mrb_str_new_cstr(m_mrb, msg)->wrap());
 
     genop(MKOP_ABx(OP_ERR, 1, idx));
 }
@@ -2201,7 +2200,7 @@ void codegen_scope::visit(RegxNode *xn) {
     const char *p2 = xn->m_str;
     int ai = m_mrb->gc().arena_save();
     int sym = new_sym( m_mrb->intern2(REGEXP_CLASS,REGEXP_CLASS_CSTR_LEN));
-    int off = new_lit(mrb_str_new_cstr(m_mrb, p1));
+    int off = new_lit(mrb_str_new_cstr(m_mrb, p1)->wrap());
     int argc = 1;
 
     genop( MKOP_A(OP_OCLASS, m_sp));
@@ -2210,7 +2209,7 @@ void codegen_scope::visit(RegxNode *xn) {
     genop( MKOP_ABx(OP_STRING, m_sp, off));
     if (p2) {
         push_();
-        off = new_lit(mrb_str_new_cstr(m_mrb, p2));
+        off = new_lit(mrb_str_new_cstr(m_mrb, p2)->wrap());
         genop( MKOP_ABx(OP_STRING, m_sp, off));
         argc++;
         pop_sp();
@@ -2254,7 +2253,7 @@ void codegen_scope::visit(DregxNode *dn) {
     n = dn->m_b->right();
     if (n->left()) {
         const char *p = (const char*)n->left();
-        int off = new_lit(mrb_str_new_cstr(m_mrb, p));
+        int off = new_lit(mrb_str_new_cstr(m_mrb, p)->wrap());
         codegen( dn->m_a, true);
         genop( MKOP_ABx(OP_STRING, m_sp, off));
         pop_sp();
@@ -2265,7 +2264,7 @@ void codegen_scope::visit(DregxNode *dn) {
         int off;
 
         push_();
-        off = new_lit(mrb_str_new_cstr(m_mrb, p2));
+        off = new_lit(mrb_str_new_cstr(m_mrb, p2)->wrap());
         genop( MKOP_ABx(OP_STRING, m_sp, off));
         argc++;
         pop_sp();
@@ -2581,15 +2580,15 @@ RProc *mrb_generate_code (mrb_state *mrb, parser_state *p) {
     MRB_TRY(&scope->jmp) {
         // prepare irep
         scope->codegen(p->m_tree, false);
-        RProc *proc = mrb_proc_new(mrb, scope->m_irep);
-        mrb_irep_decref(mrb, scope->m_irep);
+        RProc *proc = RProc::create(mrb, scope->m_irep);
+        mrb_irep_decref(mrb->gc(), scope->m_irep);
         scope->m_mpool->mrb_pool_close();
         return proc;
     } MRB_CATCH(&scope->jmp) {
         if (scope->m_filename == scope->m_irep->filename) {
             scope->m_irep->filename = nullptr;
         }
-        mrb_irep_decref(mrb, scope->m_irep);
+        mrb_irep_decref(mrb->gc(), scope->m_irep);
         scope->m_mpool->mrb_pool_close();
         return nullptr;
     } MRB_END_EXC(&scope->jmp);

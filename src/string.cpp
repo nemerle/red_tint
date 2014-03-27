@@ -132,7 +132,6 @@ mrb_value mrb_str_resize(mrb_state *mrb, mrb_value str, mrb_int len)
 }
 
 #define mrb_obj_alloc_string(mrb) ((mrb)->gc().obj_alloc<RString>((mrb)->string_class))
-
 RString* RString::create(mrb_state *mrb, const char *p, mrb_int len)
 {
     RString *s = mrb->gc().obj_alloc<RString>(mrb->string_class);
@@ -164,6 +163,9 @@ mrb_str_new_empty(mrb_state *mrb, mrb_value str)
 mrb_value mrb_str_buf_new(mrb_state *mrb, mrb_int capa)
 {
     return mrb_value::wrap(RString::create(mrb,capa));
+}
+void RString::str_cat(RString *oth) {
+    str_buf_cat(oth->m_ptr,oth->len);
 }
 
 void RString::str_buf_cat(const char *_ptr, size_t _len)
@@ -225,7 +227,7 @@ mrb_value mrb_str_new(mrb_state *mrb, const char *p, size_t len)
  *  Returns a new string object containing a copy of <i>str</i>.
  */
 
-mrb_value mrb_str_new_cstr(mrb_state *mrb, const char *p)
+RString *mrb_str_new_cstr(mrb_state *mrb, const char *p)
 {
     size_t len;
 
@@ -239,19 +241,19 @@ mrb_value mrb_str_new_cstr(mrb_state *mrb, const char *p)
         len = 0;
     }
 
-    return mrb_str_new(mrb,p,len);
+    return RString::create(mrb, p, len);
 }
 
-mrb_value mrb_str_new_static(mrb_state *mrb, const char *p, size_t len) {
+RString *RString::create_static(mrb_state *mrb, const char *p, mrb_int len) {
     if ((mrb_int)len < 0) {
         mrb->mrb_raise(E_ARGUMENT_ERROR, "negative string size (or size too big)");
     }
-    RString *s = mrb_obj_alloc_string(mrb);
+    RString *s = mrb->gc().obj_alloc<RString>(mrb->string_class);
     s->len=len;
     s->aux.capa = 0; /* nofree */
     s->m_ptr = (char *)p;
     s->flags = MRB_STR_NOFREE;
-    return mrb_value::wrap(s);
+    return s;
 }
 
 void mrb_gc_free_str(mrb_state *mrb, struct RString *str)
@@ -349,8 +351,7 @@ void mrb_str_concat(mrb_state *mrb, mrb_value self, mrb_value other)
  *
  *  Returns a new string object containing a copy of <i>str</i>.
  */
-mrb_value
-mrb_str_plus(mrb_state *mrb, mrb_value a, mrb_value b)
+mrb_value mrb_str_plus(mrb_state *mrb, mrb_value a, mrb_value b)
 {
     RString *s = a.ptr<RString>();
     RString *s2 = b.ptr<RString>();
@@ -1435,22 +1436,18 @@ mrb_str_intern(mrb_state *mrb, mrb_value self)
 
 }
 /* ---------------------------------- */
-mrb_value
-mrb_obj_as_string(mrb_state *mrb, mrb_value obj)
+RString *mrb_obj_as_string(mrb_state *mrb, mrb_value obj)
 {
-    mrb_value str;
-
     if (obj.is_string()) {
-        return obj;
+        return obj.ptr<RString>();
     }
-    str = mrb->funcall(obj, "to_s", 0);
+    mrb_value str = mrb->funcall(obj, "to_s", 0);
     if (!str.is_string())
-        return mrb_any_to_s(mrb, obj);
-    return str;
+        return mrb_any_to_s(mrb, obj).ptr<RString>();
+    return str.ptr<RString>();
 }
 
-mrb_value
-mrb_ptr_to_str(mrb_state *mrb, void *p)
+RString * mrb_ptr_to_str(mrb_state *mrb, void *p)
 {
     RString *p_str;
     char *p1;
@@ -1476,7 +1473,7 @@ mrb_ptr_to_str(mrb_state *mrb, void *p)
         *p2 = c;
     }
 
-    return mrb_value::wrap(p_str);
+    return p_str;
 }
 
 mrb_value
@@ -1729,14 +1726,13 @@ mrb_str_split_m(mrb_state *mrb, mrb_value str)
     mrb_int end;
     mrb_int lim = 0;
     mrb_value tmp;
-
     argc = mrb_get_args(mrb, "|oi", &spat, &lim);
     lim_p = (lim > 0 && argc == 2);
     if (argc == 2) {
         if (lim == 1) {
             if (RSTRING_LEN(str) == 0)
-                return RArray::new_capa(mrb, 0);
-            return RArray::new_from_values(mrb, 1, &str);
+                return RArray::create(mrb)->wrap();
+            return RArray::new_from_values(mrb, 1, &str)->wrap();
         }
         i = 1;
     }
@@ -1970,38 +1966,39 @@ bad:
     return mrb_fixnum_value(0);
 }
 
-char *
-mrb_string_value_cstr(mrb_state *mrb, mrb_value *ptr)
+char * mrb_string_value_cstr(mrb_state *mrb, const RString *ps)
 {
-    RString *ps = ptr->ptr<RString>();
     char *s = ps->m_ptr;
-
     if (!s || ps->len != strlen(s)) {
         mrb->mrb_raise(E_ARGUMENT_ERROR, "string contains null byte");
     }
     return s;
 }
 
-mrb_value mrb_str_to_inum(mrb_state *mrb, mrb_value str, int base, int badcheck)
+mrb_value mrb_str_to_inum(mrb_state *mrb, RString * str, int base, int badcheck)
 {
     char *s;
     int len;
 
-    str = mrb_str_to_str(mrb, str);
     if (badcheck) {
-        s = mrb_string_value_cstr(mrb, &str);
+        s = mrb_string_value_cstr(mrb, str);
     }
     else {
-        s = RSTRING_PTR(str);
+        s = str->m_ptr;
     }
     if (s) {
-        len = RSTRING_LEN(str);
+        len = str->len;
         if (s[len]) {    /* no sentinel somehow */
             RString *temp_str = RString::create(mrb, s, len);
             s = temp_str->m_ptr;
         }
     }
     return mrb_cstr_to_inum(mrb, s, base, badcheck);
+}
+mrb_value mrb_str_to_inum(mrb_state *mrb, mrb_value str, int base, int badcheck)
+{
+    str = mrb_str_to_str(mrb, str);
+    return mrb_str_to_inum(mrb,str.ptr<RString>(),base,badcheck);
 }
 
 /* 15.2.10.5.38 */
@@ -2112,15 +2109,13 @@ bad:
     }
     return d;
 }
-
-double mrb_str_to_dbl(mrb_state *mrb, mrb_value str, int badcheck)
+double mrb_str_to_dbl(mrb_state *mrb, RString *str, int badcheck)
 {
     char *s;
     int len;
 
-    str = mrb_str_to_str(mrb, str);
-    s = RSTRING_PTR(str);
-    len = RSTRING_LEN(str);
+    s = str->m_ptr;
+    len = str->len;
     if (s) {
         if (badcheck && memchr(s, '\0', len)) {
             mrb->mrb_raise(E_ARGUMENT_ERROR, "string for Float contains null byte");
@@ -2131,6 +2126,12 @@ double mrb_str_to_dbl(mrb_state *mrb, mrb_value str, int badcheck)
         }
     }
     return mrb_cstr_to_dbl(mrb, s, badcheck);
+}
+
+double mrb_str_to_dbl(mrb_state *mrb, mrb_value str, int badcheck)
+{
+    str = mrb_str_to_str(mrb, str);
+    return mrb_str_to_dbl(mrb,str.ptr<RString>(),badcheck);
 }
 
 /* 15.2.10.5.39 */
@@ -2150,7 +2151,7 @@ double mrb_str_to_dbl(mrb_state *mrb, mrb_value str, int badcheck)
 static mrb_value
 mrb_str_to_f(mrb_state *mrb, mrb_value self)
 {
-    return mrb_float_value(mrb_str_to_dbl(mrb, self, false));
+    return mrb_float_value(mrb_str_to_dbl(mrb, self.ptr<RString>(), false));
 }
 
 /* 15.2.10.5.40 */
@@ -2228,8 +2229,7 @@ mrb_str_upcase(mrb_state *mrb, mrb_value self)
  *  Produces a version of <i>str</i> with all nonprinting characters replaced by
  *  <code>\nnn</code> notation and all special characters escaped.
  */
-mrb_value
-mrb_str_dump(mrb_state *mrb, mrb_value str)
+mrb_value mrb_str_dump(mrb_state *mrb, mrb_value str)
 {
     mrb_int len;
     const char *p, *pend;

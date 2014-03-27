@@ -147,12 +147,13 @@ enum eOpEnum {
     OP_RSVD5,/*             reserved instruction #5                         */
     OP_LAST
 };
-
-#define OP_L_STRICT  1
-#define OP_L_CAPTURE 2
-#define OP_L_METHOD  OP_L_STRICT
-#define OP_L_LAMBDA  (OP_L_STRICT|OP_L_CAPTURE)
-#define OP_L_BLOCK   OP_L_CAPTURE
+enum eLambdaFlags{
+OP_L_STRICT  =1,
+OP_L_CAPTURE =2,
+OP_L_METHOD  =OP_L_STRICT,
+OP_L_LAMBDA  =(OP_L_STRICT|OP_L_CAPTURE),
+OP_L_BLOCK   =OP_L_CAPTURE,
+};
 
 #define OP_R_NORMAL 0
 #define OP_R_BREAK  1

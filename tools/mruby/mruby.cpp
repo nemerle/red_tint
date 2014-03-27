@@ -210,12 +210,12 @@ main(int argc, char **argv)
             const char *cmdline;
             cmdline = args.cmdline ? args.cmdline : "-";
             mrbc_filename(mrb, c, args.cmdline ? args.cmdline : "-");
-            mrb->gv_set(zero_sym, mrb_str_new_cstr(mrb, cmdline));
+            mrb->gv_set(zero_sym, mrb_str_new_cstr(mrb, cmdline)->wrap());
             v = mrb_load_file_cxt(mrb, args.rfp, c);
         }
         else {
             mrbc_filename(mrb, c, "-e");
-            mrb->gv_set(zero_sym, mrb_str_new_lit(mrb, "-e"));
+            mrb->gv_set(zero_sym, mrb_str_new_lit(mrb, "-e")->wrap());
             v = mrb_load_string_cxt(mrb, args.cmdline, c);
         }
 

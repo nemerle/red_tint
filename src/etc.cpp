@@ -9,7 +9,7 @@
 #include "mruby/data.h"
 #include "mruby/class.h"
 
-RData* mrb_data_object_alloc(mrb_state *mrb, struct RClass *klass, void *ptr, const mrb_data_type *type)
+RData* RData::object_alloc(mrb_state *mrb, RClass *klass, void *ptr, const mrb_data_type *type)
 {
     RData *data = mrb->gc().obj_alloc<RData>(klass);
     data->data = ptr;
@@ -45,16 +45,16 @@ void mrb_data_check_type(mrb_state *mrb, const mrb_value &obj, const mrb_data_ty
         }
     }
 }
-void * mrb_data_check_and_get_ptr(mrb_state *mrb, mrb_value obj, const mrb_data_type *type)
+void * mrb_data_check_and_get_ptr(mrb_value obj, const mrb_data_type *type)
 {
     if (obj.is_special_const() || (mrb_type(obj) != MRB_TT_DATA)) {
-      return NULL;
+      return nullptr;
     }
     if (DATA_TYPE(obj) != type) {
-      return NULL;
+      return nullptr;
     }
 //    mrb_data_check_type(mrb, obj, type);
-    return DATA_PTR(obj);
+    return obj.ptr<RData>()->data;
 }
 
 mrb_sym mrb_obj_to_sym(mrb_state *mrb, mrb_value name)
@@ -66,7 +66,7 @@ mrb_sym mrb_obj_to_sym(mrb_state *mrb, mrb_value name)
         default:
             tmp = mrb_check_string_type(mrb, name);
             if (tmp.is_nil()) {
-                tmp = mrb_inspect(mrb, name);
+                tmp = mrb_value::wrap(mrb_inspect(mrb, name));
                 mrb->mrb_raisef(E_TYPE_ERROR, "%S is not a symbol", tmp);
             }
             name = tmp;

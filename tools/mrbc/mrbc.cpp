@@ -231,7 +231,7 @@ static int
 dump_file(mrb_state *mrb, FILE *wfp, const char *outfile, RProc *proc, struct mrbc_args *args)
 {
     int n = MRB_DUMP_OK;
-    mrb_irep *irep = proc->body.irep;
+    mrb_irep *irep = proc->ireps();
 
     if (args->initname) {
         n = mrb_dump_irep_cfunc(mrb, irep, args->debug_info, wfp, args->initname);
@@ -310,7 +310,7 @@ main(int argc, char **argv)
         fprintf(stderr, "Output file is required\n");
         return EXIT_FAILURE;
     }
-    result =  dump_file(mrb, wfp, args.outfile, mrb_proc_ptr(load), &args);
+    result =  dump_file(mrb, wfp, args.outfile, load.ptr<RProc>(), &args);
     if(wfp!=stdout)
         fclose(wfp);
     cleanup(mrb, &args);

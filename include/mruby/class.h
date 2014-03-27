@@ -31,10 +31,7 @@ public:
     //static RProc *method_search_vm(mrb_state *, RClass**, mrb_sym);
 static  RProc*          method_search_vm(RClass ** cp, mrb_sym mid);
 static  RClass *        create(mrb_state *mrb, RClass *super);
-static  RClass *        mrb_class(mrb_state *mrb, mrb_value &v);
-static  const RClass *  mrb_class(mrb_state *mrb, const mrb_value &v) {
-                            return const_cast<const RClass *>(mrb_class(mrb,const_cast<mrb_value &>(v)));
-                        }
+static  RClass *        mrb_class(mrb_state *mrb, const mrb_value &v);
         RClass &        define_class_method(const char *name, mrb_func_t func, mrb_aspec aspec) {
                             define_singleton_method(name, func, aspec);
                             return *this;
@@ -67,7 +64,7 @@ static  const RClass *  mrb_class(mrb_state *mrb, const mrb_value &v) {
         RClass *        define_class_under(const char *name, RClass *super);
         RClass *        define_class_under(mrb_sym id, RClass *super);
         RClass *        outer_module();
-        mrb_value       class_path();
+        RString *class_path();
         const char *    class_name();
         RClass *        from_sym(mrb_sym id, bool class_only=false);
         mrb_value       mrb_instance_alloc();

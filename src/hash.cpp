@@ -51,7 +51,7 @@ void mrb_gc_free_hash(mrb_state *mrb, RHash *hash)
 }
 
 
-mrb_value mrb_hash_new_capa(mrb_state *mrb, int capa)
+RHash *RHash::new_capa(mrb_state *mrb, int capa)
 {
     RHash *h = mrb->gc().obj_alloc<RHash>(mrb->hash_class);
     h->ht = RHash::kh_ht_t::init(mrb->gc());
@@ -59,12 +59,7 @@ mrb_value mrb_hash_new_capa(mrb_state *mrb, int capa)
         h->ht->resize(capa);
     }
     h->iv = 0;
-    return mrb_value::wrap(h);
-}
-
-mrb_value mrb_hash_new(mrb_state *mrb)
-{
-    return mrb_hash_new_capa(mrb, 0);
+    return h;
 }
 
 mrb_value RHash::get(mrb_value key)
@@ -207,7 +202,7 @@ void RHash::modify()
  *     h.keys           #=> ["c", "d"]
  *
  */
-mrb_value RHash::init_core(mrb_value block,int argc, mrb_value *argv) {
+RHash *RHash::init_core(mrb_value block,int argc, mrb_value *argv) {
     mrb_value ifnone;
 
     mrb_get_args(m_vm, "o*", &block, &argv, &argc);
@@ -229,7 +224,7 @@ mrb_value RHash::init_core(mrb_value block,int argc, mrb_value *argv) {
         ifnone = block;
     }
     iv_set(mrb_intern_lit(m_vm, "ifnone"), ifnone);
-    return mrb_value::wrap(this);
+    return this;
 }
 
 static mrb_value to_hash(mrb_state *mrb, mrb_value hash)
@@ -427,7 +422,7 @@ mrb_value RHash::shift()
                 delVal = delete_key(delKey);
                 mrb_gc_protect(m_vm, delVal);
 
-                return mrb_assoc_new(m_vm, delKey, delVal);
+                return mrb_value::wrap(mrb_assoc_new(m_vm, delKey, delVal));
             }
         }
     }
@@ -489,7 +484,7 @@ mrb_value RHash::replace(mrb_value hash2)
     }
 
     ifnone =  other_ptr->iv_get(m_vm->intern2("ifnone", 6));
-    if (MRB_RHASH_PROCDEFAULT_P(hash2)) {
+    if (other_ptr->flags & MRB_HASH_PROC_DEFAULT) {
         flags |= MRB_HASH_PROC_DEFAULT;
     }
     iv_set(m_vm->intern2("ifnone", 6), ifnone);
@@ -530,16 +525,14 @@ bool RHash::empty() const
     return ht ? (ht->size() == 0) : true;
 }
 
-static mrb_value inspect_hash(mrb_value hash, bool recur)
+static RString *inspect_hash(RHash *hsh, bool recur)
 {
-    mrb_value str, str2;
-    RHash *hsh = hash.ptr<RHash>();
     RHash::kh_ht_t *h = hsh->ht;
-
+    auto vm = hsh->m_vm;
     if (recur)
-        return mrb_str_new_lit(hsh->m_vm, "{...}");
+        return mrb_str_new_lit(vm, "{...}");
 
-    str = mrb_str_new_lit(hsh->m_vm, "{");
+    RString *str = mrb_str_new_lit(vm, "{");
     if (h && h->size() > 0) {
         for (auto k = h->begin(); k != h->end(); k++) {
             int ai;
@@ -549,19 +542,16 @@ static mrb_value inspect_hash(mrb_value hash, bool recur)
 
             ai = hsh->m_vm->gc().arena_save();
 
-            if (RSTRING_LEN(str) > 1)
-                mrb_str_cat_lit(hsh->m_vm, str, ", ");
+            if (str->len > 1)
+                str->str_buf_cat(", ",2);
 
-            str2 = mrb_inspect(hsh->m_vm, h->key(k));
-            mrb_str_append(hsh->m_vm, str, str2);
-            mrb_str_buf_cat(str, "=>", 2);
-            str2 = mrb_inspect(hsh->m_vm, h->value(k));
-            mrb_str_append(hsh->m_vm, str, str2);
-
-            hsh->m_vm->gc().arena_restore(ai);
+            str->str_cat(mrb_inspect(vm, h->key(k)));
+            str->str_cat("=>", 2);
+            str->str_cat(mrb_inspect(vm, h->value(k)));
+            vm->gc().arena_restore(ai);
         }
     }
-    mrb_str_buf_cat(str, "}", 1);
+    str->str_buf_cat("}", 1);
 
     return str;
 }
@@ -580,11 +570,11 @@ static mrb_value inspect_hash(mrb_value hash, bool recur)
 
 static mrb_value mrb_hash_inspect(mrb_state *mrb, mrb_value hash)
 {
-    RHash::kh_ht_t *h = RHASH_TBL(hash);
+    RHash *h = hash.ptr<RHash>();
 
-    if (!h || h->size() == 0)
-        return mrb_str_new_lit(mrb, "{}");
-    return inspect_hash(hash, 0);
+    if (h->empty())
+        return mrb_str_new_lit(mrb, "{}")->wrap();
+    return inspect_hash(h, 0)->wrap();
 }
 
 /* 15.2.13.4.29 (x)*/
@@ -870,7 +860,7 @@ static mrb_value mrb_hash_init_core(mrb_state *mrb, mrb_value hash)
     int argc;
 
     mrb_get_args(mrb, "o*", &block, &argv, &argc);
-    return hash.ptr<RHash>()->init_core(block,argc,argv);
+    return mrb_value::wrap(hash.ptr<RHash>()->init_core(block,argc,argv));
 }
 mrb_value hash_equal(mrb_state *mrb, mrb_value hash1)
 {

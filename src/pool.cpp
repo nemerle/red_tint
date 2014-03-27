@@ -134,14 +134,11 @@ mrb_bool mrb_pool::mrb_pool_can_realloc(void *p, size_t len)
 
 void* mrb_pool::mrb_pool_realloc(void *p, size_t oldlen, size_t newlen)
 {
-    mrb_pool_page *page;
-    void *np;
 
     if (!this)
         return 0;
     oldlen += ALIGN_PADDING(oldlen);
     newlen += ALIGN_PADDING(newlen);
-    page = this->pages;
     for(mrb_pool_page *page=this->pages; page; page=page->next) {
         if (page->last != p)
             continue;
@@ -157,7 +154,7 @@ void* mrb_pool::mrb_pool_realloc(void *p, size_t oldlen, size_t newlen)
         page->offset = beg + newlen;
         return p;
     }
-    np = mrb_pool_alloc(newlen);
+    void *np = mrb_pool_alloc(newlen);
     memcpy(np, p, oldlen);
     return np;
 }

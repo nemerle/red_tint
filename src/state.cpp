@@ -27,10 +27,9 @@ static void* allocf(mrb_state */*mrb*/, void *p, size_t size, void */*ud*/)
     }
 }
 
-static mrb_value
-inspect_main(mrb_state *mrb, mrb_value mod)
+static mrb_value inspect_main(mrb_state *mrb, mrb_value mod)
 {
-    return mrb_str_new_lit(mrb, "main");
+    return mrb_str_new_lit(mrb, "main")->wrap();
 }
 
 mrb_state* mrb_state::create(mrb_allocf f, void *ud)
@@ -94,16 +93,15 @@ void mrb_irep_incref(mrb_state */*mrb*/, mrb_irep *irep)
 }
 
 void
-mrb_irep_decref(mrb_state *mrb, mrb_irep *irep)
+mrb_irep_decref(MemManager &mrb, mrb_irep *irep)
 {
     irep->refcnt--;
     if (irep->refcnt == 0) {
         mrb_irep_free(mrb, irep);
     }
 }
-void mrb_irep_free(mrb_state *mrb, mrb_irep *irep)
+void mrb_irep_free(MemManager &mm, mrb_irep *irep)
 {
-    MemManager &mm(mrb->gc());
     if (!(irep->flags & MRB_ISEQ_NO_FREE))
         mm._free(irep->iseq);
     for (int i=0; i<irep->plen; i++) {
@@ -122,22 +120,19 @@ void mrb_irep_free(mrb_state *mrb, mrb_irep *irep)
     mm._free(irep->pool);
     mm._free(irep->syms);
     for (int i=0; i<irep->rlen; i++) {
-        mrb_irep_decref(mrb, irep->reps[i]);
+        mrb_irep_decref(mm, irep->reps[i]);
     }
     mm._free(irep->reps);
     mm._free((void *)irep->filename);
     mm._free(irep->lines);
-    mrb_debug_info_free(mrb, irep->debug_info);
+    mrb_debug_info_free(mm, irep->debug_info);
     mm._free(irep);
 }
-mrb_value
-mrb_str_pool(mrb_state *mrb, mrb_value str)
+mrb_value mrb_str_pool(mrb_state *mrb, RString *s)
 {
-    RString *s = str.ptr<RString>();
     RString *ns;
     mrb_int len;
-
-    ns = (struct RString *)mrb->gc()._malloc(sizeof(struct RString));
+    ns = mrb->gc().new_t<RString>();
     ns->tt = MRB_TT_STRING;
     ns->c = mrb->string_class;
 

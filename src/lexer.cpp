@@ -1682,6 +1682,7 @@ gvar:
         c = nextc();
         if (c < 0) break;
     } while (identchar(c));
+
     if (token_column == 0 && m_lexer.toklen() == 7 && (c < 0 || c == '\n') &&
             strncmp(m_lexer.tok(), "__END__", m_lexer.toklen()) == 0)
         return -1;

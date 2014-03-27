@@ -574,10 +574,7 @@ void MemManager::obj_free(RBasic *obj)
     }
         break;
     case MRB_TT_ARRAY:
-        if (obj->flags & MRB_ARY_SHARED)
-            mrb_ary_decref(m_vm, ((RArray*)obj)->m_aux.shared);
-        else
-            _free(((RArray*)obj)->m_ptr);
+        ((RArray *)obj)->release();
         break;
 
     case MRB_TT_HASH:
@@ -590,10 +587,10 @@ void MemManager::obj_free(RBasic *obj)
         break;
     case MRB_TT_PROC:
     {
-        struct RProc *p = (struct RProc*)obj;
+        RProc *p = (RProc*)obj;
 
-        if (!p->is_cfunc() && p->body.irep) {
-            mrb_irep_decref(m_vm, p->body.irep);
+        if (!p->is_cfunc() && p->ireps()) {
+            mrb_irep_decref(*this, p->ireps());
         }
     }
         break;

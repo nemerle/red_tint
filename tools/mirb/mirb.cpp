@@ -331,9 +331,9 @@ main(int argc, char **argv)
             }
             else {
                 /* generate bytecode */
-                struct RProc *proc = mrb_generate_code(mrb, parser);
+                RProc *proc = mrb_generate_code(mrb, parser);
                 /* pass a proc for evaulation */
-                nregs = first_command ? 0: proc->body.irep->nregs;
+                nregs = first_command ? 0: proc->ireps()->nregs;
 
                 /* evaluate the bytecode */
                 result = mrb->mrb_context_run(

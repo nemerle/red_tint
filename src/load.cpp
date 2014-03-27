@@ -94,15 +94,15 @@ read_irep_record_1(mrb_state *mrb, const uint8_t *bin, uint32_t *len,bool _alloc
         }
 
         for (i = 0; i < plen; i++) {
-            mrb_value s;
+            RString *s;
             tt = *src++; //pool TT
             pool_data_len = bin_to_uint16(src); //pool data length
             src += sizeof(uint16_t);
             if (_alloc) {
-                s = mrb_str_new(mrb, (char *)src, pool_data_len);
+                s = RString::create(mrb, (char *)src, pool_data_len);
             }
             else {
-                s = mrb_str_new_static(mrb, (char *)src, pool_data_len);
+                s = RString::create_static(mrb, (char *)src, pool_data_len);
             }
             src += pool_data_len;
 
@@ -465,8 +465,8 @@ mrb_load_irep_ctx(mrb_state *mrb, const uint8_t *bin, mrbc_context *c)
         irep_error(mrb);
         return mrb_value::nil();
     }
-    auto prc = mrb_proc_new(mrb, irep);
-    mrb_irep_decref(mrb, irep);
+    auto prc = RProc::create(mrb, irep);
+    mrb_irep_decref(mrb->gc(), irep);
     if (c && c->no_exec) return mrb_value::wrap(prc);
     return mrb->mrb_context_run(prc, mrb_top_self(mrb), 0);
 }
@@ -679,8 +679,8 @@ mrb_value mrb_load_irep_file_cxt(mrb_state *mrb, FILE* fp, mrbc_context *c)
         irep_error(mrb);
         return mrb_value::nil();
     }
-    auto proc = mrb_proc_new(mrb, irep);
-    mrb_irep_decref(mrb, irep);
+    auto proc = RProc::create(mrb, irep);
+    mrb_irep_decref(mrb->gc(), irep);
     if (c && c->no_exec) return mrb_value::wrap(proc);
     return mrb->mrb_context_run(proc, mrb_top_self(mrb), 0);
 }

@@ -21,6 +21,10 @@ mrb_value mrb_exc_new(RClass *c, const char *ptr, long len)
 {
     return c->m_vm->funcall(mrb_value::wrap(c), "new", 1, mrb_str_new(c->m_vm, ptr, len));
 }
+mrb_value mrb_exc_new_str(RClass* c, RString *str)
+{
+    return c->m_vm->funcall(c->wrap(), "new", 1, str->wrap());
+}
 
 mrb_value mrb_exc_new_str(RClass* c, mrb_value str)
 {
@@ -85,7 +89,7 @@ static mrb_value exc_to_s(mrb_state *mrb, mrb_value exc)
     mrb_value mesg = mrb_attr_get(exc, mrb_intern(mrb, "mesg", 4));
 
     if (mesg.is_nil())
-        return mrb_str_new_cstr(mrb, mrb_obj_classname(mrb, exc));
+        return mrb_str_new_cstr(mrb, mrb_obj_classname(mrb, exc))->wrap();
     return mesg;
 }
 
@@ -113,36 +117,36 @@ static mrb_value exc_message(mrb_state *mrb, mrb_value exc)
 
 static mrb_value exc_inspect(mrb_state *mrb, mrb_value exc)
 {
-    mrb_value str;
+    RString *str;
     mrb_value mesg = mrb_attr_get(exc, mrb->intern2("mesg", 4));
     mrb_value file = mrb_attr_get(exc, mrb->intern2("file", 4));
     mrb_value line = mrb_attr_get(exc, mrb->intern2("line", 4));
-
+    RString *mesg_ptr = mesg.is_nil() ? nullptr : mesg.ptr<RString>();
     if (!file.is_nil() && !line.is_nil()) {
-        str = file;
-        mrb_str_cat_lit(mrb, str, ":");
-        mrb_str_append(mrb, str, line);
-        mrb_str_cat_lit(mrb, str, ": ");
-        if (!mesg.is_nil() && RSTRING_LEN(mesg) > 0) {
-            mrb_str_append(mrb, str, mesg);
-            mrb_str_cat_lit(mrb, str, " (");
+        assert(file.is_string() && line.is_string());
+        str = file.ptr<RString>()->dup();
+        str->str_buf_cat(":",1);
+        str->str_cat(line.ptr<RString>());
+        str->str_buf_cat(": ",2);
+        if (mesg_ptr && mesg_ptr->len > 0) {
+            str->str_cat(mesg_ptr);
+            str->str_buf_cat(" (",2);
         }
-        mrb_str_cat_cstr(mrb, str, mrb_obj_classname(mrb, exc));
-        if (!mesg.is_nil() && RSTRING_LEN(mesg) > 0) {
-            mrb_str_cat_lit(mrb, str, ")");
+        str->str_buf_cat(mrb_obj_classname(mrb, exc));
+        if (mesg_ptr && mesg_ptr->len > 0) {
+            str->str_buf_cat(")",1);
         }
     }
     else {
-        str = mrb_str_new_cstr(mrb, mrb_obj_classname(mrb, exc));
-        if (!mesg.is_nil() && RSTRING_LEN(mesg) > 0) {
-            mrb_str_cat_lit(mrb, str, ": ");
-            mrb_str_append(mrb, str, mesg);
+        str = RString::create(mrb,mrb_obj_classname(mrb, exc));
+        str->str_buf_cat(": ",2);
+        if (mesg_ptr && mesg_ptr->len > 0) {
+            str->str_cat(mesg_ptr);
         } else {
-            mrb_str_cat_lit(mrb, str, ": ");
-            mrb_str_cat_cstr(mrb, str, mrb_obj_classname(mrb, exc));
+            str->str_buf_cat(mrb_obj_classname(mrb, exc));
         }
     }
-    return str;
+    return str->wrap();
 }
 
 
@@ -185,11 +189,11 @@ static void exc_debug_info(mrb_state *mrb, RObject *exc)
 
         if (!err && pc) err = pc - 1;
         if (err && ci->proc && !ci->proc->is_cfunc()) {
-            mrb_irep *irep = ci->proc->body.irep;
+            mrb_irep *irep = ci->proc->ireps();
             int32_t const line = mrb_debug_get_line(irep, err - irep->iseq);
             char const* file = mrb_debug_get_filename(irep, err - irep->iseq);
             if (line != -1 && file) {
-                exc->iv_set(mrb->intern2("file", 4), mrb_str_new_cstr(mrb, file));
+                exc->iv_set(mrb->intern2("file", 4), mrb_str_new_cstr(mrb, file)->wrap());
                 exc->iv_set(mrb->intern2("line", 4), mrb_fixnum_value(line));
                 return;
             }
@@ -212,18 +216,16 @@ void mrb_exc_raise(mrb_state *mrb, mrb_value exc)
 
 void mrb_raise(RClass *c, const char *msg)
 {
-    mrb_value mesg;
-    mesg = mrb_str_new_cstr(c->m_vm, msg);
+    auto mesg = mrb_str_new_cstr(c->m_vm, msg);
     mrb_exc_raise(c->m_vm, mrb_exc_new_str(c, mesg));
 }
 
 void mrb_state::mrb_raise( RClass *c, const char *msg)
 {
-    mrb_value mesg;
-    mesg = mrb_str_new_cstr(this, msg);
+    auto mesg = mrb_str_new_cstr(this, msg);
     mrb_exc_raise(this, mrb_exc_new_str(c, mesg));
 }
-mrb_value mrb_vformat(mrb_state *mrb, const char *format, va_list ap)
+RString *mrb_vformat(mrb_state *mrb, const char *format, va_list ap)
 {
     const char *p = format;
     const char *b = p;
@@ -263,13 +265,12 @@ mrb_value mrb_vformat(mrb_state *mrb, const char *format, va_list ap)
     }
 }
 
-mrb_value mrb_format(mrb_state *mrb, const char *format, ...)
+RString *mrb_format(mrb_state *mrb, const char *format, ...)
 {
     va_list ap;
-    mrb_value str;
 
     va_start(ap, format);
-    str = mrb_vformat(mrb, format, ap);
+    auto str = mrb_vformat(mrb, format, ap);
     va_end(ap);
 
     return str;
@@ -278,10 +279,8 @@ mrb_value mrb_format(mrb_state *mrb, const char *format, ...)
 void mrb_state::mrb_raisef(RClass *c, const char *fmt, ...)
 {
     va_list args;
-    mrb_value mesg;
-
     va_start(args, fmt);
-    mesg = mrb_vformat(this, fmt, args);
+    auto mesg = mrb_vformat(this, fmt, args);
     va_end(args);
     mrb_exc_raise(this, mrb_exc_new_str(c, mesg));
 }
@@ -293,7 +292,7 @@ void mrb_name_error(mrb_state *mrb, mrb_sym id, const char *fmt, ...)
     va_list args;
 
     va_start(args, fmt);
-    argv[0] = mrb_vformat(mrb, fmt, args);
+    argv[0] = mrb_vformat(mrb, fmt, args)->wrap();
     va_end(args);
     argv[1] = mrb_symbol_value(id);
     exc = E_NAME_ERROR->new_instance(2, argv);
@@ -304,28 +303,24 @@ void mrb_warn(mrb_state *mrb, const char *fmt, ...)
 {
 #ifdef ENABLE_STDIO
     va_list ap;
-    mrb_value str;
 
     va_start(ap, fmt);
-    str = mrb_vformat(mrb, fmt, ap);
+    auto str = mrb_vformat(mrb, fmt, ap);
     fputs("warning: ", stderr);
-    fwrite(RSTRING_PTR(str), RSTRING_LEN(str), 1, stderr);
+    fwrite(str->m_ptr, str->len, 1, stderr);
     va_end(ap);
 #endif
 }
 
 void mrb_bug(mrb_state *mrb, const char *fmt, ...)
 {
-#ifdef ENABLE_STDIO
     va_list ap;
-    mrb_value str;
-
     va_start(ap, fmt);
-    str = mrb_vformat(mrb, fmt, ap);
+    auto str = mrb_vformat(mrb, fmt, ap);
     fputs("bug: ", stderr);
-    fwrite(RSTRING_PTR(str), RSTRING_LEN(str), 1, stderr);
+    mrb->sys.error_f("%s",str->m_ptr);
+    //fwrite(RSTRING_PTR(str), RSTRING_LEN(str), 1, stderr);
     va_end(ap);
-#endif
     exit(EXIT_FAILURE);
 }
 

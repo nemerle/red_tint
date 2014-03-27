@@ -173,28 +173,28 @@ void mrb_iv_copy(mrb_value dest, mrb_value src)
 
 static int inspect_i(mrb_sym sym, mrb_value v, void *p)
 {
-    RString *p_str = RSTRING(*(mrb_value*)p);
+    RString *p_str = (RString *)p;
 
     /* need not to show internal data */
     if (p_str->m_ptr[0] == '-') { /* first element */
         p_str->m_ptr[0] = '#';
-        p_str->str_cat(" ",1);
+        p_str->str_buf_cat(" ",1);
     }
     else {
-        p_str->str_cat(", ",2);
+        p_str->str_buf_cat(", ",2);
     }
     size_t len;
     const char *s = mrb_sym2name_len(p_str->m_vm, sym, len);
     p_str->str_cat(s,len);
-    p_str->str_cat("=",1);
-    mrb_value ins;
+    p_str->str_buf_cat("=",1);
+    RString * ins;
     if (mrb_type(v) == MRB_TT_OBJECT) {
-        ins = mrb_any_to_s(p_str->m_vm, v);
+        ins = mrb_any_to_s(p_str->m_vm, v).ptr<RString>();
     }
     else {
         ins = mrb_inspect(p_str->m_vm, v);
     }
-    p_str->str_append(ins);
+    p_str->str_cat(ins);
     return 0;
 }
 
@@ -205,16 +205,15 @@ mrb_value RObject::iv_inspect()
     mrb_value wrapped_self = mrb_value::wrap(this);
     if (len > 0) {
         const char *cn = mrb_obj_classname(m_vm, wrapped_self);
-        mrb_value str = mrb_str_buf_new(m_vm, 30);
+        RString *res = RString::create(m_vm,30);
+        res->str_buf_cat("-<", 2);
+        res->str_buf_cat(cn);
+        res->str_buf_cat(":",1);
+        res->str_cat(mrb_ptr_to_str(m_vm, this));
 
-        mrb_str_buf_cat(str, "-<", 2);
-        mrb_str_cat_cstr(m_vm, str, cn);
-        mrb_str_cat_lit(m_vm, str, ":");
-        mrb_str_concat(m_vm, str, mrb_ptr_to_str(m_vm, this));
-
-        t->iv_foreach(inspect_i, &str);
-        mrb_str_cat_lit(m_vm, str, ">");
-        return str;
+        t->iv_foreach(inspect_i, res);
+        res->str_buf_cat(">",1);
+        return res->wrap();
     }
     return mrb_any_to_s(m_vm, wrapped_self);
 }
@@ -470,13 +469,12 @@ mrb_value mrb_state::mrb_vm_const_get(mrb_sym sym)
     if (!c)
         c = m_ctx->m_ci->target_class;
     if (c) {
-        RClass *c2 = c;
         mrb_value v;
 
         if (c->iv && c->iv->iv_get(sym, v)) {
             return v;
         }
-        for (c2 = c->outer_module(); c2; c2 = c2->outer_module()) {
+        for (RClass *c2 = c->outer_module(); c2; c2 = c2->outer_module()) {
             if (c2->iv && c2->iv->iv_get(sym, v)) {
                 return v;
             }
@@ -507,6 +505,10 @@ RClass& RClass::define_const(const char *name, mrb_value v)
 {
     iv_set(m_vm->intern_cstr(name), v);
     return *this;
+}
+void mrb_state::define_global_const(const char *name, RBasic *val)
+{
+    object_class->define_const(name, val->wrap());
 }
 
 void mrb_state::define_global_const(const char *name, mrb_value val)

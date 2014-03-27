@@ -548,7 +548,7 @@ math_frexp(mrb_state *mrb, mrb_value obj)
     mrb_get_args(mrb, "f", &x);
     x = frexp(x, &exp);
 
-    return mrb_assoc_new(mrb, mrb_float_value(x), mrb_fixnum_value(exp));
+    return mrb_value::wrap(mrb_assoc_new(mrb, mrb_float_value(x), mrb_fixnum_value(exp)));
 }
 
 /*

@@ -72,8 +72,7 @@ sign_bits(int base, const char *p)
     return c;
 }
 
-static mrb_value
-mrb_fix2binstr(mrb_state *mrb, mrb_value x, int base)
+static RString * mrb_fix2binstr(mrb_state *mrb, mrb_value x, int base)
 {
     char buf[64], *b = buf + sizeof buf;
     mrb_int num = mrb_fixnum(x);
@@ -88,7 +87,7 @@ mrb_fix2binstr(mrb_state *mrb, mrb_value x, int base)
         val &= 0x3ff;
 
     if (val == 0) {
-        return mrb_str_new(mrb, "0", 1);
+        return RString::create(mrb, "0", 1);
     }
     *--b = '\0';
     do {
@@ -716,8 +715,9 @@ format_s:
                 mrb_int len;
                 mrb_int slen;
 
-                if (*p == 'p') arg = mrb_inspect(mrb, arg);
-                str = mrb_obj_as_string(mrb, arg);
+                if (*p == 'p')
+                    arg = mrb_inspect(mrb, arg)->wrap();
+                str = mrb_obj_as_string(mrb, arg)->wrap();
                 len = RSTRING_LEN(str);
                 RSTRING_LEN(result) = blen;
                 if (flags&(FPREC|FWIDTH)) {
@@ -838,7 +838,7 @@ bin_retry:
                 if (base == 2) {
                     org_v = v;
                     if ( v < 0 && !sign ) {
-                        val = mrb_fix2binstr(mrb, mrb_fixnum_value(v), base);
+                        val = mrb_fix2binstr(mrb, mrb_fixnum_value(v), base)->wrap();
                         dots = 1;
                     }
                     else {

@@ -102,14 +102,14 @@ static mrb_sym get_valid_iv_sym(mrb_state *mrb, mrb_value iv_name)
 
     return iv_name_id;
 }
-} // End of anonymous namespace
 mrb_bool mrb_obj_basic_to_s_p(mrb_state *mrb, mrb_value obj)
 {
     RProc *me = RClass::mrb_class(mrb, obj)->method_search(mrb->intern2("to_s", 4));
-    if (me && me->is_cfunc() && (me->body.func == mrb_any_to_s))
+    if (me && me->is_cfunc() && (me->isWrappedCfunc(mrb_any_to_s)))
         return true;
     return false;
 }
+} // End of anonymous namespace
 
 /* 15.3.1.3.17 */
 /*
@@ -927,11 +927,12 @@ mrb_value obj_respond_to(mrb_state *mrb, mrb_value self)
         if (!mid.is_string()) {
             tmp = mrb_check_string_type(mrb, mid);
             if (tmp.is_nil()) {
-                tmp = mrb_inspect(mrb, mid);
-                mrb->mrb_raisef(E_TYPE_ERROR, "%S is not a symbol", tmp);
+                mrb->mrb_raisef(E_TYPE_ERROR, "%S is not a symbol", mrb_inspect(mrb, mid)->wrap());
             }
         }
-        tmp = mrb_check_intern_str(mrb, mid);
+        //TODO: tmp is assigned to, by mrb_check_string_type, why isn't it used here ?
+        RString *mid_str = mid.ptr<RString>();
+        tmp = mrb_check_intern_str(mrb, mid_str);
         if (tmp.is_nil()) {
             respond_to_p = false;
         } else {
@@ -997,13 +998,14 @@ mrb_obj_ceqq(mrb_state *mrb, mrb_value self)
     mrb_value v;
     mrb_int i, len;
     mrb_sym eqq = mrb_intern_lit(mrb, "===");
-    mrb_value ary = RArray::splat(mrb, self);
+    RArray * ary = RArray::splat(mrb, self);
 
     mrb_get_args(mrb, "o", &v);
-    len = RARRAY_LEN(ary);
+    len = ary->m_len;
     for (i=0; i<len; i++) {
-        mrb_value c = mrb_funcall_argv(mrb, RARRAY(ary)->entry(i), eqq, 1, &v);
-        if (c.to_bool()) return mrb_true_value();
+        mrb_value c = mrb_funcall_argv(mrb, ary->entry(i), eqq, 1, &v);
+        if (c.to_bool())
+            return mrb_true_value();
     }
     return mrb_value::_false();
 }

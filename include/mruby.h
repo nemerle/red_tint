@@ -98,7 +98,7 @@ mrb_sym mrb_intern_str(mrb_state*,mrb_value);
 mrb_sym mrb_intern_static(mrb_state*,const char*,size_t);
 #define mrb_intern_lit(mrb, lit) mrb_intern_static(mrb, (lit), sizeof(lit) - 1)
 mrb_value mrb_check_intern_cstr(mrb_state*,const char*);
-mrb_value mrb_check_intern_str(mrb_state*,mrb_value);
+mrb_value mrb_check_intern_str(mrb_state*, RString *);
 mrb_value mrb_check_intern(mrb_state*,const char*,size_t);
 const char *mrb_sym2name(mrb_state*,mrb_sym);
 const char *mrb_sym2name_len(mrb_state*,mrb_sym,size_t&);
@@ -235,6 +235,7 @@ public:
     mrb_value mrb_gv_get(mrb_sym sym);
     mrb_value vm_cv_get(mrb_sym sym);
     void vm_cv_set(mrb_sym sym, const mrb_value &v);
+    void define_global_const(const char *name, RBasic *val);
     void define_global_const(const char *name, mrb_value val);
     RClass *mrb_vm_define_class(mrb_value outer, mrb_value super, mrb_sym id);
     mrb_value   mrb_vm_const_get(mrb_sym sym);
@@ -307,9 +308,8 @@ inline constexpr mrb_aspec MRB_ARGS_NONE() { return 0;}
 
 
 mrb_value mrb_str_new(mrb_state *mrb, const char *p, size_t len);
-mrb_value mrb_str_new_cstr(mrb_state*, const char*);
-mrb_value mrb_str_new_static(mrb_state *mrb, const char *p, size_t len);
-#define mrb_str_new_lit(mrb, lit) mrb_str_new_static(mrb, (lit), sizeof(lit) - 1)
+RString *mrb_str_new_cstr(mrb_state*, const char*);
+#define mrb_str_new_lit(mrb, lit) RString::create_static(mrb, (lit), sizeof(lit) - 1)
 
 mrb_value mrb_top_self(mrb_state *);
 //mrb_value mrb_run(mrb_state*, struct RProc*, mrb_value);
@@ -323,7 +323,7 @@ bool mrb_obj_equal(mrb_value , mrb_value );
 bool mrb_equal(mrb_state *mrb, mrb_value obj1, mrb_value obj2);
 mrb_value mrb_Integer(mrb_state *mrb, mrb_value val);
 mrb_value mrb_Float(mrb_state *mrb, mrb_value val);
-mrb_value mrb_inspect(mrb_state *mrb, mrb_value obj);
+RString *mrb_inspect(mrb_state *mrb, mrb_value obj);
 bool mrb_eql(mrb_state *mrb, mrb_value obj1, mrb_value obj2);
 
 #define mrb_gc_mark_value(mrb,val) do {\

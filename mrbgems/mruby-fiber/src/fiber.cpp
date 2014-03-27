@@ -73,7 +73,7 @@ static mrb_value fiber_init(mrb_state *mrb, mrb_value self)
     if (blk.is_nil()) {
         mrb_raise(E_ARGUMENT_ERROR, "tried to create Fiber object without a block");
     }
-    p = mrb_proc_ptr(blk);
+    p = blk.ptr<RProc>();
     if (p->is_cfunc()) {
         mrb_raise(E_ARGUMENT_ERROR, "tried to create Fiber from C defined method");
     }
@@ -100,8 +100,8 @@ static mrb_value fiber_init(mrb_state *mrb, mrb_value self)
     ci = c->m_ci;
     ci->target_class = p->m_target_class;
     ci->proc = p;
-    ci->pc = p->body.irep->iseq;
-    ci->nregs = p->body.irep->nregs;
+    ci->pc = p->ireps()->iseq;
+    ci->nregs = p->ireps()->nregs;
     ci[1] = ci[0];
     c->m_ci++;                      /* push dummy callinfo */
     c->fib = f;
@@ -126,7 +126,7 @@ static mrb_value fiber_result(mrb_state *mrb, mrb_value *a, int len)
         return mrb_value::nil();
     if (len == 1)
         return a[0];
-    return RArray::new_from_values(mrb, len, a);
+    return mrb_value::wrap(RArray::new_from_values(mrb, len, a));
 }
 
 

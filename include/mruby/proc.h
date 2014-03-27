@@ -24,15 +24,17 @@ enum eProcFlags {
 struct REnv;
 struct RProc : public RBasic {
     static const mrb_vtype ttype=MRB_TT_PROC;
+protected:
     union {
         mrb_irep *irep;
         mrb_func_t func;
     } body;
 //protected:
-    RClass *m_target_class;
 public:
+    RClass *m_target_class;
     RClass *target_class() {return m_target_class;}
     REnv *env;
+    mrb_irep *ireps() {assert(!is_cfunc()); return body.irep;}
     inline bool is_cfunc() const { return (flags & MRB_PROC_CFUNC)!=0;}
     void copy_from(RProc *src) {
         flags = src->flags;
@@ -48,6 +50,12 @@ public:
         r->copy_from(from);
         return r;
     }
+static  RProc *     create(mrb_state *mrb, mrb_irep *irep);
+static  RProc *     create(mrb_state *mrb, mrb_func_t func);
+static  RProc *     new_closure(mrb_state *mrb, mrb_irep *irep);
+static  RProc *     new_closure(mrb_state *mrb, mrb_func_t func, int nlocals);
+        mrb_value   call_cfunc(mrb_value self);
+        bool        isWrappedCfunc(mrb_func_t v) const {return body.func==v;}
 };
 struct REnv : public RBasic {
     static const mrb_vtype ttype=MRB_TT_ENV;
@@ -57,14 +65,5 @@ struct REnv : public RBasic {
     constexpr inline int stackSize() const { return this->flags; }
     static REnv *alloc(mrb_state *mrb);
 };
-
-
-#define mrb_proc_ptr(v)    ((RProc*)((v).value.p))
-
-RProc *mrb_proc_new(mrb_state*, mrb_irep*);
-RProc *mrb_proc_new_cfunc(mrb_state*, mrb_func_t);
-RProc *mrb_closure_new(mrb_state*, mrb_irep*);
-RProc *mrb_closure_new_cfunc(mrb_state *mrb, mrb_func_t func, int nlocals);
-//void mrb_proc_copy(RProc *a, RProc *b);
 /* implementation of #send method */
 mrb_value mrb_f_send(mrb_state *mrb, mrb_value self);

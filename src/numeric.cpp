@@ -109,7 +109,7 @@ static mrb_value num_div(mrb_state *mrb, mrb_value x)
  *  representation.
  */
 
-static mrb_value mrb_flo_to_str(mrb_state *mrb, mrb_float flo)
+static RString *mrb_flo_to_str(mrb_state *mrb, mrb_float flo)
 {
     double n = (double)flo;
     int max_digit = FLO_MAX_DIGITS;
@@ -229,7 +229,7 @@ static mrb_value mrb_flo_to_str(mrb_state *mrb, mrb_float flo)
     }
 
     *c = '\0';
-    return mrb_str_new(mrb, &s[0], c - &s[0]);
+    return RString::create(mrb, &s[0], c - &s[0]);
 }
 
 /* 15.2.9.3.16(x) */
@@ -245,7 +245,7 @@ static mrb_value mrb_flo_to_str(mrb_state *mrb, mrb_float flo)
 
 static mrb_value flo_to_s(mrb_state *mrb, mrb_value flt)
 {
-    return mrb_flo_to_str(mrb, mrb_float(flt));
+    return mrb_flo_to_str(mrb, mrb_float(flt))->wrap();
 }
 
 /* 15.2.9.3.2  */
@@ -638,8 +638,7 @@ flo_nan_p(mrb_state *mrb, mrb_value num)
  *  methods simply return the receiver.
  */
 
-static mrb_value
-int_to_i(mrb_state *mrb, mrb_value num)
+static mrb_value int_to_i(mrb_state *mrb, mrb_value num)
 {
     return num;
 }
@@ -758,15 +757,16 @@ fix_mod(mrb_state *mrb, mrb_value x)
 static mrb_value fix_divmod(mrb_state *mrb, mrb_value x)
 {
     mrb_value y = mrb->get_arg<mrb_value>();
-
+    RArray *res;
     if (y.is_fixnum()) {
         mrb_int div, mod;
 
         if (mrb_fixnum(y) == 0) {
-            return mrb_assoc_new(mrb, mrb_float_value(INFINITY),mrb_float_value(NAN));
+            res = mrb_assoc_new(mrb, mrb_float_value(INFINITY),mrb_float_value(NAN));
+        } else {
+            fixdivmod(mrb, mrb_fixnum(x), mrb_fixnum(y), &div, &mod);
+            res = mrb_assoc_new(mrb, mrb_fixnum_value(div), mrb_fixnum_value(mod));
         }
-        fixdivmod(mrb, mrb_fixnum(x), mrb_fixnum(y), &div, &mod);
-        return mrb_assoc_new(mrb, mrb_fixnum_value(div), mrb_fixnum_value(mod));
     }
     else {
         mrb_float div, mod;
@@ -775,8 +775,9 @@ static mrb_value fix_divmod(mrb_state *mrb, mrb_value x)
         flodivmod(mrb, (mrb_float)mrb_fixnum(x), mrb_to_flo(mrb, y), &div, &mod);
         a = mrb_float_value((mrb_int)div);
         b = mrb_float_value(mod);
-        return mrb_assoc_new(mrb, a, b);
+        res = mrb_assoc_new(mrb, a, b);
     }
+    return mrb_value::wrap(res);
 }
 static mrb_value
 flo_divmod(mrb_state *mrb, mrb_value x)
@@ -790,7 +791,7 @@ flo_divmod(mrb_state *mrb, mrb_value x)
     flodivmod(mrb, mrb_float(x), mrb_to_flo(mrb, y), &div, &mod);
     a = mrb_float_value((mrb_int)div);
     b = mrb_float_value(mod);
-    return mrb_assoc_new(mrb, a, b);
+    return mrb_value::wrap(mrb_assoc_new(mrb, a, b));
 }
 /* 15.2.8.3.7  */
 /*
