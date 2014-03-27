@@ -12,10 +12,10 @@
 #include "mruby/string.h"
 #include "mruby/variable.h"
 
-static inline mrb_value mrb_hash_ht_key(mrb_state *mrb, mrb_value key)
+static inline mrb_value mrb_hash_ht_key(mrb_value key)
 {
     if (key.is_string())
-        return mrb_str_dup(mrb, key);
+        return key.ptr<RString>()->dup()->wrap();
     return key;
 }
 
@@ -122,7 +122,7 @@ mrb_value RHash::set(mrb_value key, mrb_value val) /* mrb_hash_aset */
     if (k == h->end()) {
         /* expand */
         int ai = m_vm->gc().arena_save();
-        k=h->put(mrb_hash_ht_key(m_vm,key));
+        k=h->put(mrb_hash_ht_key(key));
         m_vm->gc().arena_restore(ai);
     }
     h->value(k) = val;
@@ -146,7 +146,7 @@ RHash *RHash::dup() const
         for (k = h->begin(); k != h->end(); k++) {
             if (h->exist(k)) {
                 int ai = m_vm->gc().arena_save();
-                auto ret_k = ret_h->put(mrb_hash_ht_key(m_vm,h->key(k)));
+                auto ret_k = ret_h->put(mrb_hash_ht_key(h->key(k)));
                 m_vm->gc().arena_restore(ai);
                 ret_h->value(ret_k) = h->value(k);
             }

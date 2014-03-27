@@ -1044,7 +1044,7 @@ fix_to_f(mrb_state *mrb, mrb_value num)
  *     FloatDomainError: Infinity
  */
 /* ------------------------------------------------------------------------*/
-mrb_value mrb_flo_to_fixnum(mrb_state *mrb, mrb_value x)
+mrb_int mrb_flo_to_fixnum(mrb_state *mrb, mrb_value x)
 {
     mrb_int z;
 
@@ -1063,9 +1063,8 @@ mrb_value mrb_flo_to_fixnum(mrb_state *mrb, mrb_value x)
         }
         z = (mrb_int)d;
     }
-    return mrb_fixnum_value(z);
+    return z;
 }
-
 mrb_value mrb_fixnum_plus(mrb_state *mrb, mrb_value x, mrb_value y)
 {
     mrb_int a;

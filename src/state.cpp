@@ -135,7 +135,7 @@ mrb_value mrb_str_pool(mrb_state *mrb, RString *s)
     ns = mrb->gc().new_t<RString>();
     ns->tt = MRB_TT_STRING;
     ns->c = mrb->string_class;
-
+    ns->m_vm = mrb;
     len = s->len;
     ns->len = len;
     ns->flags = 0;

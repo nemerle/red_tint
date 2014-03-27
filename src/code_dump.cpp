@@ -256,8 +256,8 @@ void mrb_state::codedump(mrb_irep *irep)
             case OP_STRING:
             {
                 mrb_value v = irep->pool[GETARG_Bx(c)];
-                mrb_value s = mrb_str_dump(this, mrb_str_new(this, RSTRING_PTR(v), RSTRING_LEN(v)));
-                sys.print_f("OP_STRING\tR%d\t%s\n", GETARG_A(c), RSTRING_PTR(s));
+                RString *s = v.ptr<RString>()->mrb_str_dump();
+                sys.print_f("OP_STRING\tR%d\t%s\n", GETARG_A(c), s->m_ptr);
             }
                 break;
             case OP_STRCAT:
@@ -289,9 +289,9 @@ void mrb_state::codedump(mrb_irep *irep)
                 break;
             case OP_ERR:
             {
-                mrb_value v = irep->pool[GETARG_Bx(c)];
-                mrb_value s = mrb_str_dump(this, mrb_str_new(this, RSTRING_PTR(v), RSTRING_LEN(v)));
-                sys.print_f("OP_ERR\t%s\n", RSTRING_PTR(s));
+                RString *v = irep->pool[GETARG_Bx(c)].ptr<RString>();
+                RString *s = v->mrb_str_dump();
+                sys.print_f("OP_ERR\t%s\n", s->m_ptr);
             }
                 break;
             case OP_EPUSH:

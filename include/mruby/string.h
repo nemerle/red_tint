@@ -43,6 +43,10 @@ public:
     void str_buf_cat(const char *m_ptr, size_t len);
     void str_modify();
     void resize(mrb_int len);
+    RString *mrb_str_dump();
+    mrb_int mrb_str_to_inum(int base, int badcheck);
+    RString *capitalize_bang();
+    RString *chop_bang();
 private:
 };
 #define str_new_lit(mrb, lit) RString::create(mrb, (lit), sizeof(lit) - 1)
@@ -61,8 +65,6 @@ RString *mrb_ptr_to_str(mrb_state *, void *);
 RString *mrb_obj_as_string(mrb_state *mrb, mrb_value obj);
 mrb_value mrb_str_substr(mrb_state *mrb, mrb_value str, mrb_int beg, mrb_int len);
 mrb_value mrb_check_string_type(mrb_state *mrb, mrb_value str);
-mrb_value mrb_str_buf_new(mrb_state *mrb, mrb_int capa);
-mrb_value mrb_str_buf_cat(mrb_value str, const char *ptr, size_t len);
 
 char *mrb_string_value_cstr(mrb_state *mrb, const RString *ptr);
 char *mrb_string_value_ptr(mrb_state *mrb, mrb_value ptr);
@@ -70,16 +72,11 @@ mrb_value mrb_str_dup(mrb_state *mrb, mrb_value str); /* mrb_str_dup */
 mrb_value mrb_str_pool(mrb_state *mrb, RString *str); /* mrb_str_dup */
 mrb_value mrb_str_intern(mrb_state *mrb, mrb_value self);
 #define mrb_str_cat_lit(mrb, str, lit) mrb_str_cat(mrb, str, (lit), sizeof(lit) - 1)
-mrb_value mrb_str_to_inum(mrb_state *mrb, RString *str, int base, int badcheck);
 double mrb_str_to_dbl(mrb_state *mrb, RString *str, int badcheck);
 mrb_value mrb_str_to_str(mrb_state *mrb, mrb_value str);
-mrb_int mrb_str_hash(mrb_state *mrb, mrb_value str);
-mrb_value mrb_str_buf_append(mrb_state *mrb, mrb_value str, mrb_value str2);
+
 mrb_value mrb_str_inspect(mrb_state *mrb, mrb_value str);
 int mrb_str_equal(mrb_state *mrb, mrb_value str1, mrb_value str2);
-mrb_value mrb_str_dump(mrb_state *mrb, mrb_value str);
-mrb_value mrb_str_cat(mrb_state *mrb, mrb_value str, const char *ptr, int len);
-mrb_value mrb_str_append(mrb_state *mrb, mrb_value str, mrb_value str2);
 
 int mrb_str_cmp(mrb_state *mrb, mrb_value str1, mrb_value str2);
 char *mrb_str_to_cstr(mrb_state *mrb, mrb_value str);

@@ -126,9 +126,9 @@ static RString * mrb_fix2binstr(mrb_state *mrb, mrb_value x, int base)
     while (blen + (l) >= bsiz) {\
     bsiz*=2;\
     }\
-    RSTRING(result)->resize(bsiz);\
+    res_ptr->resize(bsiz);\
     /*  ENC_CODERANGE_SET(result, cr);*/\
-    buf = RSTRING_PTR(result);\
+    buf = res_ptr->m_ptr;\
     } while (0)
 
 #define PUSH(s, l) do { \
@@ -496,7 +496,6 @@ mrb_str_format(mrb_state *mrb, int argc, const mrb_value *argv, mrb_value fmt)
     char *buf;
     mrb_int blen;
     mrb_int bsiz;
-    mrb_value result;
     mrb_int n;
     mrb_int width;
     mrb_int prec;
@@ -530,9 +529,8 @@ mrb_str_format(mrb_state *mrb, int argc, const mrb_value *argv, mrb_value fmt)
     end = p + RSTRING_LEN(fmt);
     blen = 0;
     bsiz = 120;
-    result = mrb_str_buf_new(mrb, bsiz);
-    RString *res_ptr=result.ptr<RString>();
-    buf = RSTRING_PTR(result);
+    RString *res_ptr= RString::create(mrb,bsiz);
+    buf = res_ptr->m_ptr;
     memset(buf, 0, bsiz);
 
     for (; p < end; p++) {
@@ -719,7 +717,7 @@ format_s:
                     arg = mrb_inspect(mrb, arg)->wrap();
                 str = mrb_obj_as_string(mrb, arg)->wrap();
                 len = RSTRING_LEN(str);
-                RSTRING_LEN(result) = blen;
+                res_ptr->len = blen;
                 if (flags&(FPREC|FWIDTH)) {
                     slen = RSTRING_LEN(str);
                     if (slen < 0) {
@@ -805,12 +803,11 @@ bin_retry:
                             val = mrb_fixnum_value((mrb_int)mrb_float(val));
                             goto bin_retry;
                         }
-                        val = mrb_flo_to_fixnum(mrb, val);
-                        if (val.is_fixnum()) goto bin_retry;
+                        v = mrb_flo_to_fixnum(mrb, val);
                         break;
                     case MRB_TT_STRING:
-                        val = mrb_str_to_inum(mrb, val.ptr<RString>(), 0, true);
-                        goto bin_retry;
+                        v = val.ptr<RString>()->mrb_str_to_inum(0, true);
+                        break;
                     case MRB_TT_FIXNUM:
                         v = mrb_fixnum(val);
                         break;
@@ -845,7 +842,7 @@ bin_retry:
                     else {
                         val_ptr = mrb_fixnum_to_str(mrb, mrb_fixnum_value(v), base);
                     }
-                    v = mrb_fixnum(mrb_str_to_inum(mrb, val_ptr, 10, false));
+                    v = val_ptr->mrb_str_to_inum(10, false);
                 }
                 if (sign) {
                     char c = *p;
@@ -1074,7 +1071,7 @@ sprint_exit:
     }
 #endif
     res_ptr->resize(blen);
-    return result;
+    return res_ptr->wrap();
 }
 
 static void

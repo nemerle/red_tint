@@ -108,7 +108,7 @@ read_irep_record_1(mrb_state *mrb, const uint8_t *bin, uint32_t *len,bool _alloc
 
             switch (tt) { //pool data
                 case IREP_TT_FIXNUM:
-                    irep->pool[i] = mrb_str_to_inum(mrb, s, 10, false);
+                    irep->pool[i] = mrb_value::wrap(s->mrb_str_to_inum(10, false));
                     break;
 
                 case IREP_TT_FLOAT:

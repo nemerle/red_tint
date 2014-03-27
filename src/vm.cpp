@@ -499,9 +499,9 @@ static void localjump_error(mrb_state *mrb, localjump_error_kind kind)
     char kind_str_len[] = { 6, 5, 5 };
     static const char lead[] = "unexpected ";
 
-    mrb_value msg = mrb_str_buf_new(mrb, sizeof(lead) + 7);
-    mrb_str_buf_cat(msg, lead, sizeof(lead) - 1);
-    mrb_str_buf_cat(msg, kind_str[kind], kind_str_len[kind]);
+    RString *msg = RString::create(mrb, sizeof(lead) + 7);
+    msg->str_buf_cat(lead, sizeof(lead) - 1);
+    msg->str_buf_cat(kind_str[kind], kind_str_len[kind]);
     mrb_value exc = mrb_exc_new_str(E_LOCALJUMP_ERROR, msg);
     mrb->m_exc = exc.object_ptr();
 }
@@ -1889,7 +1889,7 @@ L_RESCUE:
 
             CASE(OP_STRING) {
                 /* A Bx           R(A) := str_new(Lit(Bx)) */
-                regs[GETARG_A(i)] = mrb_str_dup(this, pool[GETARG_Bx(i)]);
+                regs[GETARG_A(i)] = pool[GETARG_Bx(i)].ptr<RString>()->dup()->wrap();
                 gc().arena_restore(ai);
                 NEXT;
             }
@@ -2083,7 +2083,7 @@ L_STOP:
 
             CASE(OP_ERR) {
                 /* Bx     raise RuntimeError with message Lit(Bx) */
-                mrb_value msg = mrb_str_dup(this, pool[GETARG_Bx(i)]);
+                RString *msg = pool[GETARG_Bx(i)].ptr<RString>()->dup();
                 RClass *excep_class = A_RUNTIME_ERROR(this);
 
                 if (GETARG_A(i) != 0) {

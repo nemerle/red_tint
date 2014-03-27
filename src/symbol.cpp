@@ -389,20 +389,19 @@ id:
 
 static mrb_value sym_inspect(mrb_state *mrb, mrb_value sym)
 {
-    mrb_value str;
     const char *name;
     size_t len;
     mrb_sym id = mrb_symbol(sym);
 
     name = mrb_sym2name_len(mrb, id, len);
-    str = mrb_str_new(mrb, 0, len+1);
-    RSTRING(str)->m_ptr[0] = ':';
-    memcpy(RSTRING(str)->m_ptr+1, name, len);
+    RString *str = RString::create(mrb, 0, len+1);
+    str->m_ptr[0] = ':';
+    memcpy(str->m_ptr+1, name, len);
     if (!symname_p(name) || strlen(name) != len) {
-        str = mrb_str_dump(mrb, str);
-        memcpy(RSTRING(str)->m_ptr, ":\"", 2);
+        str = str->mrb_str_dump();
+        memcpy(str->m_ptr, ":\"", 2);
     }
-    return str;
+    return str->wrap();
 }
 
 mrb_value mrb_sym2str(mrb_state *mrb, mrb_sym sym)
@@ -424,8 +423,8 @@ const char* mrb_sym2name(mrb_state *mrb, mrb_sym sym) {
         return name;
     }
     else {
-        mrb_value str = mrb_str_dump(mrb, RString::create_static(mrb, name, len)->wrap());
-        return RSTRING(str)->m_ptr;
+        RString *str = RString::create_static(mrb, name, len)->mrb_str_dump();
+        return str->m_ptr;
     }
 }
 

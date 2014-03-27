@@ -481,7 +481,7 @@ mrb_value mrb_to_int(mrb_state *mrb, mrb_value val)
     return mrb_to_integer(mrb, val, "to_int");
 }
 
-static mrb_value mrb_convert_to_integer(mrb_state *mrb, mrb_value val, int base)
+static mrb_int mrb_convert_to_integer(mrb_state *mrb, mrb_value val, int base)
 {
     mrb_value tmp;
 
@@ -502,7 +502,7 @@ static mrb_value mrb_convert_to_integer(mrb_state *mrb, mrb_value val, int base)
         case MRB_TT_FIXNUM:
             if (base != 0)
                 goto arg_error;
-            return val;
+            return val.value.i;
 
         default:
             break;
@@ -510,20 +510,20 @@ static mrb_value mrb_convert_to_integer(mrb_state *mrb, mrb_value val, int base)
     if (base != 0) {
         tmp = mrb_check_string_type(mrb, val);
         if (!tmp.is_nil())
-            return mrb_str_to_inum(mrb, val.ptr<RString>(), base, true);
+            return val.ptr<RString>()->mrb_str_to_inum(base, true);
 arg_error:
         mrb->mrb_raise(E_ARGUMENT_ERROR, "base specified for non string value");
     }
     tmp = convert_type(mrb, val, "Integer", "to_int", false);
     if (tmp.is_nil()) {
-        return mrb_to_integer(mrb, val, "to_i");
+        return mrb_to_integer(mrb, val, "to_i").value.i;
     }
-    return tmp;
+    return tmp.value.i;
 }
 
 mrb_value mrb_Integer(mrb_state *mrb, mrb_value val)
 {
-    return mrb_convert_to_integer(mrb, val, 0);
+    return mrb_value::wrap(mrb_convert_to_integer(mrb, val, 0));
 }
 
 mrb_value mrb_Float(mrb_state *mrb, mrb_value val)
