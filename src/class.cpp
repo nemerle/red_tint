@@ -982,7 +982,7 @@ static mrb_value mrb_bob_init(mrb_state *mrb, mrb_value cv)
 
 static mrb_value mrb_bob_not(mrb_state *mrb, mrb_value cv)
 {
-    return mrb_bool_value(!cv.to_bool());
+    return mrb_value::wrap(!cv.to_bool());
 }
 
 /* 15.3.1.3.30 */
@@ -1523,7 +1523,7 @@ static mrb_value mrb_mod_cvar_defined(mrb_state *mrb, mrb_value mod)
         }
         defined_p = mod_cls->mrb_mod_cv_defined(mrb_symbol(sym));
     }
-    return mrb_bool_value(defined_p);
+    return mrb_value::wrap(defined_p);
 }
 
 /* 15.2.2.4.17 */
@@ -1666,7 +1666,7 @@ static mrb_value mrb_mod_method_defined(mrb_state *mrb, mrb_value mod)
             method_defined_p = mod_cls->respond_to(mrb_symbol(sym));
         }
     }
-    return mrb_bool_value(method_defined_p);
+    return mrb_value::wrap(method_defined_p);
 }
 
 static void remove_method(mrb_state *mrb, mrb_value mod, mrb_sym mid)
@@ -1749,7 +1749,7 @@ mrb_value RClass::mod_const_defined(mrb_value id) {
         }
     }
 
-    return mrb_bool_value(const_defined_p);
+    return mrb_value::wrap(const_defined_p);
 
 }
 mrb_value mrb_mod_const_defined(mrb_state *mrb, mrb_value mod)
@@ -1811,9 +1811,9 @@ static mrb_value mrb_mod_s_constants(mrb_state *mrb, mrb_value mod)
 static mrb_value mrb_mod_eqq(mrb_state *mrb, mrb_value mod)
 {
     mrb_value obj = mrb->get_arg<mrb_value>();
-    mrb_bool eqq = obj.is_kind_of(mrb, mrb_class_ptr(mod));
+    bool eqq = obj.is_kind_of(mrb, mrb_class_ptr(mod));
 
-    return mrb_bool_value(eqq);
+    return mrb_value::wrap(eqq);
 }
 
 void mrb_init_class(mrb_state *mrb)

@@ -86,7 +86,7 @@ mrb_value mrb_range_excl(mrb_state *mrb, mrb_value range)
 {
     RRange *r = mrb_range_ptr(range);
 
-    return mrb_bool_value(r->excl);
+    return mrb_value::wrap(r->excl);
 }
 
 static void range_init(mrb_state *mrb, mrb_value range, mrb_value beg, mrb_value end, int exclude_end)
@@ -214,7 +214,7 @@ mrb_range_include(mrb_state *mrb, mrb_value range)
     mrb_value val;
     RRange *r = mrb_range_ptr(range);
     mrb_value beg, end;
-    mrb_bool include_p;
+    bool include_p;
 
     mrb_get_args(mrb, "o", &val);
 
@@ -224,7 +224,7 @@ mrb_range_include(mrb_state *mrb, mrb_value range)
             ((r->excl && r_gt(mrb, end, val)) || /* end >  val */
              (r_ge(mrb, end, val))); /* end >= val */
 
-    return mrb_bool_value(include_p);
+    return mrb_value::wrap(include_p);
 }
 
 /*

@@ -576,9 +576,9 @@ int mrb_str_equal(mrb_state *mrb, mrb_value str1, mrb_value str2)
 static mrb_value mrb_str_equal_m(mrb_state *mrb, mrb_value str1)
 {
     mrb_value str2 = mrb->get_arg<mrb_value>();
-    mrb_bool equal_p = mrb_str_equal(mrb, str1, str2);
+    bool equal_p = mrb_str_equal(mrb, str1, str2);
 
-    return mrb_bool_value(equal_p);
+    return mrb_value::wrap(equal_p);
 }
 /* ---------------------------------- */
 mrb_value mrb_str_to_str(mrb_state *mrb, mrb_value str)
@@ -1109,7 +1109,7 @@ mrb_str_empty_p(mrb_state *mrb, mrb_value self)
 {
     RString *s = self.ptr<RString>();
 
-    return mrb_bool_value(s->len == 0);
+    return mrb_value::wrap(s->len == 0);
 }
 
 /* 15.2.10.5.17 */
@@ -1125,7 +1125,7 @@ static mrb_value mrb_str_eql(mrb_state *mrb, mrb_value self)
     mrb_value str2 = mrb->get_arg<mrb_value>();
     eql_p = (mrb_type(str2) == MRB_TT_STRING) && str_eql(self, str2);
 
-    return mrb_bool_value(eql_p);
+    return mrb_value::wrap(eql_p);
 }
 
 static mrb_value
@@ -1243,7 +1243,7 @@ mrb_str_include(mrb_state *mrb, mrb_value self)
         include_p = (i != -1);
     }
 
-    return mrb_bool_value(include_p);
+    return mrb_value::wrap(include_p);
 }
 
 /* 15.2.10.5.22 */

@@ -175,8 +175,9 @@ public:
 static  constexpr   mrb_value   undef(void)      { return {{0},MRB_TT_UNDEF}; }
 static  constexpr   mrb_value   nil(void)        { return {{0},MRB_TT_FALSE}; }
 static  inline      mrb_value   _false(void)     { return {{(void *)intptr_t(1)},MRB_TT_FALSE}; }
-
-static  constexpr   mrb_value   wrap(RBasic *p)  { return {{p},p->tt}; }
+static  inline      mrb_value   _true(void)      { return {{(void *)intptr_t(1)},MRB_TT_TRUE}; }
+                                template<class T>
+static  inline      mrb_value   wrap(T p) { return {{p},p->tt}; }
                     bool        respond_to(mrb_state *,mrb_sym msg) const;
                     bool        is_instance_of(mrb_state *mrb, RClass* c) const;
                     bool        is_kind_of(mrb_state *mrb, RClass *c);
@@ -184,6 +185,8 @@ static  constexpr   mrb_value   wrap(RBasic *p)  { return {{p},p->tt}; }
                     // TODO: consider using a constructor to ease the return value conversions from void *, to mrb_values
                     mrb_value   mrb_iv_get(mrb_sym sym) const;
 };
+
+
 //#define mrb_ptr(v)   ((RObject*)((v).value.p))
 
 #define mrb_type(o)   (o).tt
@@ -246,14 +249,6 @@ static inline mrb_value mrb_true_value(void)
     return {{(void *)intptr_t(1)},MRB_TT_TRUE};
 }
 
-static inline mrb_value mrb_bool_value(mrb_bool boolean)
-{
-    mrb_value v;
-
-    MRB_SET_VALUE(v, boolean ? MRB_TT_TRUE : MRB_TT_FALSE, value.i, 1);
-    return v;
-}
-
 namespace red_tint {
 static inline mrb_value toRuby(RBasic *p)
 {
@@ -262,3 +257,11 @@ static inline mrb_value toRuby(RBasic *p)
 
 } // end of mruby namespace
 
+
+template<>
+inline mrb_value   mrb_value::wrap<bool>(bool p)  { return {{(void *)1},p ? MRB_TT_TRUE : MRB_TT_FALSE}; }
+template<>
+inline mrb_value   mrb_value::wrap<mrb_int>(mrb_int p)  { return {{(void *)p},MRB_TT_FIXNUM}; }
+// wrapping mrb_value in mrb_value is no-op, useful in macros that always call wrap
+template<>
+inline mrb_value   mrb_value::wrap<mrb_value>(mrb_value p)  { return p; }

@@ -865,7 +865,7 @@ void RArray::clear()
 
 mrb_value RArray::empty_p() const
 {
-    return mrb_bool_value(m_len == 0);
+    return mrb_value::wrap(m_len == 0);
 }
 
 mrb_value mrb_check_array_type(mrb_state *mrb, const mrb_value &ary)
@@ -1047,7 +1047,7 @@ mrb_value RArray::mrb_ary_equal()
     }
     if (!ary2.is_array()) {
         if (ary2.respond_to(m_vm, mrb_intern(m_vm, "to_ary", 6))) {
-            return mrb_bool_value(mrb_equal(m_vm, ary2, mrb_value::wrap(this)));
+            return mrb_value::wrap(mrb_equal(m_vm, ary2, mrb_value::wrap(this)));
         }
         return mrb_value::_false();
     }

@@ -167,7 +167,7 @@ mrb_fix2binstr(mrb_state *mrb, mrb_value x, int base)
     (mrb->mrb_raisef(E_ARGUMENT_ERROR, "named%S after unnumbered(%S)", mrb_str_new(mrb, (name), (len)), mrb_fixnum_value(posarg)), mrb_value::undef()) : \
     posarg == -1 ? \
     (mrb->mrb_raisef(E_ARGUMENT_ERROR, "named%S after numbered", mrb_str_new(mrb, (name), (len))), mrb_value::undef()) :    \
-    (posarg = -2, mrb_hash_fetch(mrb, get_hash(mrb, &hash, argc, argv), id, mrb_value::undef())))
+    (posarg = -2, get_hash(mrb, &hash, argc, argv).ptr<RHash>()->fetch(id, mrb_value::undef())))
 
 #define GETNUM(n, val) \
     for (; p < end && ISDIGIT(*p); p++) {\

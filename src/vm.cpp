@@ -1911,7 +1911,7 @@ L_RESCUE:
                 mrb_value hash = mrb_hash_new_capa(this, c);
 
                 while (b < lim) {
-                    mrb_hash_set(this, hash, regs[b], regs[b+1]);
+                    hash.ptr<RHash>()->set(regs[b], regs[b+1]);
                     b+=2;
                 }
                 regs[GETARG_A(i)] = hash;

@@ -223,9 +223,9 @@ static mrb_value
 sym_equal(mrb_state *mrb, mrb_value sym1)
 {
     mrb_value sym2 = mrb->get_arg<mrb_value>();
-    mrb_bool equal_p = mrb_obj_equal(sym1, sym2);
+    bool equal_p = mrb_obj_equal(sym1, sym2);
 
-    return mrb_bool_value(equal_p);
+    return mrb_value::wrap(equal_p);
 }
 
 /* 15.2.11.3.2  */

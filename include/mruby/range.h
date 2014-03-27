@@ -16,7 +16,7 @@ struct mrb_range_edges {
 struct RRange : public RBasic{
     static const mrb_vtype ttype = MRB_TT_RANGE;
     mrb_range_edges *edges;
-    int excl;
+    bool excl;
 };
 
 #define mrb_range_ptr(v)    ((struct RRange*)((v).value.p))

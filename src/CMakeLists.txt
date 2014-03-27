@@ -35,6 +35,7 @@ SET(MRUBY_SRC_C
     vm.cpp
     version
     debug
+    InstanceVariablesTable
     ../include/mrbconf.h
     ../include/mruby.h
     ../include/mruby/array.h

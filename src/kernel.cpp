@@ -169,7 +169,7 @@ static mrb_value mrb_obj_equal_m(mrb_state *mrb, mrb_value self)
     mrb_value arg = mrb->get_arg<mrb_value>();
     mrb_bool eql_p = mrb_obj_equal(self, arg);
 
-    return mrb_bool_value(eql_p);
+    return mrb_value::wrap(eql_p);
 }
 
 static mrb_value mrb_obj_not_equal_m(mrb_state *mrb, mrb_value self)
@@ -177,7 +177,7 @@ static mrb_value mrb_obj_not_equal_m(mrb_state *mrb, mrb_value self)
     mrb_value arg = mrb->get_arg<mrb_value>();
     mrb_bool eql_p = mrb_equal(mrb, self, arg);
 
-    return mrb_bool_value(!eql_p);
+    return mrb_value::wrap(!eql_p);
 }
 
 /* 15.3.1.3.2  */
@@ -195,7 +195,7 @@ mrb_equal_m(mrb_state *mrb, mrb_value self)
     mrb_value arg = mrb->get_arg<mrb_value>();
     mrb_bool equal_p = mrb_equal(mrb, self, arg);
 
-    return mrb_bool_value(equal_p);
+    return mrb_value::wrap(equal_p);
 }
 
 /* 15.3.1.3.3  */
@@ -267,7 +267,7 @@ mrb_f_block_given_p_m(mrb_state *mrb, mrb_value self)
         }
     }
 
-    return mrb_bool_value(given_p);
+    return mrb_value::wrap(given_p);
 }
 
 /* 15.3.1.3.7  */
@@ -557,7 +557,7 @@ mrb_value mrb_obj_instance_eval(mrb_state *mrb, mrb_value self)
 static mrb_value obj_is_instance_of(mrb_state *mrb, mrb_value self)
 {
     bool instance_of_p = self.is_instance_of(mrb, mrb->get_arg<RClass *>());
-    return mrb_bool_value(instance_of_p);
+    return mrb_value::wrap(instance_of_p);
 }
 
 
@@ -584,7 +584,7 @@ mrb_value mrb_obj_ivar_defined(mrb_state *mrb, mrb_value self)
     mrb_sym mid=get_valid_iv_sym(mrb,mrb->get_arg<mrb_value>());
     bool defined_p = self.object_ptr()->iv_defined(mid);
 
-    return mrb_bool_value(defined_p);
+    return mrb_value::wrap(defined_p);
 }
 
 /* 15.3.1.3.21 */
@@ -676,7 +676,7 @@ mrb_value mrb_obj_is_kind_of_m(mrb_state *mrb, mrb_value self)
 
     mrb_bool kind_of_p = self.is_kind_of(mrb, mrb->get_arg<RClass *>());
 
-    return mrb_bool_value(kind_of_p);
+    return mrb_value::wrap(kind_of_p);
 }
 
 
@@ -949,7 +949,7 @@ mrb_value obj_respond_to(mrb_state *mrb, mrb_value self)
             return mrb_funcall_argv(mrb, self, rtm_id, argc, argv);
         }
     }
-    return mrb_bool_value(respond_to_p);
+    return mrb_value::wrap(respond_to_p);
 }
 
 /* 15.3.1.3.45 */

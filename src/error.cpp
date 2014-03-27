@@ -170,7 +170,7 @@ static mrb_value exc_equal(mrb_state *mrb, mrb_value exc)
         equal_p = mrb_equal(mrb, mrb_attr_get(exc, id_mesg), mesg);
     }
 
-    return mrb_bool_value(equal_p);
+    return mrb_value::wrap(equal_p);
 }
 
 static void exc_debug_info(mrb_state *mrb, RObject *exc)

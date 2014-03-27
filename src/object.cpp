@@ -106,7 +106,7 @@ static mrb_value true_and(mrb_state *mrb, mrb_value obj)
 
     mrb_get_args(mrb, "b", &obj2);
 
-    return mrb_bool_value(obj2);
+    return mrb_value::wrap(obj2);
 }
 
 /* 15.2.5.3.2  */
@@ -124,7 +124,7 @@ static mrb_value true_xor(mrb_state *mrb, mrb_value obj)
     mrb_bool obj2;
 
     mrb_get_args(mrb, "b", &obj2);
-    return mrb_bool_value(!obj2);
+    return mrb_value::wrap(!obj2);
 }
 
 /* 15.2.5.3.3  */
@@ -207,7 +207,7 @@ static mrb_value false_xor(mrb_state *mrb, mrb_value obj)
     mrb_bool obj2;
 
     mrb_get_args(mrb, "b", &obj2);
-    return mrb_bool_value(obj2);
+    return mrb_value::wrap(obj2);
 }
 
 /* 15.2.4.3.3  */
@@ -226,7 +226,7 @@ static mrb_value false_or(mrb_state *mrb, mrb_value obj)
     mrb_bool obj2;
 
     mrb_get_args(mrb, "b", &obj2);
-    return mrb_bool_value(obj2);
+    return mrb_value::wrap(obj2);
 }
 
 /* 15.2.6.3.3  */

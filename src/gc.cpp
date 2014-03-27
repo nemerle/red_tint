@@ -1061,7 +1061,7 @@ static mrb_value gc_start(mrb_state *mrb, mrb_value obj)
 static mrb_value gc_enable(mrb_state *mrb, mrb_value obj)
 {
     bool old = mrb->gc().gc_disabled(false);
-    return mrb_bool_value(old);
+    return mrb_value::wrap(old);
 }
 
 /*
@@ -1079,7 +1079,7 @@ static mrb_value gc_enable(mrb_state *mrb, mrb_value obj)
 static mrb_value gc_disable(mrb_state *mrb, mrb_value obj)
 {
     bool old = mrb->gc().gc_disabled(true);
-    return mrb_bool_value(old);
+    return mrb_value::wrap(old);
 }
 
 /*
@@ -1171,7 +1171,7 @@ void MemManager::change_gen_gc_mode(mrb_int enable)
 static mrb_value
 gc_generational_mode_get(mrb_state *mrb, mrb_value self)
 {
-    return mrb_bool_value(mrb->gc().generational_gc_mode());
+    return mrb_value::wrap(mrb->gc().generational_gc_mode());
 }
 
 /*
@@ -1191,7 +1191,7 @@ gc_generational_mode_set(mrb_state *mrb, mrb_value self)
     if (mrb->gc().generational_gc_mode() != enable)
         mrb->gc().change_gen_gc_mode(enable);
 
-    return mrb_bool_value(enable);
+    return mrb_value::wrap(enable);
 }
 
 void mrb_state::mrb_objspace_each_objects(each_object_callback* callback, void *data)
