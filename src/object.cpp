@@ -539,7 +539,7 @@ mrb_value mrb_Float(mrb_state *mrb, mrb_value val)
             return val;
 
         case MRB_TT_STRING:
-            return mrb_float_value(mrb_str_to_dbl(mrb, val.ptr<RString>(), true));
+            return mrb_float_value(val.ptr<RString>()->to_dbl(true));
 
         default:
             return mrb_convert_type(mrb, val, MRB_TT_FLOAT, "Float", "to_f");

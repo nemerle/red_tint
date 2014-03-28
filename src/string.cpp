@@ -675,13 +675,13 @@ static mrb_int mrb_str_index(mrb_value str, mrb_value sub, mrb_int offset)
     if (pos < 0) return pos;
     return pos + offset;
 }
-mrb_value mrb_str_dup(mrb_state *mrb, mrb_value str)
-{
-    /* should return shared string */
-    RString *s = str.ptr<RString>();
+//mrb_value mrb_str_dup(mrb_state *mrb, mrb_value str)
+//{
+//    /* should return shared string */
+//    RString *s = str.ptr<RString>();
 
-    return s->dup()->wrap();
-}
+//    return s->dup()->wrap();
+//}
 
 static mrb_value mrb_str_aref(mrb_state *mrb, mrb_value str, mrb_value indx)
 {
@@ -693,13 +693,15 @@ static mrb_value mrb_str_aref(mrb_state *mrb, mrb_value str, mrb_value indx)
             idx = mrb_fixnum(indx);
 
 num_index:
-            str = mrb_str_substr(mrb, str, idx, 1);
-            if (!str.is_nil() && RSTRING_LEN(str) == 0) return mrb_value::nil();
-            return str;
+        {
+            RString *res = str.ptr<RString>()->substr(idx, 1);
+            if (!res || res->len == 0) return mrb_value::nil();
+            return res->wrap();
+        }
 
         case MRB_TT_STRING:
             if (mrb_str_index(str, indx, 0) != -1)
-                return mrb_str_dup(mrb, indx);
+                return indx; // was mrb_str_dup(mrb, indx)
             return mrb_value::nil();
 
         case MRB_TT_RANGE:
@@ -779,7 +781,8 @@ mrb_str_aref_m(mrb_state *mrb, mrb_value str)
     argc = mrb_get_args(mrb, "o|o", &a1, &a2);
     if (argc == 2) {
         regexp_check(mrb, a1);
-        return mrb_str_substr(mrb, str, mrb_fixnum(a1), mrb_fixnum(a2));
+        RString *res= str.ptr<RString>()->substr(mrb_fixnum(a1), mrb_fixnum(a2));
+        return res? res->wrap() : mrb_value::nil();
     }
     if (argc != 1) {
         mrb->mrb_raisef(E_ARGUMENT_ERROR, "wrong number of arguments (%S for 1)", mrb_fixnum_value(argc));
@@ -800,7 +803,7 @@ mrb_str_aref_m(mrb_state *mrb, mrb_value str)
  *     a               #=> "Hello"
  *     a.capitalize!   #=> nil
  */
-RString *RString::capitalize_bang()
+bool RString::capitalize_bang()
 {
     char *p, *pend;
     int modify = 0;
@@ -857,70 +860,77 @@ static mrb_value mrb_str_capitalize(mrb_state *mrb, mrb_value self)
  *  Modifies <i>str</i> in place as described for <code>String#chomp</code>,
  *  returning <i>str</i>, or <code>nil</code> if no modifications were made.
  */
-static mrb_value
-mrb_str_chomp_bang(mrb_state *mrb, mrb_value str)
+bool RString::chomp_bang(RString *sep)
 {
-    mrb_value rs;
     mrb_int newline;
     char *p, *pp;
     mrb_int rslen;
     mrb_int len;
-    RString *s = str.ptr<RString>();
-
-    s->str_modify();
-    len = s->len;
-    if (mrb_get_args(mrb, "|S", &rs) == 0) {
-        if (len == 0) return mrb_value::nil();
+    if(this->len<=0)
+        return nullptr;
+    this->str_modify();
+    len = this->len;
+    if (sep==nullptr) {
 smart_chomp:
-        if (s->m_ptr[len-1] == '\n') {
-            s->len--;
-            if (s->len > 0 &&
-                    s->m_ptr[s->len-1] == '\r') {
-                s->len--;
+        if (m_ptr[len-1] == '\n') {
+            this->len--;
+            if (this->len > 0 &&
+                    m_ptr[this->len-1] == '\r') {
+                this->len--;
             }
         }
-        else if (s->m_ptr[len-1] == '\r') {
-            s->len--;
+        else if (m_ptr[len-1] == '\r') {
+            this->len--;
         }
         else {
-            return mrb_value::nil();
+            return false;
         }
-        s->m_ptr[s->len] = '\0';
-        return str;
+        m_ptr[this->len] = '\0';
+        return true;
     }
 
-    if (len == 0 || rs.is_nil()) return mrb_value::nil();
-    p = s->m_ptr;
-    rslen = RSTRING_LEN(rs);
+    p = m_ptr;
+    rslen = sep->len;
     if (rslen == 0) {
-        while (len>0 && p[len-1] == '\n') {
+        while (len>0 && m_ptr[len-1] == '\n') {
             len--;
-            if (len>0 && p[len-1] == '\r')
+            if (len>0 && m_ptr[len-1] == '\r')
                 len--;
         }
-        if (len < s->len) {
-            s->len = len;
-            p[len] = '\0';
-            return str;
+        if (len < this->len) {
+            this->len = len;
+            m_ptr[len] = '\0';
+            return true;
         }
-        return mrb_value::nil();
+        return false;
     }
-    if (rslen > len) return mrb_value::nil();
-    newline = RSTRING_PTR(rs)[rslen-1];
+    if (rslen > len)
+        return false;
+    newline = sep->m_ptr[rslen-1];
     if (rslen == 1 && newline == '\n')
-        newline = RSTRING_PTR(rs)[rslen-1];
+        newline = sep->m_ptr[rslen-1];
     if (rslen == 1 && newline == '\n')
         goto smart_chomp;
 
-    pp = p + len - rslen;
-    if (p[len-1] == newline &&
+    pp = m_ptr + len - rslen;
+    if (m_ptr[len-1] == newline &&
             (rslen <= 1 ||
-             memcmp(RSTRING_PTR(rs), pp, rslen) == 0)) {
-        s->len = len - rslen;
-        p[s->len] = '\0';
-        return str;
+             memcmp(sep->m_ptr, pp, rslen) == 0)) {
+        this->len = len - rslen;
+        p[this->len] = '\0';
+        return true;
     }
-    return mrb_value::nil();
+    return false;
+}
+static mrb_value
+mrb_str_chomp_bang(mrb_state *mrb, mrb_value str)
+{
+    mrb_value rs;
+    RString *sep=nullptr;
+    if(mrb_get_args(mrb, "|S", &rs) != 0) {
+        sep = rs.ptr<RString>();
+    }
+    return str.ptr<RString>()->chomp_bang(sep) ? str:mrb_value::nil();
 }
 
 /* 15.2.10.5.9  */
@@ -945,11 +955,14 @@ smart_chomp:
 static mrb_value
 mrb_str_chomp(mrb_state *mrb, mrb_value self)
 {
-    mrb_value str;
-
-    str = mrb_str_dup(mrb, self);
-    mrb_str_chomp_bang(mrb, str);
-    return str;
+    mrb_value rs;
+    RString *sep=nullptr;
+    if(mrb_get_args(mrb, "|S", &rs) != 0) {
+        sep = rs.ptr<RString>();
+    }
+    RString *res = self.ptr<RString>()->dup();
+    res->chomp_bang(sep);
+    return res->wrap();
 }
 
 /* 15.2.10.5.12 */
@@ -961,23 +974,22 @@ mrb_str_chomp(mrb_state *mrb, mrb_value self)
  *  or <code>nil</code> if <i>str</i> is the empty string.  See also
  *  <code>String#chomp!</code>.
  */
-RString *RString::chop_bang()
+bool RString::chop_bang()
 {
+    if (this->len <= 0)
+        return false;
     str_modify();
-    if (this->len > 0) {
-        int len;
-        len = this->len - 1;
-        if (this->m_ptr[len] == '\n') {
-            if (len > 0 &&
-                    this->m_ptr[len-1] == '\r') {
-                len--;
-            }
+    int len;
+    len = this->len - 1;
+    if (this->m_ptr[len] == '\n') {
+        if (len > 0 &&
+                this->m_ptr[len-1] == '\r') {
+            len--;
         }
-        this->len = len;
-        this->m_ptr[len] = '\0';
-        return this;
     }
-    return nullptr;
+    this->len = len;
+    this->m_ptr[len] = '\0';
+    return true;
 }
 
 static mrb_value mrb_str_chop_bang(mrb_state *mrb, mrb_value str)
@@ -1018,16 +1030,13 @@ static mrb_value mrb_str_chop(mrb_state *mrb, mrb_value self)
  *  Downcases the contents of <i>str</i>, returning <code>nil</code> if no
  *  changes were made.
  */
-static mrb_value
-mrb_str_downcase_bang(mrb_state *mrb, mrb_value str)
+bool RString::downcase_bang()
 {
     char *p, *pend;
-    int modify = 0;
-    RString *s = str.ptr<RString>();
-
-    s->str_modify();
-    p = s->m_ptr;
-    pend = s->m_ptr + s->len;
+    bool modify = false;
+    str_modify();
+    p = m_ptr;
+    pend = m_ptr + this->len;
     while (p < pend) {
         if (ISUPPER(*p)) {
             *p = TOLOWER(*p);
@@ -1035,9 +1044,13 @@ mrb_str_downcase_bang(mrb_state *mrb, mrb_value str)
         }
         p++;
     }
+    return modify;
+}
 
-    if (modify) return str;
-    return mrb_value::nil();
+static mrb_value mrb_str_downcase_bang(mrb_state *mrb, mrb_value str)
+{
+    RString *s = str.ptr<RString>();
+    return s->downcase_bang() ? str : mrb_value::nil();
 }
 
 /* 15.2.10.5.13 */
@@ -1051,12 +1064,11 @@ mrb_str_downcase_bang(mrb_state *mrb, mrb_value str)
  *
  *     "hEllO".downcase   #=> "hello"
  */
-static mrb_value
-mrb_str_downcase(mrb_state *mrb, mrb_value self)
+static mrb_value mrb_str_downcase(mrb_state *mrb, mrb_value self)
 {
-    mrb_value str = mrb_str_dup(mrb, self);
-    mrb_str_downcase_bang(mrb, str);
-    return str;
+    RString *str = self.ptr<RString>()->dup();
+    str->downcase_bang();
+    return str->wrap();
 }
 
 /* 15.2.10.5.16 */
@@ -1092,51 +1104,50 @@ static mrb_value mrb_str_eql(mrb_state *mrb, mrb_value self)
 
     return mrb_value::wrap(eql_p);
 }
-
-static mrb_value
-mrb_str_subseq(mrb_state *mrb, mrb_value str, mrb_int beg, mrb_int len)
-{
-    RString *orig, *s;
+RString *RString::subseq(mrb_int beg, mrb_int len) {
+    RString *s;
     mrb_shared_string *shared;
 
-    orig = str.ptr<RString>();
-    str_make_shared(mrb, orig);
-    shared = orig->aux.shared;
-    s = mrb_obj_alloc_string(mrb);
-    s->m_ptr = orig->m_ptr + beg;
+    str_make_shared(m_vm, this);
+    shared = this->aux.shared;
+    s = m_vm->gc().obj_alloc<RString>(m_vm->string_class);
+    s->m_ptr = this->m_ptr + beg;
     s->len = len;
     s->aux.shared = shared;
     STR_SET_SHARED_FLAG(s);
     shared->refcnt++;
 
-    return mrb_value::wrap(s);
+    return s;
+
+}
+static mrb_value mrb_str_subseq(mrb_state *mrb, mrb_value str, mrb_int beg, mrb_int len)
+{
+    RString *orig = str.ptr<RString>();
+    return orig->subseq(beg,len)->wrap();
 }
 
-mrb_value
-mrb_str_substr(mrb_state *mrb, mrb_value str, mrb_int beg, mrb_int len)
+RString *RString::substr(mrb_int beg, mrb_int len)
 {
     mrb_value str2;
 
     if (len < 0)
-        return mrb_value::nil();
-    if (!RSTRING_LEN(str)) {
+        return nullptr;
+    if (!this->len) {
         len = 0;
     }
-    if (beg > RSTRING_LEN(str))
-        return mrb_value::nil();
+    if (beg > this->len)
+        return nullptr;
     if (beg < 0) {
-        beg += RSTRING_LEN(str);
+        beg += this->len;
         if (beg < 0)
-            return mrb_value::nil();
+            return nullptr;
     }
-    if (beg + len > RSTRING_LEN(str))
-        len = RSTRING_LEN(str) - beg;
+    if (beg + len > this->len)
+        len = this->len - beg;
     if (len <= 0) {
         len = 0;
     }
-    str2 = mrb_str_subseq(mrb, str, beg, len);
-
-    return str2;
+    return subseq(beg, len);
 }
 void RString::buf_append(mrb_value str2)
 {
@@ -1451,16 +1462,17 @@ mrb_check_string_type(mrb_state *mrb, mrb_value str)
  *
  *     "stressed".reverse   #=> "desserts"
  */
-static mrb_value
-mrb_str_reverse(mrb_state *mrb, mrb_value str)
+static mrb_value mrb_str_reverse(mrb_state *mrb, mrb_value str)
 {
     char *s, *e, *p;
+    RString *self=str.ptr<RString>();
+    if (self->len <= 1)
+        return self->dup()->wrap();
 
-    if (RSTRING(str)->len <= 1) return mrb_str_dup(mrb, str);
-
-    RString *s2 = RString::create(mrb, 0, RSTRING(str)->len);
+    RString *s2 = RString::create(mrb, 0, self->len);
     str_with_class(s2, str);
-    s = RSTRING_PTR(str); e = RSTRING_END(str) - 1;
+    s = self->m_ptr;
+    e = self->m_ptr + self->len - 1;
     p = s2->m_ptr;
 
     while (e >= s) {
@@ -2063,29 +2075,23 @@ bad:
     }
     return d;
 }
-double mrb_str_to_dbl(mrb_state *mrb, RString *str, int badcheck)
+double RString::to_dbl(int badcheck)
 {
     char *s;
     int len;
 
-    s = str->m_ptr;
-    len = str->len;
+    s = this->m_ptr;
+    len = this->len;
     if (s) {
         if (badcheck && memchr(s, '\0', len)) {
-            mrb->mrb_raise(E_ARGUMENT_ERROR, "string for Float contains null byte");
+            m_vm->mrb_raise(A_ARGUMENT_ERROR(m_vm), "string for Float contains null byte");
         }
         if (s[len]) {    /* no sentinel somehow */
-            RString *temp_str = RString::create(mrb, s, len);
+            RString *temp_str = RString::create(m_vm, s, len);
             s = temp_str->m_ptr;
         }
     }
-    return mrb_cstr_to_dbl(mrb, s, badcheck);
-}
-
-double mrb_str_to_dbl(mrb_state *mrb, mrb_value str, int badcheck)
-{
-    str = mrb_str_to_str(mrb, str);
-    return mrb_str_to_dbl(mrb,str.ptr<RString>(),badcheck);
+    return mrb_cstr_to_dbl(m_vm, s, badcheck);
 }
 
 /* 15.2.10.5.39 */
@@ -2105,7 +2111,7 @@ double mrb_str_to_dbl(mrb_state *mrb, mrb_value str, int badcheck)
 static mrb_value
 mrb_str_to_f(mrb_state *mrb, mrb_value self)
 {
-    return mrb_float_value(mrb_str_to_dbl(mrb, self.ptr<RString>(), false));
+    return mrb_float_value(self.ptr<RString>()->to_dbl(false));
 }
 
 /* 15.2.10.5.40 */
@@ -2119,9 +2125,10 @@ mrb_str_to_f(mrb_state *mrb, mrb_value self)
 static mrb_value
 mrb_str_to_s(mrb_state *mrb, mrb_value self)
 {
-    if (mrb_obj_class(mrb, self) != mrb->string_class) {
-        return mrb_str_dup(mrb, self);
-    }
+    assert(mrb_obj_class(mrb, self) == mrb->string_class);
+//    if (mrb_obj_class(mrb, self) != mrb->string_class) {
+//        return mrb_str_dup(mrb, self);
+//    }
     return self;
 }
 
@@ -2133,26 +2140,28 @@ mrb_str_to_s(mrb_state *mrb, mrb_value self)
  *  Upcases the contents of <i>str</i>, returning <code>nil</code> if no changes
  *  were made.
  */
-static mrb_value
-mrb_str_upcase_bang(mrb_state *mrb, mrb_value str)
+bool RString::upcase_bang()
 {
-    RString *s = str.ptr<RString>();
     char *p, *pend;
-    int modify = 0;
+    bool modify = false;
 
-    s->str_modify();
-    p = RSTRING_PTR(str);
-    pend = RSTRING_END(str);
+    this->str_modify();
+    p = m_ptr;
+    pend = m_ptr+this->len;
     while (p < pend) {
         if (ISLOWER(*p)) {
             *p = TOUPPER(*p);
-            modify = 1;
+            modify = true;
         }
         p++;
     }
+    return modify;
+}
 
-    if (modify) return str;
-    return mrb_value::nil();
+static mrb_value mrb_str_upcase_bang(mrb_state *mrb, mrb_value str)
+{
+    RString *s = str.ptr<RString>();
+    return s->upcase_bang() ? str : mrb_value::nil();
 }
 
 /* 15.2.10.5.42 */
@@ -2166,14 +2175,11 @@ mrb_str_upcase_bang(mrb_state *mrb, mrb_value str)
  *
  *     "hEllO".upcase   #=> "HELLO"
  */
-static mrb_value
-mrb_str_upcase(mrb_state *mrb, mrb_value self)
+static mrb_value mrb_str_upcase(mrb_state *mrb, mrb_value self)
 {
-    mrb_value str;
-
-    str = mrb_str_dup(mrb, self);
-    mrb_str_upcase_bang(mrb, str);
-    return str;
+    auto str = self.ptr<RString>()->dup();
+    str->upcase_bang();
+    return str->wrap();
 }
 
 /*
